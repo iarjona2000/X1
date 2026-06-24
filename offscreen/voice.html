@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>X1 Voice</title></head>
+<body>
+<script>
+// X1 Offscreen — Double-Clap Detection
+// Two sharp peaks within 200-700ms triggers X1_CLAP → SW toggles voice bar
+
+var clapMode = true;
+var audioCtx = null;
+var analyser = null;
+var stream = null;
+var clapCooldown = false;
+
+// Double-clap state
+var firstClapTime = 0;
+var waitingSecond = false;
+var CLAP_THRESHOLD = 40;       // RMS threshold for a "clap" peak
+var QUIET_THRESHOLD = 15;      // Must drop below this between claps
+var MIN_GAP = 150;             // Min ms between two claps
+var MAX_GAP = 700;             // Max ms between two claps
+var wentQuiet = false;
+
+function startClapDetection() {
+  navigator.mediaDevices.getUserMedia({audio: true}).then(function(s) {
+    stream = s;
+    audioCtx = new AudioContext();
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 256;
+    var source = audioCtx.createMediaStreamSource(s);
+    source.connect(analyser);
+    detectLoop();
+  }).catch(function(e) {
+    console.log('[X1] Mic error:', e.message);
+    setTimeout(startClapDetection, 3000);
+  });
+}
+
+function detectLoop() {
+  if (!clapMode || !analyser) { requestAnimationFrame(detectLoop); return; }
+  var data = new Uint8Array(analyser.frequencyBinCount);
+  analyser.getByteTimeDomainData(data);
+  var sum = 0;
+  for (var i = 0; i < data.length; i++) {
+    var val = Math.abs(data[i] - 128);
+    sum += val * val;
+  }
+  var rms = Math.sqrt(sum / data.length);
+  var now = Date.now();
+
+  if (clapCooldown) { requestAnimationFrame(detectLoop); return; }
+
+  if (rms > CLAP_THRESHOLD) {
+    if (!waitingSecond) {
+      // First clap detected
+      firstClapTime = now;
+      waitingSecond = true;
+      wentQuiet = false;
+    } else if (wentQuiet) {
+      // Potential second clap
+      var gap = now - firstClapTime;
+      if (gap >= MIN_GAP && gap <= MAX_GAP) {
+        // Double clap confirmed!
+        console.log('[X1] Double clap! (gap: ' + gap + 'ms)');
+        chrome.runtime.sendMessage({type: 'X1_CLAP'});
+        clapCooldown = true;
+        waitingSecond = false;
+        wentQuiet = false;
+        setTimeout(function() { clapCooldown = false; }, 2000);
+      } else if (gap > MAX_GAP) {
+        // Too slow — treat this as a new first clap
+        firstClapTime = now;
+        wentQuiet = false;
+      }
+    }
+  } else if (rms < QUIET_THRESHOLD && waitingSecond) {
+    wentQuiet = true;
+  }
+
+  // Timeout: if waiting too long for second clap, reset
+  if (waitingSecond && (now - firstClapTime) > MAX_GAP) {
+    waitingSecond = false;
+    wentQuiet = false;
+  }
+
+  requestAnimationFrame(detectLoop);
+}
+
+chrome.runtime.onMessage.addListener(function(msg) {
+  if (msg.type === 'CLAP_MODE') clapMode = msg.enabled !== false;
+  if (msg.type === 'VOICE_PING') chrome.runtime.sendMessage({type: 'VOICE_STATUS', status: 'alive'});
+});
+
+chrome.storage.local.get('voice_enabled', function(r) {
+  if (r.voice_enabled !== false) {
+    startClapDetection();
+    console.log('[X1] Double-clap detection active');
+  }
+});
+</script>
+</body>
+</html>

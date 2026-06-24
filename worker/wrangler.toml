@@ -1,0 +1,8 @@
+name = "x1-proxy"
+main = "src/worker.js"
+compatibility_date = "2026-06-01"
+account_id = "130e823c470feb5c46d25d59a5f9bcd3"
+
+# === Secrets (set via `npx wrangler secret put`) ===
+# OPENCODE_KEY=sk-xxx
+# GROQ_KEY=gsk_xxx

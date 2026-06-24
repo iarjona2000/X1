@@ -1,0 +1,99 @@
+{
+  "manifest_version": 3,
+  "name": "X1 — AI Voice Agent",
+  "version": "2.1.0",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAxby3wxothK8kGSwB6ZnvopHjH7AV5x5+YGuYYTNK8iQhuGZHiXNIoHxVLPrF/xCi5vPuWwWPZ5PHh9ObnfJpjk1u7oJwcuhEPsbHGi9uMfNS8E24ywS8YcR335zfxZC0nQF+GUBsXeM24oRhKn3h0+SN/G7c3NNVMv4HpWuevQjYXDyeRIhojNWpvoBhHUUPaDw+nYrUnGxZ5f6nzrBATiizwZIvft2BO7cPfgzdo95TSocTima14rExvQNAvYa+RiAaKQMOc9LFm2bTtBhTs+A/0Lg7XIFTZwxJEgN/GTtuNXLsnDplX/oCnJQp/ASsfWRw00Fi/FhGiojA5Ki33QIDAQAB",
+  "description": "Tu agente de IA con memoria y contexto, integrado con Google Workspace.",
+  "permissions": [
+    "identity",
+    "storage",
+    "tabs",
+    "tabGroups",
+    "alarms",
+    "scripting",
+    "notifications",
+    "offscreen"
+  ],
+  "host_permissions": [
+    "https://mail.google.com/*",
+    "https://calendar.google.com/*",
+    "https://docs.google.com/*",
+    "https://sheets.google.com/*",
+    "https://drive.google.com/*",
+    "https://www.googleapis.com/*",
+    "https://*/*",
+    "http://*/*"
+  ],
+  "oauth2": {
+    "client_id": "653077619345-erf587evo9le3t8p9ku5i8t485rdo6lc.apps.googleusercontent.com",
+    "scopes": [
+      "https://www.googleapis.com/auth/gmail.readonly",
+      "https://www.googleapis.com/auth/gmail.compose",
+      "https://www.googleapis.com/auth/gmail.send",
+      "https://www.googleapis.com/auth/gmail.modify",
+      "https://www.googleapis.com/auth/calendar.readonly",
+      "https://www.googleapis.com/auth/calendar.events",
+      "https://www.googleapis.com/auth/spreadsheets",
+      "https://www.googleapis.com/auth/documents",
+      "https://www.googleapis.com/auth/drive.readonly",
+      "https://www.googleapis.com/auth/drive.file",
+      "https://www.googleapis.com/auth/tasks",
+      "https://www.googleapis.com/auth/contacts.readonly"
+    ]
+  },
+  "background": {
+    "service_worker": "background/service-worker.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://mail.google.com/*"],
+      "js": ["content/gmail.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://calendar.google.com/*"],
+      "js": ["content/calendar.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://docs.google.com/*"],
+      "js": ["content/docs.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://sheets.google.com/*"],
+      "js": ["content/sheets.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://meet.google.com/*"],
+      "js": ["content/meet.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://*/*"],
+      "js": ["content/universal.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://*/*", "http://*/*"],
+      "js": ["content/voice-listener.js"],
+      "run_at": "document_idle",
+      "world": "MAIN"
+    },
+    {
+      "matches": ["https://*/*", "http://*/*"],
+      "js": ["content/voice-bridge.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "icons": {
+    "16": "assets/icon-16.png",
+    "48": "assets/icon-48.png",
+    "128": "assets/icon-128.png"
+  },
+  "action": {
+    "default_icon": "assets/icon-48.png",
+    "default_title": "Abrir X1"
+  }
+}

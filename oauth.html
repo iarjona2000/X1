@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>X1 Auth</title></head>
+<body style="font-family:sans-serif;display:flex;justify-content:center;align-items:center;min-height:100vh;margin:0;background:#f5f5f5">
+<div style="text-align:center;padding:2rem">
+  <div id="status" style="font-size:18px">Procesando...</div>
+  <div id="detail" style="font-size:13px;color:#666;margin-top:8px"></div>
+</div>
+<script>
+  ;(async () => {
+    const status = document.getElementById('status')
+    const detail = document.getElementById('detail')
+    try {
+      const hash = location.hash.substring(1)
+      if (!hash) { status.textContent = 'Error'; detail.textContent = 'No hay datos en la URL'; return }
+      const params = new URLSearchParams(hash)
+      const token = params.get('access_token')
+      const error = params.get('error')
+      if (error) { status.textContent = 'Error: ' + error; detail.textContent = 'No se pudo autorizar. Intenta de nuevo.'; return }
+      if (!token) { status.textContent = 'Error'; detail.textContent = 'No se encontró access_token'; return }
+      await chrome.storage.local.set({ x1_google_token: token })
+      status.textContent = 'Conectado a Google'
+      detail.textContent = 'Ya puedes cerrar esta pestaña'
+      setTimeout(() => window.close(), 2000)
+    } catch (e) {
+      status.textContent = 'Error interno'
+      detail.textContent = e.message || 'Error desconocido'
+    }
+  })()
+</script>
+</body>
+</html>
