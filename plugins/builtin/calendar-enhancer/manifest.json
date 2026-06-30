@@ -1,0 +1,11 @@
+{
+  "id": "calendar-enhancer",
+  "name": "Calendar Enhancer",
+  "version": "1.0.0",
+  "description": "Enhanced calendar features including smart scheduling and event insights",
+  "author": "X1 Team",
+  "category": "productivity",
+  "permissions": ["alarms", "storage"],
+  "enabled": true,
+  "hooks": ["beforeCommand", "onResponse", "onTimer"]
+}

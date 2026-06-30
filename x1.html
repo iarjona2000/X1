@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>X1</title>
+  <style>
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      background: #fafaff;
+      font-family: system-ui, sans-serif;
+    }
+    .mascot { width: 200px; height: 280px; }
+  </style>
+</head>
+<body>
+
+<svg class="mascot" viewBox="0 0 200 280" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="body" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"  stop-color="#6B8AFF"/>
+      <stop offset="100%" stop-color="#4F6FE0"/>
+    </linearGradient>
+    <linearGradient id="shadow" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"  stop-color="#0a0a14" stop-opacity="0.10"/>
+      <stop offset="100%" stop-color="#0a0a14" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <!-- sombra suave -->
+  <ellipse cx="100" cy="266" rx="55" ry="5" fill="url(#shadow)"/>
+
+  <!-- cuerpo pill -->
+  <rect x="45" y="30" width="110" height="230" rx="55" fill="url(#body)"/>
+
+  <!-- tres trazos verticales refinados -->
+  <!-- outer dos, un poco más gruesos y largos -->
+  <rect x="68"  y="120" width="6" height="60" rx="3" fill="#fafaff"/>
+  <rect x="126" y="120" width="6" height="60" rx="3" fill="#fafaff"/>
+  <!-- central, más fino y corto — la firma -->
+  <rect x="97"  y="138" width="6" height="42" rx="3" fill="#fafaff" opacity="0.85"/>
+</svg>
+
+</body>
+</html>

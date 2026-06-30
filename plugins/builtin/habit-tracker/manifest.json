@@ -1,0 +1,11 @@
+{
+  "id": "habit-tracker",
+  "name": "Habit Tracker",
+  "version": "1.0.0",
+  "description": "Track daily habits and routines with streak visualization",
+  "author": "X1 Team",
+  "category": "wellness",
+  "permissions": ["alarms", "storage", "notifications"],
+  "enabled": false,
+  "hooks": ["onTimer", "onResponse"]
+}

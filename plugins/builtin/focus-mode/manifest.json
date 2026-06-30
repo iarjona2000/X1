@@ -1,0 +1,11 @@
+{
+  "id": "focus-mode",
+  "name": "Focus Mode",
+  "version": "1.0.0",
+  "description": "Advanced focus and distraction blocking with ambient awareness",
+  "author": "X1 Team",
+  "category": "productivity",
+  "permissions": ["tabs", "alarms", "storage"],
+  "enabled": false,
+  "hooks": ["beforeCommand", "onPageLoad", "onTimer"]
+}

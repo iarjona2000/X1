@@ -1,0 +1,11 @@
+{
+  "id": "custom-greeting",
+  "name": "Custom Greeting",
+  "version": "1.0.0",
+  "description": "Custom greetings based on time and weather with personalized morning routine",
+  "author": "X1 User",
+  "category": "custom",
+  "permissions": ["storage", "notifications"],
+  "enabled": true,
+  "hooks": ["beforeCommand", "onTimer"]
+}

@@ -1,0 +1,11 @@
+{
+  "id": "note-taker",
+  "name": "Note Taker",
+  "version": "1.0.0",
+  "description": "Auto-capture notes from any page with smart organization",
+  "author": "X1 Team",
+  "category": "productivity",
+  "permissions": ["tabs", "storage"],
+  "enabled": true,
+  "hooks": ["onPageLoad", "afterCommand"]
+}

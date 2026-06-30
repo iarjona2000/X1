@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bienvenido a X1</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0a0a0a; color: #f5f5f5;
+      line-height: 1.5; min-height: 100vh;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .container { max-width: 640px; width: 100%; padding: 48px 32px; }
+    .logo { font-size: 48px; font-weight: 700; letter-spacing: -0.03em; margin-bottom: 8px; }
+    .logo span { color: #7c6aff; }
+    .subtitle { color: #a0a0a0; font-size: 18px; margin-bottom: 48px; }
+    .step { display: flex; gap: 20px; padding: 20px 0; border-top: 1px solid #222; }
+    .step:last-child { border-bottom: 1px solid #222; }
+    .step-num {
+      width: 36px; height: 36px; min-width: 36px;
+      background: #7c6aff20; color: #7c6aff;
+      border-radius: 50%; display: flex; align-items: center; justify-content: center;
+      font-weight: 600; font-size: 14px; border: 1px solid #7c6aff40;
+    }
+    .step-num.done { background: #22c55e20; border-color: #22c55e40; color: #22c55e; }
+    .step-content { flex: 1; }
+    .step-content h3 { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+    .step-content p { color: #a0a0a0; font-size: 14px; margin-bottom: 12px; }
+    .btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 10px 20px; border-radius: 8px; font-size: 14px; font-weight: 500;
+      border: 1px solid #333; background: #1a1a1a; color: #f5f5f5;
+      cursor: pointer; transition: all 0.2s;
+    }
+    .btn:hover { background: #2a2a2a; }
+    .btn.primary { background: #7c6aff; border-color: #7c6aff; color: #fff; }
+    .btn.primary:hover { background: #6b5ce6; }
+    .btn.primary:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn.done { background: #22c55e20; border-color: #22c55e40; color: #22c55e; }
+    .badge {
+      display: inline-block; padding: 2px 8px; border-radius: 4px;
+      font-size: 11px; font-weight: 500; background: #22c55e20; color: #22c55e;
+      margin-left: 8px;
+    }
+    .commands { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+    .cmd {
+      padding: 6px 12px; border-radius: 6px; background: #1a1a1a;
+      border: 1px solid #333; font-size: 13px; color: #ccc;
+      font-family: 'SF Mono', monospace; cursor: pointer; transition: all 0.15s;
+    }
+    .cmd:hover { border-color: #7c6aff; color: #fff; }
+    .footer { margin-top: 48px; text-align: center; color: #555; font-size: 13px; }
+    .status-text { font-size: 13px; color: #22c55e; display: none; margin-top: 8px; }
+    .status-text.visible { display: block; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="logo">X1 <span>+</span></div>
+    <div class="subtitle">Tu agente de IA en el navegador. Todo por voz.</div>
+
+    <div class="step">
+      <div class="step-num" id="step1Num">1</div>
+      <div class="step-content">
+        <h3>Activa el micrófono <span class="badge">30 seg</span></h3>
+        <p>X1 te escucha cuando hablas. Necesitamos acceso al micrófono para empezar.</p>
+        <button class="btn primary" id="micBtn">Conceder micrófono</button>
+        <div class="status-text visible" id="micStatus">Micrófono concedido</div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num" id="step2Num">2</div>
+      <div class="step-content">
+        <h3>Prueba un comando de voz <span class="badge">30 seg</span></h3>
+        <p>Di cualquiera de estos comandos para ver a X1 en acción:</p>
+        <div class="commands">
+          <span class="cmd">"Busca inteligencia artificial"</span>
+          <span class="cmd">"Qué hay en esta página"</span>
+          <span class="cmd">"Crea un documento"</span>
+          <span class="cmd">"Baja"</span>
+        </div>
+        <button class="btn" id="voiceBtn" disabled>Ya lo probé</button>
+        <div class="status-text" id="voiceStatus">Comando detectado</div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num" id="step3Num">3</div>
+      <div class="step-content">
+        <h3>Conecta Google (opcional)</h3>
+        <p>Para leer emails, crear eventos y documentos. Puedes saltarte este paso.</p>
+        <button class="btn" id="googleBtn">Conectar Google</button>
+        <button class="btn" id="googleSkip" style="margin-left:8px">Saltar</button>
+        <div class="status-text" id="googleStatus">Google conectado</div>
+      </div>
+    </div>
+
+    <div style="text-align:center;margin-top:32px">
+      <button class="btn primary" id="finishBtn" disabled>Comenzar con X1</button>
+    </div>
+
+    <div class="footer">
+      X1 usa IA en la nube. Sin datos personales almacenados fuera de tu dispositivo.
+    </div>
+  </div>
+
+  <script>
+    var step1Done = false, step2Done = false, step3Done = false;
+
+    function checkAll() {
+      if (step1Done && step2Done) {
+        document.getElementById('finishBtn').disabled = false;
+      }
+    }
+
+    // Step 1: Mic
+    document.getElementById('micBtn').addEventListener('click', function() {
+      navigator.mediaDevices.getUserMedia({audio: true}).then(function(s) {
+        s.getTracks().forEach(function(t) { t.stop(); });
+        step1Done = true;
+        document.getElementById('step1Num').className = 'step-num done';
+        document.getElementById('step1Num').textContent = '\u2713';
+        document.getElementById('micBtn').style.display = 'none';
+        document.getElementById('micStatus').className = 'status-text visible';
+        document.getElementById('voiceBtn').disabled = false;
+        chrome.storage.local.set({x1_mic_granted: true});
+        checkAll();
+      }).catch(function() {
+        alert('Necesitamos el micrófono para funcionar. Por favor, concede el permiso.');
+      });
+    });
+
+    // Step 2: Voice test
+    document.getElementById('voiceBtn').addEventListener('click', function() {
+      step2Done = true;
+      document.getElementById('step2Num').className = 'step-num done';
+      document.getElementById('step2Num').textContent = '\u2713';
+      document.getElementById('voiceBtn').style.display = 'none';
+      document.getElementById('voiceStatus').className = 'status-text visible';
+      checkAll();
+    });
+
+    // Step 3: Google (optional)
+    document.getElementById('googleBtn').addEventListener('click', function() {
+      chrome.runtime.sendMessage({type:'X1_LOGIN_GOOGLE'}).then(function() {
+        step3Done = true;
+        document.getElementById('step3Num').className = 'step-num done';
+        document.getElementById('step3Num').textContent = '\u2713';
+        document.getElementById('googleBtn').style.display = 'none';
+        document.getElementById('googleSkip').style.display = 'none';
+        document.getElementById('googleStatus').className = 'status-text visible';
+      }).catch(function() { alert('No se pudo conectar Google.'); });
+    });
+    document.getElementById('googleSkip').addEventListener('click', function() {
+      step3Done = true;
+      document.getElementById('step3Num').className = 'step-num done';
+      document.getElementById('step3Num').textContent = '-';
+      document.getElementById('googleBtn').style.display = 'none';
+      document.getElementById('googleSkip').style.display = 'none';
+      document.getElementById('googleStatus').textContent = 'Saltado';
+      document.getElementById('googleStatus').className = 'status-text visible';
+    });
+
+    // Finish
+    document.getElementById('finishBtn').addEventListener('click', function() {
+      chrome.storage.local.set({x1_onboarding_done: true});
+      window.close();
+    });
+
+    // Listen for voice commands from the extension
+    chrome.runtime.onMessage.addListener(function(msg) {
+      if (msg.type === 'X1_VOICE_RESPONSE' && !step2Done) {
+        step2Done = true;
+        document.getElementById('step2Num').className = 'step-num done';
+        document.getElementById('step2Num').textContent = '\u2713';
+        document.getElementById('voiceBtn').style.display = 'none';
+        document.getElementById('voiceStatus').className = 'status-text visible';
+        checkAll();
+      }
+    });
+
+    // Auto-test connection to SW
+    chrome.runtime.sendMessage({type:'X1_PING'}).catch(function() {});
+  </script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+{
+  "id": "data-exporter",
+  "name": "Data Exporter",
+  "version": "1.0.0",
+  "description": "Export conversations to Markdown, calendar to CSV, emails to PDF",
+  "author": "X1 User",
+  "category": "custom",
+  "permissions": ["storage", "downloads"],
+  "enabled": true,
+  "hooks": ["beforeCommand", "afterCommand"]
+}

@@ -1,0 +1,11 @@
+{
+  "id": "meeting-assistant",
+  "name": "Meeting Assistant",
+  "version": "1.0.0",
+  "description": "Meeting preparation, real-time notes and follow-up automation",
+  "author": "X1 Team",
+  "category": "productivity",
+  "permissions": ["tabs", "alarms", "storage"],
+  "enabled": true,
+  "hooks": ["beforeCommand", "onResponse", "onTimer"]
+}

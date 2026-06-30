@@ -1,0 +1,11 @@
+{
+  "id": "email-ai",
+  "name": "Email AI",
+  "version": "1.0.0",
+  "description": "AI-powered email triage, prioritization and suggestions",
+  "author": "X1 Team",
+  "category": "communication",
+  "permissions": ["identity", "storage"],
+  "enabled": true,
+  "hooks": ["beforeCommand", "onResponse", "onPageLoad"]
+}

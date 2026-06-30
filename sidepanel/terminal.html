@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="description" content="X1 Terminal Interface" />
+  <meta name="theme-color" content="#050505" />
+  <title>X1 Terminal</title>
+  <link rel="stylesheet" href="./terminal-theme.css" />
+</head>
+<body>
+  <!-- Loading Screen -->
+  <div id="loadingScreen" class="loading-screen">
+    <div class="loading-content">
+      <div class="loading-logo">X1</div>
+      <div class="loading-progress">
+        <div class="progress-fill"></div>
+      </div>
+      <p class="loading-text">Initializing system</p>
+    </div>
+  </div>
+
+  <!-- App Container -->
+  <div id="appContainer" class="app-container hidden">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-left">
+        <div class="logo-wrapper">
+          <span class="logo-text">X1</span>
+          <div class="status-indicator online" id="statusDot"></div>
+        </div>
+        <span class="text-muted" style="font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em;">v2.0</span>
+      </div>
+      <div class="header-right">
+        <button class="header-btn" id="clearBtn" title="Clear terminal">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14z"/>
+          </svg>
+        </button>
+        <button class="header-btn" id="helpBtn" title="Help">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3M12 17h.01"/>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Tab Navigation -->
+    <nav class="tab-navigation">
+      <button class="tab-btn active" data-tab="terminal">
+        <span>>_</span>
+        <span>Terminal</span>
+      </button>
+      <button class="tab-btn" data-tab="tasks">
+        <span>☐</span>
+        <span>Tasks</span>
+      </button>
+      <button class="tab-btn" data-tab="calendar">
+        <span>◷</span>
+        <span>Calendar</span>
+      </button>
+      <button class="tab-btn" data-tab="email">
+        <span>@</span>
+        <span>Email</span>
+      </button>
+      <button class="tab-btn" data-tab="system">
+        <span>◉</span>
+        <span>System</span>
+      </button>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <!-- Terminal Tab -->
+      <section id="terminalTab" class="tab-content active">
+        <div class="terminal-container" id="terminalContainer">
+          <div class="terminal-output" id="terminalOutput">
+            <div class="terminal-line">
+              <span class="terminal-prefix">[SYS]</span>
+              <span class="terminal-text">X1 Terminal v2.0 initialized</span>
+            </div>
+            <div class="terminal-line">
+              <span class="terminal-prefix">[SYS]</span>
+              <span class="terminal-text">Type 'help' for available commands</span>
+            </div>
+            <div class="terminal-line">
+              <span class="terminal-prefix">[SYS]</span>
+              <span class="terminal-text">Ready for input_</span>
+            </div>
+          </div>
+          <div class="terminal-input-line">
+            <span class="terminal-prompt">guest@x1:~$</span>
+            <input type="text" class="terminal-input" id="terminalInput" placeholder=" " autocomplete="off" spellcheck="false" />
+          </div>
+        </div>
+      </section>
+
+      <!-- Tasks Tab -->
+      <section id="tasksTab" class="tab-content">
+        <div class="tasks-header">
+          <h2 class="section-title">Tasks</h2>
+          <button class="add-btn" id="addTaskBtn">+ NEW</button>
+        </div>
+        <div class="tasks-list" id="tasksList">
+          <!-- Tasks will be rendered here -->
+        </div>
+        <div class="task-input-container" id="taskInputContainer" style="display: none;">
+          <input type="text" class="terminal-input" id="taskInput" placeholder="Enter task description..." />
+          <button class="send-button" id="submitTaskBtn">ADD</button>
+        </div>
+      </section>
+
+      <!-- Calendar Tab -->
+      <section id="calendarTab" class="tab-content">
+        <div class="calendar-header">
+          <h2 class="section-title">Calendar</h2>
+          <span class="text-muted" style="font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em;">Upcoming</span>
+        </div>
+        <div class="calendar-list" id="calendarList">
+          <!-- Events will be rendered here -->
+        </div>
+      </section>
+
+      <!-- Email Tab -->
+      <section id="emailTab" class="tab-content">
+        <div class="email-header">
+          <h2 class="section-title">Inbox</h2>
+          <span class="text-muted" style="font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em;" id="emailCount">0 messages</span>
+        </div>
+        <div class="email-list" id="emailList">
+          <!-- Emails will be rendered here -->
+        </div>
+      </section>
+
+      <!-- System Tab -->
+      <section id="systemTab" class="tab-content">
+        <div class="system-header">
+          <h2 class="section-title">System</h2>
+        </div>
+        <div class="system-grid" id="systemGrid">
+          <!-- System info will be rendered here -->
+        </div>
+      </section>
+    </main>
+
+    <!-- Status Bar -->
+    <footer class="status-bar">
+      <div class="status-bar-left">
+        <span class="status-dot active"></span>
+        <span>CONNECTED</span>
+      </div>
+      <div class="status-bar-right">
+        <span id="clockDisplay">00:00:00</span>
+        <span>|</span>
+        <span id="memoryDisplay">0 KB</span>
+      </div>
+    </footer>
+  </div>
+
+  <script src="./terminal-app.js"></script>
+</body>
+</html>

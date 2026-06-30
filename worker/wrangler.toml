@@ -3,6 +3,50 @@ main = "src/worker.js"
 compatibility_date = "2026-06-01"
 account_id = "130e823c470feb5c46d25d59a5f9bcd3"
 
-# === Secrets (set via `npx wrangler secret put`) ===
-# OPENCODE_KEY=sk-xxx
-# GROQ_KEY=gsk_xxx
+# ═══════════════════════════════════════════
+# Worker config — X1 AI Gateway (v4)
+# ═══════════════════════════════════════════
+
+# === Secrets (set via `npx wrangler secret put NAME`) ===
+# Each provider in src/providers.config.js maps to one envKey here.
+#
+#   npx wrangler secret put GROQ_KEY
+#   npx wrangler secret put GROK_KEY
+#   npx wrangler secret put OPENAI_KEY
+#   npx wrangler secret put GEMINI_KEY
+#   npx wrangler secret put MISTRAL_KEY
+#   npx wrangler secret put DEEPSEEK_KEY
+#   npx wrangler secret put TOGETHER_KEY
+#   npx wrangler secret put OPENROUTER_KEY
+#   npx wrangler secret put CEREBRAS_KEY
+#   npx wrangler secret put SAMBANOVA_KEY
+#   npx wrangler secret put NVIDIA_KEY
+#   npx wrangler secret put CF_AI_KEY
+#   npx wrangler secret put OPENCODE_KEY
+#   npx wrangler secret put ANTHROPIC_KEY      # disabled in v4, ready for Phase 6
+#   npx wrangler secret put TAVILY_KEY         # web search (Phase 6)
+
+# === Vars (non-secret, set inline) ===
+[vars]
+# Account ID for Cloudflare Workers AI (separate from `account_id` above).
+# Get it: https://dash.cloudflare.com → Workers & Pages → Overview → Account ID
+CF_ACCOUNT_ID = ""
+
+# Per-provider timeout. Total budget = PER_PROVIDER_MS * (chain length / parallelism).
+PER_PROVIDER_MS = "8000"
+
+# Total request budget across all providers in a cascade.
+TOTAL_BUDGET_MS = "25000"
+
+# Circuit breaker: open the circuit after N consecutive failures per provider.
+BREAKER_FAILS = "3"
+
+# Circuit breaker: cooldown before re-trying a tripped provider (ms).
+BREAKER_COOLDOWN_MS = "60000"
+
+# === KV namespaces (Phase 5: per-IP rate limiting + cross-worker breaker state) ===
+# To create: npx wrangler kv:namespace create X1_KV
+# Then paste the id below:
+# [[kv_namespaces]]
+# binding = "X1_KV"
+# id = "<paste-here>"

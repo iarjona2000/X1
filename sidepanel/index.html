@@ -1,9 +1,21 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>X1</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="description" content="X1 - Advanced Machine Intelligence Side Panel" />
+  <meta name="theme-color" content="#6366f1" />
+  <title>X1 Side Panel</title>
+  
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9B1z2hJo03QDfOZ+gPZJnNOJmLlq1J6XGmJ5bQ0dZz1+GkFVBfQ==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+  
+  <link rel="stylesheet" crossorigin href="./style.css" />
   <script type="module" crossorigin src="./sidepanel.js"></script>
   <link rel="modulepreload" crossorigin href="./chunks/chunk-D9B2Ntkf.js">
   <link rel="modulepreload" crossorigin href="./chunks/graph-BaZHFiHa.js">
@@ -12,9 +24,25 @@
   <link rel="modulepreload" crossorigin href="./chunks/gmail-Cr7ehdwy.js">
   <link rel="modulepreload" crossorigin href="./chunks/sheets-DebPIPm9.js">
   <link rel="modulepreload" crossorigin href="./chunks/local-BHP_PqUJ.js">
-  <link rel="stylesheet" crossorigin href="./assets/sidepanel-boZgC778.css">
 </head>
 <body>
-  <div id="root"></div>
+  <!-- Loading Screen -->
+  <div id="loadingScreen" class="loading-screen">
+    <div class="loading-content">
+      <div class="x1-logo">
+        <span class="logo-text">X1</span>
+        <div class="logo-glow"></div>
+      </div>
+      <div class="loading-progress">
+        <div class="progress-bar">
+          <div class="progress-fill"></div>
+        </div>
+      </div>
+      <p class="loading-text">Loading X1 Intelligence...</p>
+    </div>
+  </div>
+
+  <!-- React App Root -->
+  <div id="root" class="app-root hidden"></div>
 </body>
 </html>
