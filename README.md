@@ -292,7 +292,7 @@ See `docs/HANDOFF.md` for detailed 7-step testing roadmap.
 ## Authors / Fundadores
 
 Iván Arjona (@iarjona2000) — Co-fundador, arquitectura backend e integración de agentes.  
-Marc Calero (@tomas) — Co-fundador, diseño de voz y experiencia de usuario.
+Tomás Calero (Tomahawk999) — Co-fundador, diseño de voz y experiencia de usuario.
 
 Ambos co-fundadores de X1 — agente de navegador voice-first.
 
