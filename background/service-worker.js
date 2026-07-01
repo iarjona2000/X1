@@ -247,6 +247,10 @@ function parseCommand(cmd) {
   var mPrice = l.match(/^(?:alerta de precio|price alert|av[ií]same cuando)\s+(.+?)\s+(?:baje de|costs? less than|under)\s+(\d+(?:[.,]\d+)?)/i);
   if (mPrice) return {action:'addPriceAlert', productName:mPrice[1].trim(), url:'', targetPrice:parseFloat(mPrice[2].replace(',','.'))};
 
+  // ── N8N OUTGOING WEBHOOK ──
+  var mN8n = l.match(/^(?:env[ií]a|manda|enviar)\s+(?:a\s+)?n8n\s*:?\s*(.+)$/i);
+  if (mN8n) return {action:'sendToN8n', message: mN8n[1].trim()};
+
   // ── CRM PUSH (Pipedrive/HubSpot) ──
   var mCrm = l.match(/^(?:manda|env[ií]a|a[ñn]ade)\s+(?:a\s+)?(pipedrive|hubspot)\s*:?\s*(.+)$/i);
   if (mCrm) {
@@ -1320,7 +1324,7 @@ function loadAIKeys() {
       'cerebrasKey','sambanovaKey','mistralKey','deepseekKey','togetherKey',
       'cloudflareAccountId','cloudflareKey','tavilyKey','elevenlabsKey',
       'openaiKey','finnhubKey','alphaVantageKey','firecrawlKey',
-      'pipedriveKey','hubspotKey','invoiceGeneratorKey',
+      'pipedriveKey','hubspotKey','invoiceGeneratorKey','n8nWebhookUrl','libretranslateUrl',
       'proxySecret',
       'aiProvider'
     ], function(r) {
@@ -1349,7 +1353,7 @@ function loadGoogleUser() {
 loadGoogleUser();
 
 chrome.storage.onChanged.addListener(function(changes) {
-  if (changes.groqKey || changes.opencodeKey || changes.nvidiaKey || changes.geminiKey || changes.openrouterKey || changes.cerebrasKey || changes.sambanovaKey || changes.mistralKey || changes.deepseekKey || changes.togetherKey || changes.cloudflareAccountId || changes.cloudflareKey || changes.tavilyKey || changes.openaiKey || changes.finnhubKey || changes.alphaVantageKey || changes.firecrawlKey || changes.pipedriveKey || changes.hubspotKey || changes.invoiceGeneratorKey || changes.proxySecret || changes.aiProvider) loadAIKeys();
+  if (changes.groqKey || changes.opencodeKey || changes.nvidiaKey || changes.geminiKey || changes.openrouterKey || changes.cerebrasKey || changes.sambanovaKey || changes.mistralKey || changes.deepseekKey || changes.togetherKey || changes.cloudflareAccountId || changes.cloudflareKey || changes.tavilyKey || changes.openaiKey || changes.finnhubKey || changes.alphaVantageKey || changes.firecrawlKey || changes.pipedriveKey || changes.hubspotKey || changes.invoiceGeneratorKey || changes.n8nWebhookUrl || changes.libretranslateUrl || changes.proxySecret || changes.aiProvider) loadAIKeys();
   if (changes.google_user) loadGoogleUser();
 });
 
@@ -1496,14 +1500,14 @@ var x1Skills = [];
 var x1Corrections = [];
 
 function loadKnowledge() {
-  chrome.storage.local.get(['x1_graph','x1_manual','x1_priorities','x1_reminders','x1_automations','x1_snippets','x1_skills','x1_corrections'], function(r) {
+  chrome.storage.local.get(['x1_graph','x1_manual','x1_priorities','x1_reminders','x1_automations','x1_snippets','x1_skills_legacy','x1_corrections'], function(r) {
     if(r.x1_graph) try{opGraph=JSON.parse(r.x1_graph);}catch(e){}
     if(r.x1_manual) try{knowledgeManual=JSON.parse(r.x1_manual);}catch(e){}
     if(r.x1_priorities) try{userPriorities=JSON.parse(r.x1_priorities);}catch(e){}
     if(r.x1_reminders) try{reminders=JSON.parse(r.x1_reminders);}catch(e){}
     if(r.x1_automations) try{x1Automations=JSON.parse(r.x1_automations);}catch(e){}
     if(r.x1_snippets) try{x1Snippets=JSON.parse(r.x1_snippets);}catch(e){}
-    if(r.x1_skills) try{x1Skills=JSON.parse(r.x1_skills);}catch(e){}
+    if(r.x1_skills_legacy) try{x1Skills=JSON.parse(r.x1_skills_legacy);}catch(e){}
     if(r.x1_corrections) try{x1Corrections=JSON.parse(r.x1_corrections);}catch(e){}
     console.log('[X1] Knowledge loaded: graph='+opGraph.entities.length+' manual='+knowledgeManual.entries.length+' automations='+x1Automations.length+' corrections='+x1Corrections.length);
   });
@@ -1519,7 +1523,7 @@ function savePriorities(){chrome.storage.local.set({x1_priorities:JSON.stringify
 function saveReminders(){chrome.storage.local.set({x1_reminders:JSON.stringify(reminders)});}
 function saveAutomations(){chrome.storage.local.set({x1_automations:JSON.stringify(x1Automations)});}
 function saveSnippets(){chrome.storage.local.set({x1_snippets:JSON.stringify(x1Snippets)});}
-function saveSkills(){chrome.storage.local.set({x1_skills:JSON.stringify(x1Skills)});}
+function saveSkills(){chrome.storage.local.set({x1_skills_legacy:JSON.stringify(x1Skills)});}
 
 var lastPageContext = '';
 
@@ -2354,8 +2358,33 @@ function translateText(text, targetLang, sourceLang) {
     '. Only return the translation, nothing else:\n\n' + text;
   return geminiComplete(prompt, {model: 'gemini-2.0-flash', temperature: 0.1}).then(function(result) {
     if (result) return result;
-    return groqComplete(prompt).then(function(r2) { return r2; });
+    return groqComplete(prompt).then(function(r2) {
+      if (r2) return r2;
+      return libretranslateComplete(text, targetLang, sourceLang);
+    });
   });
+}
+
+// Final fallback (Section 17.1) — only used if Gemini and Groq are both
+// unavailable/rate-limited. User supplies their own instance (self-hosted or
+// a public mirror); no default URL is baked in since public mirrors change
+// and often require their own API keys.
+function libretranslateComplete(text, targetLang, sourceLang) {
+  var base = aiKeys.libretranslateUrl;
+  if (!base) return Promise.resolve(null);
+  return fetch(base.replace(/\/$/, '') + '/translate', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      q: text,
+      source: (sourceLang || 'auto').toLowerCase().substring(0, 2),
+      target: (targetLang || 'en').toLowerCase().substring(0, 2),
+      format: 'text'
+    }),
+    signal: AbortSignal.timeout(15000)
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    return (data && data.translatedText) || null;
+  }).catch(function(e) { console.error('[X1] LibreTranslate fail:', e.message); return null; });
 }
 
 // ── Firecrawl (REST scrape — fallback for JS-heavy/protected pages that
@@ -2374,6 +2403,19 @@ function firecrawlScrape(url) {
     var md = data.data && data.data.markdown;
     return md ? md.substring(0, 8000) : null;
   }).catch(function(e) { console.error('[X1] Firecrawl fail:', e.message); return null; });
+}
+
+// ── n8n Outgoing Webhook (Section 7.3) ──
+function sendToN8n(payload) {
+  var url = aiKeys.n8nWebhookUrl;
+  if (!url) return Promise.resolve({ok: false, error: 'no_webhook_configured'});
+  return fetch(url, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(Object.assign({source: 'x1', timestamp: Date.now()}, payload)),
+    signal: AbortSignal.timeout(15000)
+  }).then(function(r) { return {ok: r.ok, status: r.status}; })
+    .catch(function(e) { console.error('[X1] n8n webhook fail:', e.message); return {ok: false, error: e.message}; });
 }
 
 // ── CRM Integration (Pipedrive / HubSpot) ──
@@ -2419,21 +2461,6 @@ function pushLeadToCRM(crmName, lead) {
   if (crmName === 'pipedrive') return pushLeadToPipedrive(lead);
   if (crmName === 'hubspot') return pushLeadToHubspot(lead);
   return Promise.resolve({ok: false, error: 'unknown_crm'});
-}
-
-// ── Financial / Market Data (Finnhub) ──
-function getFinancialQuote(ticker) {
-  var key = aiKeys.finnhubKey;
-  if (!key) return Promise.resolve(null);
-  return fetch('https://finnhub.io/api/v1/quote?symbol=' + encodeURIComponent(ticker) + '&token=' + key, {
-    signal: AbortSignal.timeout(10000)
-  }).then(function(r) { return r.json(); }).then(function(data) {
-    if (!data || typeof data.c !== 'number' || data.c === 0) return null;
-    return {
-      ticker: ticker, current: data.c, change: data.d, changePercent: data.dp,
-      high: data.h, low: data.l, open: data.o, prevClose: data.pc
-    };
-  }).catch(function(e) { console.error('[X1] Finnhub fail:', e.message); return null; });
 }
 
 // ── Automated Invoicing (Invoice-Generator.com) ──
@@ -4639,6 +4666,22 @@ function execAction(act, tabId) {
         resolve({text: 'Alerta de precio creada para ' + (act.productName || 'producto') + '. Te aviso cuando baje de ' + pa.currency + ' ' + pa.targetPrice + '.', showText: true});
         break;
 
+      case 'sendToN8n':
+        var n8nIdx = stepProgress(tabId, 'n8n', 'Enviando webhook...');
+        sendToN8n({message: act.message || act.text || ''}).then(function(n8nResult) {
+          if (n8nResult && n8nResult.ok) {
+            stepDone(tabId, n8nIdx);
+            resolve({text: 'Enviado a n8n correctamente.', showText: true});
+          } else {
+            stepError(tabId, n8nIdx);
+            resolve({text: 'No se pudo enviar a n8n: ' + ((n8nResult && n8nResult.error) || 'webhook no configurado en Settings'), showText: true});
+          }
+        }).catch(function(e) {
+          stepError(tabId, n8nIdx);
+          resolve({text: 'Error n8n: ' + e.message, showText: true});
+        });
+        break;
+
       case 'crmPush':
         var crmIdx = stepProgress(tabId, 'CRM', 'Enviando a ' + act.crm + '...');
         pushLeadToCRM(act.crm, act.lead || {}).then(function(pushResult) {
@@ -4656,14 +4699,14 @@ function execAction(act, tabId) {
 
       case 'financialQuote':
         var fqIdx = stepProgress(tabId, 'Finance', 'Consultando cotizacion...');
-        getFinancialQuote(act.ticker).then(function(quote) {
+        if (typeof X1FinancialData === 'undefined') { stepError(tabId, fqIdx); resolve({text: 'Modulo financiero no disponible.', showText: true}); break; }
+        X1FinancialData.getQuote(act.ticker).then(function(quote) {
           stepDone(tabId, fqIdx);
-          if (!quote) { resolve({text: 'No se pudo obtener la cotizacion de ' + act.ticker + '.', showText: true}); return; }
           var arrow = quote.change >= 0 ? '+' : '';
-          resolve({text: quote.ticker + ': $' + quote.current + ' (' + arrow + quote.change + ', ' + arrow + quote.changePercent + '%)', showText: true});
+          resolve({text: quote.symbol + ': $' + quote.current + ' (' + arrow + quote.change + ', ' + arrow + quote.changePercent + '%)', showText: true});
         }).catch(function(e) {
           stepError(tabId, fqIdx);
-          resolve({text: 'Error cotizacion: ' + e.message, showText: true});
+          resolve({text: 'No se pudo obtener la cotizacion de ' + act.ticker + ': ' + e.message, showText: true});
         });
         break;
 
@@ -5887,8 +5930,52 @@ function checkDealFlow() {
 try { chrome.alarms.create('x1-meeting-check', {periodInMinutes: 5}); } catch(e) { console.error('[X1] alarm meeting top-level failed:', e && e.message); }
 try { chrome.alarms.create('x1-email-check', {periodInMinutes: 30}); } catch(e) { console.error('[X1] alarm email top-level failed:', e && e.message); }
 try { chrome.alarms.create('x1-deal-check', {periodInMinutes: 1440}); } catch(e) { console.error('[X1] alarm deal top-level failed:', e && e.message); }
+// External command reception (B.14) — chrome.alarms floors at 1 minute for
+// regular installs (the spec's "every 30 seconds" isn't reachable in MV3).
+try { chrome.alarms.create('x1-external-commands-poll', {periodInMinutes: 1}); } catch(e) { console.error('[X1] alarm external-commands failed:', e && e.message); }
+
+// Read-only/non-destructive action types only — anything else (send email,
+// delete, purchase-shaped actions) waits for the user to approve manually,
+// since these commands come from an external system X1 doesn't control.
+var SAFE_EXTERNAL_ACTIONS = ['speak','webSearch','deepResearch','financialQuote','marketSummary','companyNews','seoAnalysis','extractData','crossTabAnalysis','providerHealth','translate','addPriceAlert','addMonitor','listMonitors'];
+
+function queuePendingExternalCommand(command, actionType) {
+  chrome.storage.local.get('x1PendingExternalCommands', function(r) {
+    var pending = r.x1PendingExternalCommands || [];
+    pending.push({command: command, actionType: actionType, receivedAt: Date.now()});
+    if (pending.length > 20) pending = pending.slice(pending.length - 20);
+    chrome.storage.local.set({x1PendingExternalCommands: pending});
+  });
+  try {
+    chrome.notifications.create('', {
+      type: 'basic', iconUrl: 'assets/x1-logo-square.png',
+      title: 'Comando externo pendiente de aprobacion',
+      message: command.substring(0, 100) + ' (accion: ' + actionType + ') — requiere confirmacion manual.'
+    });
+  } catch(e) {}
+}
+
+function pollExternalCommands() {
+  if (!PROXY_URL) return;
+  fetch(PROXY_URL + '/commands/poll', {
+    headers: {'X-X1-Auth': aiKeys.proxySecret || PROXY_SHARED_SECRET},
+    signal: AbortSignal.timeout(10000)
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    var commands = (data && data.commands) || [];
+    commands.forEach(function(item) {
+      var act = parseCommand(item.command);
+      if (!act) return;
+      if (SAFE_EXTERNAL_ACTIONS.indexOf(act.action) !== -1) {
+        handleVoice(item.command, false, function() {});
+      } else {
+        queuePendingExternalCommand(item.command, act.action || 'unknown');
+      }
+    });
+  }).catch(function(e) { console.error('[X1] external command poll failed:', e.message); });
+}
 
 chrome.alarms.onAlarm.addListener(function(alarm) {
+  if (alarm.name === 'x1-external-commands-poll') { pollExternalCommands(); return; }
   if (alarm.name === 'x1-meeting-check') {
     // Check for meetings starting in 10-15 minutes
     isLoggedIn().then(function(logged) {
@@ -6115,6 +6202,17 @@ chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
     handleVoice(msg.command||'', msg.wantsText||false, sendResponse);
     return true;
   }
+  if(msg.type==='X1_MEETING_END'){
+    handleMeetingEnd(msg.transcript||'', msg.url||'', msg.title||'', msg.durationMs||0);
+    sendResponse({ok:true});
+    return false;
+  }
+  if(msg.type==='X1_POINTER_ASK' && sender && sender.tab){
+    answerAboutRegion(sender.tab.windowId, msg.x||0, msg.y||0, msg.devicePixelRatio||1, msg.question||'Describe lo que ves.')
+      .then(function(text){ sendResponse({text: text, showText: true}); })
+      .catch(function(e){ sendResponse({text: 'Error: ' + e.message, showText: true}); });
+    return true;
+  }
   if(msg.type==='X1_OPEN_PANEL' && sender && sender.tab){
     chrome.sidePanel.open({ tabId: sender.tab.id }).catch(function(e) {
       console.error('[X1] sidePanel.open error:', e);
@@ -6325,6 +6423,92 @@ function executePlanStep(planId, step) {
     }
   }).catch(function(e) {
     return Promise.resolve("Error executing step: " + e.message);
+  });
+}
+
+// ── Meeting Transcription (B.13) ──
+function handleMeetingEnd(transcript, url, title, durationMs) {
+  if (!transcript || transcript.trim().length < 20) return;
+  var prompt = 'Analiza esta transcripcion de una reunion y devuelve SOLO un objeto JSON con esta forma exacta: ' +
+    '{"summary": string, "participants": [string], "decisions": [string], "actionItems": [string]}.\n\n' +
+    'Transcripcion:\n' + transcript.substring(0, 12000);
+  aiComplete(prompt).then(function(result) {
+    var parsed = null;
+    var txt = (result && typeof result === 'object') ? (result.text || JSON.stringify(result)) : String(result || '');
+    var m = txt.match(/\{[\s\S]*\}/);
+    if (m) { try { parsed = JSON.parse(m[0]); } catch(e) { parsed = null; } }
+    if (!parsed) parsed = { summary: txt.substring(0, 500), participants: [], decisions: [], actionItems: [] };
+
+    var entity = {
+      name: (title || 'Reunion') + ' — ' + new Date().toISOString().slice(0, 10),
+      type: 'MEETING',
+      properties: {
+        url: url, title: title, durationMs: durationMs,
+        summary: parsed.summary || '', participants: parsed.participants || [],
+        decisions: parsed.decisions || [], transcript: transcript.substring(0, 20000)
+      },
+      relations: [], date: new Date().toISOString()
+    };
+    if (typeof opGraph !== 'undefined') { opGraph.entities.push(entity); saveGraph(); }
+
+    (parsed.actionItems || []).forEach(function(item) {
+      if (typeof createTask === 'function') createTask(item, { description: 'De la reunion: ' + (title || url), tags: ['meeting'] });
+    });
+
+    try { chrome.notifications.create('', {
+      type: 'basic', iconUrl: 'assets/x1-logo-square.png',
+      title: 'Reunion transcrita', message: (parsed.actionItems || []).length + ' tareas extraidas, ' + (parsed.participants || []).length + ' participantes.'
+    }); } catch(e) {}
+  }).catch(function(e) { console.error('[X1] handleMeetingEnd error:', e.message); });
+}
+
+// ── Pointer Interaction (Alt+Click visual ask, B.12) ──
+// Crops the screenshot around the click point (Canvas API, no eval/CDN scripts)
+// before sending — keeps the vision call focused and cheaper than the whole tab.
+function answerAboutRegion(windowId, clientX, clientY, dpr, question) {
+  return new Promise(function(resolve, reject) {
+    chrome.tabs.captureVisibleTab(windowId, {format: 'png'}, function(dataUrl) {
+      if (chrome.runtime.lastError) { reject(new Error(chrome.runtime.lastError.message)); return; }
+      fetch(dataUrl).then(function(r) { return r.blob(); }).then(function(blob) {
+        return createImageBitmap(blob);
+      }).then(function(bitmap) {
+        var cropSize = 480;
+        var cx = clientX * dpr;
+        var cy = clientY * dpr;
+        var half = (cropSize * dpr) / 2;
+        var srcX = Math.max(0, Math.min(bitmap.width - 1, cx - half));
+        var srcY = Math.max(0, Math.min(bitmap.height - 1, cy - half));
+        var srcW = Math.min(cropSize * dpr, bitmap.width - srcX);
+        var srcH = Math.min(cropSize * dpr, bitmap.height - srcY);
+        var canvas = new OffscreenCanvas(srcW, srcH);
+        var ctx = canvas.getContext('2d');
+        ctx.drawImage(bitmap, srcX, srcY, srcW, srcH, 0, 0, srcW, srcH);
+        return canvas.convertToBlob({type: 'image/png'});
+      }).then(function(croppedBlob) {
+        return croppedBlob.arrayBuffer();
+      }).then(function(buf) {
+        var bytes = new Uint8Array(buf);
+        var binary = '';
+        var chunkSize = 0x8000;
+        for (var i = 0; i < bytes.length; i += chunkSize) {
+          binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+        }
+        var base64 = btoa(binary);
+        var providersToTry = ['gemini', 'openai', 'groq'];
+        function tryNextProvider(index) {
+          if (index >= providersToTry.length) { reject(new Error('No pude analizar la imagen con ningun proveedor disponible.')); return; }
+          callVisionProvider(providersToTry[index], base64, question).then(resolve).catch(function(e) {
+            var msg = (e.message || '').toLowerCase();
+            if (msg.indexOf('does not support') !== -1 || msg.indexOf('not supported') !== -1 || msg.indexOf('no api key') !== -1) {
+              tryNextProvider(index + 1);
+            } else {
+              reject(e);
+            }
+          });
+        }
+        tryNextProvider(0);
+      }).catch(reject);
+    });
   });
 }
 

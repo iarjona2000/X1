@@ -48,6 +48,15 @@ async function handleRequest(request, env, ctx) {
     });
   }
 
+  // External command reception (B.14) — lets n8n/Zapier queue a command for
+  // X1 to pick up on its next poll, without X1 needing a public URL of its own.
+  if (url.pathname === '/commands/queue' && request.method === 'POST') {
+    return queueCommand(request, env);
+  }
+  if (url.pathname === '/commands/poll' && request.method === 'GET') {
+    return pollCommands(env);
+  }
+
   // Only POST to /v1/chat/completions
   if (request.method !== 'POST' || url.pathname !== '/v1/chat/completions') {
     return jsonResponse({ error: 'Not found' }, 404);
@@ -134,6 +143,37 @@ async function checkRateLimit(request, env, ctx) {
   }
   ctx.waitUntil(env.X1_KV.put(bucket, String(current + 1), { expirationTtl: 90 }));
   return null;
+}
+
+// External command queue (B.14). Requires X1_KV — without it, commands would
+// only survive within a single isolate and could vanish before X1 ever polls,
+// so this fails explicitly rather than pretending to queue reliably.
+var COMMAND_QUEUE_KEY = 'x1:command-queue';
+var COMMAND_QUEUE_MAX = 50;
+
+async function queueCommand(request, env) {
+  if (!env.X1_KV) return jsonResponse({ error: 'queue_not_configured', hint: 'bind X1_KV in wrangler.toml' }, 501);
+  var body;
+  try { body = await request.json(); } catch (e) { return jsonResponse({ error: 'Invalid JSON' }, 400); }
+  if (!body || typeof body.command !== 'string' || !body.command.trim()) {
+    return jsonResponse({ error: 'command (string) required' }, 400);
+  }
+  var raw = await env.X1_KV.get(COMMAND_QUEUE_KEY);
+  var queue = [];
+  try { queue = raw ? JSON.parse(raw) : []; } catch (e) { queue = []; }
+  queue.push({ command: body.command.trim(), meta: body.meta || {}, queuedAt: Date.now() });
+  if (queue.length > COMMAND_QUEUE_MAX) queue = queue.slice(queue.length - COMMAND_QUEUE_MAX);
+  await env.X1_KV.put(COMMAND_QUEUE_KEY, JSON.stringify(queue));
+  return jsonResponse({ ok: true, queued: queue.length });
+}
+
+async function pollCommands(env) {
+  if (!env.X1_KV) return jsonResponse({ commands: [] });
+  var raw = await env.X1_KV.get(COMMAND_QUEUE_KEY);
+  var queue = [];
+  try { queue = raw ? JSON.parse(raw) : []; } catch (e) { queue = []; }
+  if (queue.length > 0) await env.X1_KV.put(COMMAND_QUEUE_KEY, JSON.stringify([]));
+  return jsonResponse({ commands: queue });
 }
 
 function providerStatus(env) {

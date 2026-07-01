@@ -324,6 +324,27 @@ var X1PluginEngine = (function() {
         return runStep(stepIndex + 1);
       }
 
+      if (step.type === 'webhook') {
+        var webhookUrl = step.url || (typeof aiKeys !== 'undefined' && aiKeys.n8nWebhookUrl);
+        if (!webhookUrl) {
+          results.stepResults.push({ type: 'webhook', data: null, error: 'No webhook URL (set step.url or n8nWebhookUrl in Settings)' });
+          return runStep(stepIndex + 1);
+        }
+        var webhookBody = Object.assign({ source: 'x1-plugin', plugin: pluginId, userMsg: userMsg }, step.payload || { synthesis: results.synthesis || '' });
+        return fetch(webhookUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(webhookBody),
+          signal: AbortSignal.timeout(15000)
+        }).then(function(resp) {
+          results.stepResults.push({ type: 'webhook', data: { ok: resp.ok, status: resp.status } });
+          return runStep(stepIndex + 1);
+        }).catch(function(e) {
+          results.stepResults.push({ type: 'webhook', data: null, error: e.message });
+          return runStep(stepIndex + 1);
+        });
+      }
+
       if (step.type === 'notify') {
         var notifyText = step.text || results.synthesis || 'Task complete.';
         notifyText = notifyText.replace(/\{synthesis\}/g, results.synthesis || '');

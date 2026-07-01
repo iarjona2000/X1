@@ -1,0 +1,20 @@
+{
+  "sector": "FINANZAS",
+  "criteria": [
+    {
+      "name": "exactitud_numerica",
+      "weight": 0.5,
+      "description": "¿Los cálculos, cifras y fórmulas son correctos? ¿No hay errores aritméticos ni de fórmula?"
+    },
+    {
+      "name": "razonamiento_auditable",
+      "weight": 0.3,
+      "description": "¿Se explica el razonamiento paso a paso de forma que un humano pueda verificarlo, no solo el resultado final?"
+    },
+    {
+      "name": "claridad",
+      "weight": 0.2,
+      "description": "¿La respuesta es clara, bien estructurada y sin relleno innecesario para un contexto financiero/empresarial?"
+    }
+  ]
+}

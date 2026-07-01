@@ -464,6 +464,32 @@
           '</div>' +
         '</div>' +
         '<div class="settings-section">' +
+          '<h3>Generacion de imagenes</h3>' +
+          '<div class="setting-row">' +
+            '<span class="setting-label">Cloudflare Account ID</span>' +
+            '<input class="setting-input" type="password" data-key="cloudflareAccountId" placeholder="id de cuenta Cloudflare">' +
+          '</div>' +
+          '<div class="setting-row">' +
+            '<span class="setting-label">Cloudflare AI Key</span>' +
+            '<input class="setting-input" type="password" data-key="cloudflareKey" placeholder="token con permiso Workers AI">' +
+          '</div>' +
+          '<div class="setting-row">' +
+            '<span class="setting-label">OpenAI (fallback DALL-E)</span>' +
+            '<input class="setting-input" type="password" data-key="openaiKey" placeholder="sk-... (opcional)">' +
+          '</div>' +
+        '</div>' +
+        '<div class="settings-section">' +
+          '<h3>Automatizacion</h3>' +
+          '<div class="setting-row">' +
+            '<span class="setting-label">n8n Webhook URL</span>' +
+            '<input class="setting-input" type="text" data-key="n8nWebhookUrl" placeholder="https://tu-n8n.com/webhook/...">' +
+          '</div>' +
+          '<div class="setting-row">' +
+            '<span class="setting-label">LibreTranslate URL</span>' +
+            '<input class="setting-input" type="text" data-key="libretranslateUrl" placeholder="opcional, fallback si Gemini/Groq fallan">' +
+          '</div>' +
+        '</div>' +
+        '<div class="settings-section">' +
           '<h3>Proxy (avanzado)</h3>' +
           '<div class="setting-row">' +
             '<span class="setting-label">Proxy secret</span>' +
@@ -486,7 +512,7 @@
 
     document.getElementById('app').appendChild(overlay);
 
-    chrome.storage.local.get(['aiProvider', 'groqKey', 'geminiKey', 'openrouterKey', 'nvidiaKey', 'firecrawlKey', 'pipedriveKey', 'hubspotKey', 'finnhubKey', 'invoiceGeneratorKey', 'proxySecret'], function(r) {
+    chrome.storage.local.get(['aiProvider', 'groqKey', 'geminiKey', 'openrouterKey', 'nvidiaKey', 'firecrawlKey', 'pipedriveKey', 'hubspotKey', 'finnhubKey', 'invoiceGeneratorKey', 'cloudflareAccountId', 'cloudflareKey', 'openaiKey', 'n8nWebhookUrl', 'libretranslateUrl', 'proxySecret'], function(r) {
       if (r.aiProvider) {
         var sel = overlay.querySelector('#setting-provider');
         if (sel) sel.value = r.aiProvider;

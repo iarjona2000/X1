@@ -56,8 +56,18 @@ RATE_LIMIT_PER_MIN = "30"
 # === KV namespaces (per-IP rate limiting + cross-worker breaker state) ===
 # Optional but recommended now that /v1/chat/completions is auth-gated: the
 # shared secret stops randoms, but if it ever leaks, this caps the damage.
+# Also REQUIRED for the external command queue below (POST /commands/queue,
+# GET /commands/poll) — without it, /commands/queue responds 501 rather than
+# silently dropping commands or pretending to queue reliably.
 # To create: npx wrangler kv:namespace create X1_KV
 # Then paste the id below:
 # [[kv_namespaces]]
 # binding = "X1_KV"
 # id = "<paste-here>"
+
+# === External command reception (B.14) ===
+# n8n/Zapier/etc POST to https://<worker-url>/commands/queue with header
+# X-X1-Auth: <PROXY_SHARED_SECRET> and body {"command": "cotizacion de AAPL"}.
+# X1 polls GET /commands/poll every ~1 minute (chrome.alarms, service-worker.js)
+# and auto-runs only read-only actions (SAFE_EXTERNAL_ACTIONS) — anything else
+# (send email, delete, purchase-shaped) is queued for manual approval instead.
