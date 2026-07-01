@@ -6130,6 +6130,7 @@ function detectPageContext(host, url, title) {
 // ═══════════════════════════════════════════
 
 chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
+  console.log('[X1-SW] onMessage:', msg && msg.type, 'sender:', sender && (sender.tab && sender.tab.id || sender.url || 'no-tab'));
   if(!msg) return;
   if(msg.type==='X1_GET_CONTEXT'){
     var url = msg.url || '';
@@ -6184,7 +6185,7 @@ chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
     return true;
   }
   if(msg.type==='PING'){
-    console.log('[X1] PING received from', sender && sender.tab && sender.tab.id);
+    console.log('[X1-SW] PING handler firing');
     sendResponse({pong:true, ts:Date.now()});
     return false;
   }
@@ -6212,7 +6213,7 @@ chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
     return true;
   }
   if(msg.type==='VOICE_COMMAND_EXEC'){
-    console.log('[X1] VOICE_COMMAND_EXEC received:', msg.command, 'from', sender && sender.tab && sender.tab.id);
+    console.log('[X1-SW] VOICE_COMMAND_EXEC handler firing');
     handleVoice(msg.command||'', msg.wantsText||false, sendResponse);
     return true;
   }

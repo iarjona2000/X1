@@ -37,22 +37,28 @@
   });
 
   function checkConnection() {
+    console.log('[X1-sidepanel] checkConnection start');
     if (!chrome.runtime || !chrome.runtime.sendMessage) {
+      console.log('[X1-sidepanel] chrome.runtime or sendMessage missing');
       statusDot.style.background = 'var(--destructive)';
       statusText.textContent = 'Offline';
       return;
     }
     try {
       chrome.runtime.sendMessage({ type: 'PING' }, function(response) {
+        console.log('[X1-sidepanel] PING callback:', response, 'lastError:', chrome.runtime.lastError);
         if (chrome.runtime.lastError || !response) {
+          console.log('[X1-sidepanel] PING failed:', chrome.runtime.lastError && chrome.runtime.lastError.message);
           statusDot.style.background = 'var(--destructive)';
           statusText.textContent = 'Offline';
         } else {
+          console.log('[X1-sidepanel] PING ok');
           statusDot.style.background = 'var(--primary)';
           statusText.textContent = 'Ready';
         }
       });
     } catch(e) {
+      console.log('[X1-sidepanel] PING exception:', e);
       statusDot.style.background = 'var(--destructive)';
       statusText.textContent = 'Offline';
     }
