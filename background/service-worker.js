@@ -5470,6 +5470,7 @@ function runAgentLoop(tabId, goal, url, resolve) {
 // ═══════════════════════════════════════════
 
 function handleVoice(cmd, wantsText, sendResponse) {
+  console.log('[X1] handleVoice called with:', cmd.substring(0, 50), 'wantsText:', wantsText);
   startKeepalive();
   var done = false;
   var responded = false;
@@ -6181,6 +6182,7 @@ chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
     return true;
   }
   if(msg.type==='PING'){
+    console.log('[X1] PING received from', sender && sender.tab && sender.tab.id);
     sendResponse({pong:true, ts:Date.now()});
     return false;
   }
@@ -6208,6 +6210,7 @@ chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
     return true;
   }
   if(msg.type==='VOICE_COMMAND_EXEC'){
+    console.log('[X1] VOICE_COMMAND_EXEC received:', msg.command, 'from', sender && sender.tab && sender.tab.id);
     handleVoice(msg.command||'', msg.wantsText||false, sendResponse);
     return true;
   }

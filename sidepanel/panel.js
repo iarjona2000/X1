@@ -238,9 +238,11 @@
     }, 28000);
 
     function doSend() {
+      console.log('[X1-sidepanel] Sending VOICE_COMMAND_EXEC:', text.substring(0, 50));
       chrome.runtime.sendMessage(
         { type: 'VOICE_COMMAND_EXEC', command: text, raw: text, wantsText: true },
         function(response) {
+          console.log('[X1-sidepanel] VOICE_COMMAND_EXEC response:', response, 'lastError:', chrome.runtime.lastError);
           if (responded) return;
           responded = true;
           clearTimeout(panelTimeout);
@@ -276,6 +278,7 @@
         return;
       }
       chrome.runtime.sendMessage({ type: 'PING' }, function(pong) {
+        console.log('[X1-sidepanel] PING response:', pong, 'lastError:', chrome.runtime.lastError);
         if (chrome.runtime.lastError) {
           if (!responded) {
             responded = true;
@@ -285,6 +288,7 @@
           }
           return;
         }
+        console.log('[X1-sidepanel] PING ok, sending VOICE_COMMAND_EXEC');
         doSend();
       });
     } catch(e) {
