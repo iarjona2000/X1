@@ -439,6 +439,36 @@
             '<span class="setting-label">NVIDIA</span>' +
             '<input class="setting-input" type="password" data-key="nvidiaKey" placeholder="nvapi-...">' +
           '</div>' +
+          '<div class="setting-row">' +
+            '<span class="setting-label">Firecrawl</span>' +
+            '<input class="setting-input" type="password" data-key="firecrawlKey" placeholder="fc-... (opcional, fallback paginas protegidas)">' +
+          '</div>' +
+        '</div>' +
+        '<div class="settings-section">' +
+          '<h3>Integraciones de negocio</h3>' +
+          '<div class="setting-row">' +
+            '<span class="setting-label">Pipedrive</span>' +
+            '<input class="setting-input" type="password" data-key="pipedriveKey" placeholder="api_token de Pipedrive">' +
+          '</div>' +
+          '<div class="setting-row">' +
+            '<span class="setting-label">HubSpot</span>' +
+            '<input class="setting-input" type="password" data-key="hubspotKey" placeholder="private app token">' +
+          '</div>' +
+          '<div class="setting-row">' +
+            '<span class="setting-label">Finnhub</span>' +
+            '<input class="setting-input" type="password" data-key="finnhubKey" placeholder="cotizaciones bursatiles">' +
+          '</div>' +
+          '<div class="setting-row">' +
+            '<span class="setting-label">Invoice-Generator</span>' +
+            '<input class="setting-input" type="password" data-key="invoiceGeneratorKey" placeholder="opcional">' +
+          '</div>' +
+        '</div>' +
+        '<div class="settings-section">' +
+          '<h3>Proxy (avanzado)</h3>' +
+          '<div class="setting-row">' +
+            '<span class="setting-label">Proxy secret</span>' +
+            '<input class="setting-input" type="password" data-key="proxySecret" placeholder="mismo valor que PROXY_SHARED_SECRET en el Worker">' +
+          '</div>' +
         '</div>' +
         '<div class="settings-section">' +
           '<h3>Voice</h3>' +
@@ -456,7 +486,7 @@
 
     document.getElementById('app').appendChild(overlay);
 
-    chrome.storage.local.get(['aiProvider', 'groqKey', 'geminiKey', 'openrouterKey', 'nvidiaKey'], function(r) {
+    chrome.storage.local.get(['aiProvider', 'groqKey', 'geminiKey', 'openrouterKey', 'nvidiaKey', 'firecrawlKey', 'pipedriveKey', 'hubspotKey', 'finnhubKey', 'invoiceGeneratorKey', 'proxySecret'], function(r) {
       if (r.aiProvider) {
         var sel = overlay.querySelector('#setting-provider');
         if (sel) sel.value = r.aiProvider;

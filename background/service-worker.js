@@ -193,7 +193,7 @@ function parseCommand(cmd) {
   // Everything else goes to AI for proper interpretation
 
   // ── API KEY CONFIG (must be regex — contains the key itself) ──
-  var mApiKey = l.match(/(?:configura|config|api\s*key|clave)\s+(grok|groq|openai|gemini|anthropic|opencode|cerebras|sambanova|mistral|deepseek|together|cloudflare|tavily|elevenlabs|openrouter|nvidia)\s+(\S+)/i);
+  var mApiKey = l.match(/(?:configura|config|api\s*key|clave)\s+(groq|gemini|cerebras|mistral|tavily|elevenlabs|openrouter|nvidia)\s+(\S+)/i);
   if (mApiKey) {
     var provider = mApiKey[1].toLowerCase();
     var apikey = mApiKey[2];
@@ -205,9 +205,12 @@ function parseCommand(cmd) {
   }
 
   // ── CHANGE AI PROVIDER ──
-  var mUseAI = l.match(/^(?:usa|utiliza|cambia\s*a)\s+(grok|groq|openai|gemini|opencode|ollama|cerebras|sambanova|mistral|deepseek|together|cloudflare|openrouter|nvidia|auto)$/i);
+  var mUseAI = l.match(/^(?:usa|utiliza|cambia\s*a)\s+(groq|gemini|ollama|cerebras|mistral|openrouter|nvidia|nemotron|deepseek|auto)$/i);
   if (mUseAI) {
     var prov = mUseAI[1].toLowerCase();
+    if (prov === 'nvidia') prov = 'nvidiaGlm';
+    else if (prov === 'nemotron') prov = 'nvidiaNemotron';
+    else if (prov === 'deepseek') prov = 'nvidiaDeepseek';
     chrome.storage.local.set({aiProvider: prov});
     aiKeys.aiProvider = prov;
     return {action:'speak', text:'Ahora uso '+prov+'.'};
@@ -244,6 +247,37 @@ function parseCommand(cmd) {
   var mPrice = l.match(/^(?:alerta de precio|price alert|av[ií]same cuando)\s+(.+?)\s+(?:baje de|costs? less than|under)\s+(\d+(?:[.,]\d+)?)/i);
   if (mPrice) return {action:'addPriceAlert', productName:mPrice[1].trim(), url:'', targetPrice:parseFloat(mPrice[2].replace(',','.'))};
 
+  // ── CRM PUSH (Pipedrive/HubSpot) ──
+  var mCrm = l.match(/^(?:manda|env[ií]a|a[ñn]ade)\s+(?:a\s+)?(pipedrive|hubspot)\s*:?\s*(.+)$/i);
+  if (mCrm) {
+    var crmName = mCrm[1].toLowerCase();
+    var crmRest = mCrm[2].trim();
+    var emailMatch = crmRest.match(/[\w.+-]+@[\w-]+\.[\w.-]+/);
+    var crmEmail = emailMatch ? emailMatch[0] : '';
+    var beforeEmail = crmEmail ? crmRest.split(crmEmail)[0] : crmRest;
+    var afterEmail = crmEmail ? crmRest.split(crmEmail)[1] : '';
+    return {action:'crmPush', crm: crmName, lead: {
+      name: beforeEmail.replace(/[,;]+\s*$/,'').trim(),
+      email: crmEmail,
+      company: afterEmail ? afterEmail.replace(/^[,;\s]+/,'').trim() : ''
+    }};
+  }
+
+  // ── FINANCIAL QUOTE (Finnhub) ──
+  var mQuote = l.match(/^(?:cotizaci[oó]n(?:\s+de)?|precio\s+(?:de\s+la\s+)?acci[oó]n(?:\s+de)?|stock\s+price(?:\s+of)?|quote(?:\s+for)?)\s+([A-Za-z.]{1,6})$/i);
+  if (mQuote) return {action:'financialQuote', ticker: mQuote[1].toUpperCase()};
+
+  // ── INVOICE GENERATION (Invoice-Generator.com) ──
+  // Structured MVP format: "factura: Cliente | concepto | horas | precio/hora"
+  var mInvoice = l.match(/^(?:factura|invoice)\s*:\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(\d+(?:[.,]\d+)?)\s*\|\s*(\d+(?:[.,]\d+)?)$/i);
+  if (mInvoice) return {
+    action:'generateInvoicePdf',
+    clientName: mInvoice[1].trim(),
+    description: mInvoice[2].trim(),
+    hours: parseFloat(mInvoice[3].replace(',','.')),
+    rate: parseFloat(mInvoice[4].replace(',','.'))
+  };
+
   // ── GROUP CHAT / MODEL COMPARISON ──
   var mGroup = l.match(/^(?:group chat|compara modelos|comparar modelos|multi.?modelo)\s*(.*)$/i);
   if (mGroup) return {action:'groupChat', text:mGroup[1].trim() || '', models:['groq','gemini','ollama']};
@@ -258,7 +292,7 @@ function parseCommand(cmd) {
   // ── CHECK CURRENT AI PROVIDER ──
   if (/^(?:qu[eé]\s+)?(?:ia|ai|inteligencia)\s+(?:usas|tienes|est[aá]s\s+usando)$/i.test(l)) {
     var provName = aiKeys.aiProvider || 'auto';
-    return {action:'speak', text:'Actualmente uso ' + provName + '. Puedes cambiarme con: usa groq/grok/openai/opencode/gemini/ollama.'};
+    return {action:'speak', text:'Actualmente uso ' + provName + '. Puedes cambiarme con: usa groq/gemini/ollama/cerebras/mistral/openrouter/nvidia.'};
   }
 
   // ── GOOGLE AUTH ──
@@ -1270,7 +1304,13 @@ function googleApi(url, method, body) {
 // MULTI-AI ENGINE (Proxy → Groq → OpenCode → Ollama)
 // ═══════════════════════════════════════════
 
-var PROXY_URL = 'https://x1-proxy.calezamindset.workers.dev';
+var PROXY_URL = 'https://x1-proxy.baosx1.workers.dev';
+// App-level access token, not a provider credential — its only job is telling
+// the Worker "this request came from a real copy of X1", not scanner traffic.
+// Ships in every install by design (this is what makes the free/no-key path
+// work for non-technical users). Provider keys (NVIDIA_KEY etc.) stay
+// Worker-side only and are NOT affected by this — see wrangler.toml.
+var PROXY_SHARED_SECRET = '9ff4b7dda5f7defd5f7fb7c32c133428bc87e8efeb8550d3ce1e5838c1d3b850';
 
 var aiKeys = {};
 function loadAIKeys() {
@@ -1279,7 +1319,9 @@ function loadAIKeys() {
       'groqKey','opencodeKey','nvidiaKey','geminiKey','openrouterKey',
       'cerebrasKey','sambanovaKey','mistralKey','deepseekKey','togetherKey',
       'cloudflareAccountId','cloudflareKey','tavilyKey','elevenlabsKey',
-      'openaiKey','finnhubKey','alphaVantageKey',
+      'openaiKey','finnhubKey','alphaVantageKey','firecrawlKey',
+      'pipedriveKey','hubspotKey','invoiceGeneratorKey',
+      'proxySecret',
       'aiProvider'
     ], function(r) {
       aiKeys = r || {};
@@ -1307,7 +1349,7 @@ function loadGoogleUser() {
 loadGoogleUser();
 
 chrome.storage.onChanged.addListener(function(changes) {
-  if (changes.groqKey || changes.opencodeKey || changes.nvidiaKey || changes.geminiKey || changes.openrouterKey || changes.cerebrasKey || changes.sambanovaKey || changes.mistralKey || changes.deepseekKey || changes.togetherKey || changes.cloudflareAccountId || changes.cloudflareKey || changes.tavilyKey || changes.openaiKey || changes.finnhubKey || changes.alphaVantageKey || changes.aiProvider) loadAIKeys();
+  if (changes.groqKey || changes.opencodeKey || changes.nvidiaKey || changes.geminiKey || changes.openrouterKey || changes.cerebrasKey || changes.sambanovaKey || changes.mistralKey || changes.deepseekKey || changes.togetherKey || changes.cloudflareAccountId || changes.cloudflareKey || changes.tavilyKey || changes.openaiKey || changes.finnhubKey || changes.alphaVantageKey || changes.firecrawlKey || changes.pipedriveKey || changes.hubspotKey || changes.invoiceGeneratorKey || changes.proxySecret || changes.aiProvider) loadAIKeys();
   if (changes.google_user) loadGoogleUser();
 });
 
@@ -1699,9 +1741,10 @@ var proxyLastFail = 0;
     console.log('[X1] Calling proxy...');
     var clean = stripImages(buildSystemPrompt(null,userMsg));
     var usr = stripImages(userMsg);
+    var proxyHeaders = {'Content-Type':'application/json', 'X-X1-Auth': aiKeys.proxySecret || PROXY_SHARED_SECRET};
     return fetch(PROXY_URL + '/v1/chat/completions', {
       method:'POST',
-      headers:{'Content-Type':'application/json'},
+      headers:proxyHeaders,
       body:JSON.stringify({
         messages:[{role:'system',content:clean},{role:'user',content:usr}]
       }),
@@ -1717,28 +1760,6 @@ var proxyLastFail = 0;
   }
 
 // ── OpenCode Zen (OpenAI-compatible, free models: big-pickle, deepseek-v4-flash-free) ──
-function opencodeComplete(userMsg) {
-  var key = aiKeys.opencodeKey;
-  if (!key) return Promise.resolve(null);
-  var clean = stripImages(buildSystemPrompt(null,userMsg));
-  var usr = stripImages(userMsg);
-  return fetch('https://opencode.ai/zen/v1/chat/completions', {
-    method:'POST',
-    headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},
-    body:JSON.stringify({
-      model:'big-pickle',
-      messages:[{role:'system',content:clean},{role:'user',content:usr}],
-      temperature:0.1, max_tokens:2000
-    }),
-    signal:AbortSignal.timeout(15000)
-  }).then(function(r){return r.json();}).then(function(data){
-    if(data.error) { console.error('[X1] OpenCode error:', data.error); return null; }
-    var txt = (data.choices&&data.choices[0]&&data.choices[0].message&&data.choices[0].message.content||'').trim();
-    if(!isValidContent(txt)) return null;
-    return txt;
-  }).catch(function(e){ console.error('[X1] OpenCode fail:', e.message); return null; });
-}
-
 // ── Ollama (local fallback) ──
 var ollamaModels = null;
 
@@ -1776,8 +1797,10 @@ function ollamaComplete(userMsg) {
 }
 
  
-// ── NVIDIA (Nemotron, Llama-3.1 Nemotron, etc.) ──
-function nvidiaComplete(userMsg) {
+// ── NVIDIA NIM (una sola clave, varios modelos — cada uno cuenta como candidato
+//    distinto para el Panel+Juez, pero comparten cuota/infraestructura: si NVIDIA
+//    cae o la clave se revoca, caen los 3 a la vez) ──
+function nvidiaCompleteWithModel(userMsg, model) {
   var key = aiKeys.nvidiaKey;
   if (!key) return Promise.resolve(null);
   var clean = stripImages(buildSystemPrompt(null,userMsg));
@@ -1786,18 +1809,21 @@ function nvidiaComplete(userMsg) {
     method:'POST',
     headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},
     body:JSON.stringify({
-      model:'nemotron-3-ultra',
+      model:model,
       messages:[{role:'system',content:clean},{role:'user',content:usr}],
       temperature:0.1, max_tokens:2000
     }),
-    signal:AbortSignal.timeout(15000)
+    signal:AbortSignal.timeout(20000)
   }).then(function(r){return r.json();}).then(function(data){
-    if(data.error) { console.error('[X1] NVIDIA error:', data.error); return null; }
+    if(data.error) { console.error('[X1] NVIDIA (' + model + ') error:', data.error); return null; }
     var txt = (data.choices&&data.choices[0]&&data.choices[0].message&&data.choices[0].message.content||'').trim();
     if(!isValidContent(txt)) return null;
     return txt;
-  }).catch(function(e){ console.error('[X1] NVIDIA fail:', e.message); return null; });
+  }).catch(function(e){ console.error('[X1] NVIDIA (' + model + ') fail:', e.message); return null; });
 }
+function nvidiaGlmComplete(userMsg) { return nvidiaCompleteWithModel(userMsg, 'z-ai/glm-5.1'); }
+function nvidiaNemotronComplete(userMsg) { return nvidiaCompleteWithModel(userMsg, 'nvidia/nemotron-3-ultra-550b-a55b'); }
+function nvidiaDeepseekComplete(userMsg) { return nvidiaCompleteWithModel(userMsg, 'deepseek-ai/deepseek-v4-pro'); }
 
 // ── Gemini Flash (Google AI Studio — 1M+ tokens context, multimodal) ──
 var geminiLastFail = 0;
@@ -1962,41 +1988,6 @@ function cerebrasComplete(userMsg) {
   });
 }
 
-// ── SambaNova (fast open-source model inference) ──
-var sambanovaLastFail = 0;
-function sambanovaComplete(userMsg) {
-  var key = aiKeys.sambanovaKey;
-  if (!key) return Promise.resolve(null);
-  if (Date.now() - sambanovaLastFail < 30000) return Promise.resolve(null);
-  var sys = stripImages(buildSystemPrompt(null, userMsg));
-  var usr = stripImages(userMsg);
-  return fetch('https://api.sambanova.ai/v1/chat/completions', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key},
-    body: JSON.stringify({
-      model: 'Meta-Llama-3.3-70B-Instruct',
-      messages: [{role: 'system', content: sys}, {role: 'user', content: usr}],
-      temperature: 0.1,
-      max_tokens: 2000
-    }),
-    signal: AbortSignal.timeout(15000)
-  }).then(function(r) { return r.json(); }).then(function(data) {
-    if (data.error) {
-      console.error('[X1] SambaNova error:', data.error);
-      if (data.error.code === 429) sambanovaLastFail = Date.now();
-      return null;
-    }
-    var txt = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content || '').trim();
-    if (!isValidContent(txt)) return null;
-    console.log('[X1] SambaNova OK');
-    return txt;
-  }).catch(function(e) {
-    console.error('[X1] SambaNova fail:', e.message);
-    sambanovaLastFail = Date.now();
-    return null;
-  });
-}
-
 // ── Mistral (European privacy, strong at code + structured output) ──
 var mistralLastFail = 0;
 function mistralComplete(userMsg, options) {
@@ -2032,114 +2023,6 @@ function mistralComplete(userMsg, options) {
     return null;
   });
 }
-
-// ── DeepSeek (cost-efficient, strong reasoning with R1, 90% cache discount) ──
-var deepseekLastFail = 0;
-function deepseekComplete(userMsg, options) {
-  var key = aiKeys.deepseekKey;
-  if (!key) return Promise.resolve(null);
-  if (Date.now() - deepseekLastFail < 30000) return Promise.resolve(null);
-  var model = (options && options.model) || 'deepseek-chat';
-  var sys = stripImages(buildSystemPrompt(null, userMsg));
-  var usr = stripImages(userMsg);
-  return fetch('https://api.deepseek.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key},
-    body: JSON.stringify({
-      model: model,
-      messages: [{role: 'system', content: sys}, {role: 'user', content: usr}],
-      temperature: (options && options.temperature != null) ? options.temperature : 0.1,
-      max_tokens: (options && options.maxTokens) || 2000
-    }),
-    signal: AbortSignal.timeout(20000)
-  }).then(function(r) { return r.json(); }).then(function(data) {
-    if (data.error) {
-      console.error('[X1] DeepSeek error:', data.error);
-      if (data.error.code === 429) deepseekLastFail = Date.now();
-      return null;
-    }
-    var txt = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content || '').trim();
-    if (!isValidContent(txt)) return null;
-    console.log('[X1] DeepSeek OK (' + model + ')');
-    return txt;
-  }).catch(function(e) {
-    console.error('[X1] DeepSeek fail:', e.message);
-    deepseekLastFail = Date.now();
-    return null;
-  });
-}
-
-// ── Together AI (hundreds of open-source models, code specialists) ──
-var togetherLastFail = 0;
-function togetherComplete(userMsg, options) {
-  var key = aiKeys.togetherKey;
-  if (!key) return Promise.resolve(null);
-  if (Date.now() - togetherLastFail < 30000) return Promise.resolve(null);
-  var model = (options && options.model) || 'meta-llama/Llama-3.3-70B-Instruct-Turbo';
-  var sys = stripImages(buildSystemPrompt(null, userMsg));
-  var usr = stripImages(userMsg);
-  return fetch('https://api.together.xyz/v1/chat/completions', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key},
-    body: JSON.stringify({
-      model: model,
-      messages: [{role: 'system', content: sys}, {role: 'user', content: usr}],
-      temperature: (options && options.temperature != null) ? options.temperature : 0.1,
-      max_tokens: (options && options.maxTokens) || 2000
-    }),
-    signal: AbortSignal.timeout(20000)
-  }).then(function(r) { return r.json(); }).then(function(data) {
-    if (data.error) {
-      console.error('[X1] Together error:', data.error);
-      if (data.error.code === 429) togetherLastFail = Date.now();
-      return null;
-    }
-    var txt = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content || '').trim();
-    if (!isValidContent(txt)) return null;
-    console.log('[X1] Together OK (' + model + ')');
-    return txt;
-  }).catch(function(e) {
-    console.error('[X1] Together fail:', e.message);
-    togetherLastFail = Date.now();
-    return null;
-  });
-}
-
-// ── Cloudflare Workers AI (edge inference, privacy-first) ──
-var cloudflareLastFail = 0;
-function cloudflareComplete(userMsg) {
-  var accountId = aiKeys.cloudflareAccountId;
-  var key = aiKeys.cloudflareKey;
-  if (!accountId || !key) return Promise.resolve(null);
-  if (Date.now() - cloudflareLastFail < 30000) return Promise.resolve(null);
-  var model = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
-  var sys = stripImages(buildSystemPrompt(null, userMsg));
-  var usr = stripImages(userMsg);
-  return fetch('https://api.cloudflare.com/client/v4/accounts/' + accountId + '/ai/run/' + model, {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key},
-    body: JSON.stringify({
-      messages: [{role: 'system', content: sys}, {role: 'user', content: usr}],
-      max_tokens: 2000
-    }),
-    signal: AbortSignal.timeout(20000)
-  }).then(function(r) { return r.json(); }).then(function(data) {
-    if (!data.success || !data.result) {
-      console.error('[X1] Cloudflare error:', data.errors || 'Unknown');
-      cloudflareLastFail = Date.now();
-      return null;
-    }
-    var txt = (data.result.response || '').trim();
-    if (!isValidContent(txt)) return null;
-    console.log('[X1] Cloudflare OK');
-    return txt;
-  }).catch(function(e) {
-    console.error('[X1] Cloudflare fail:', e.message);
-    cloudflareLastFail = Date.now();
-    return null;
-  });
-}
-
 
 // ═══════════════════════════════════════════
 // TASK CLASSIFICATION + INTELLIGENT ROUTING
@@ -2290,33 +2173,30 @@ function recordProviderOK(provider) {
 
 // ── Routing Decision Matrix ──
 var ROUTE_MATRIX = {
-  conversational: ['proxy','groq','cerebras','gemini','nvidia','openrouter','opencode','ollama'],
-  reasoning:      ['proxy','groq','nvidia','deepseek','gemini','openrouter','ollama'],
-  long_context:   ['proxy','gemini','groq','openrouter','ollama'],
-  multimodal:     ['proxy','gemini','openrouter'],
-  code:           ['proxy','groq','mistral','deepseek','together','openrouter','ollama'],
-  creative:       ['proxy','groq','deepseek','gemini','openrouter','ollama'],
-  agentic:        ['proxy','groq','gemini','nvidia','openrouter','ollama'],
-  sensitive:      ['proxy','cloudflare','mistral','ollama'],
-  translation:    ['proxy','gemini','groq','deepseek','openrouter','ollama']
+  conversational: ['groq','cerebras','gemini','nvidiaGlm','openrouter','proxy','ollama'],
+  reasoning:      ['groq','nvidiaGlm','nvidiaNemotron','nvidiaDeepseek','gemini','openrouter','proxy','ollama'],
+  long_context:   ['gemini','groq','openrouter','proxy','ollama'],
+  multimodal:     ['gemini','openrouter','proxy'],
+  code:           ['groq','mistral','nvidiaDeepseek','openrouter','proxy','ollama'],
+  creative:       ['groq','gemini','openrouter','proxy','ollama'],
+  agentic:        ['groq','gemini','nvidiaGlm','openrouter','proxy','ollama'],
+  sensitive:      ['mistral','proxy','ollama'],
+  translation:    ['gemini','groq','openrouter','proxy','ollama']
 };
 
 function getRoutedChain(taskType) {
   var route = ROUTE_MATRIX[taskType] || ROUTE_MATRIX.conversational;
   var providerMap = {
-    proxy:      {name:'proxy', fn:proxyComplete, has:!!PROXY_URL, fast:true},
-    groq:       {name:'groq', fn:groqComplete, has:!!aiKeys.groqKey, fast:true},
-    nvidia:     {name:'nvidia', fn:nvidiaComplete, has:!!aiKeys.nvidiaKey, fast:true},
-    ollama:     {name:'ollama', fn:ollamaComplete, has:true, fast:false},
-    opencode:   {name:'opencode', fn:opencodeComplete, has:!!aiKeys.opencodeKey, fast:false},
-    gemini:     {name:'gemini', fn:geminiComplete, has:!!aiKeys.geminiKey, fast:true},
-    openrouter: {name:'openrouter', fn:openrouterComplete, has:!!aiKeys.openrouterKey, fast:false},
-    cerebras:   {name:'cerebras', fn:cerebrasComplete, has:!!aiKeys.cerebrasKey, fast:true},
-    sambanova:  {name:'sambanova', fn:sambanovaComplete, has:!!aiKeys.sambanovaKey, fast:true},
-    mistral:    {name:'mistral', fn:mistralComplete, has:!!aiKeys.mistralKey, fast:true},
-    deepseek:   {name:'deepseek', fn:deepseekComplete, has:!!aiKeys.deepseekKey, fast:false},
-    together:   {name:'together', fn:togetherComplete, has:!!aiKeys.togetherKey, fast:false},
-    cloudflare: {name:'cloudflare', fn:cloudflareComplete, has:!!(aiKeys.cloudflareAccountId && aiKeys.cloudflareKey), fast:false}
+    groq:            {name:'groq', fn:groqComplete, has:!!aiKeys.groqKey, fast:true},
+    nvidiaGlm:       {name:'nvidiaGlm', fn:nvidiaGlmComplete, has:!!aiKeys.nvidiaKey, fast:true},
+    nvidiaNemotron:  {name:'nvidiaNemotron', fn:nvidiaNemotronComplete, has:!!aiKeys.nvidiaKey, fast:true},
+    nvidiaDeepseek:  {name:'nvidiaDeepseek', fn:nvidiaDeepseekComplete, has:!!aiKeys.nvidiaKey, fast:false},
+    ollama:          {name:'ollama', fn:ollamaComplete, has:true, fast:false},
+    gemini:          {name:'gemini', fn:geminiComplete, has:!!aiKeys.geminiKey, fast:true},
+    openrouter:      {name:'openrouter', fn:openrouterComplete, has:!!aiKeys.openrouterKey, fast:false},
+    cerebras:        {name:'cerebras', fn:cerebrasComplete, has:!!aiKeys.cerebrasKey, fast:true},
+    mistral:         {name:'mistral', fn:mistralComplete, has:!!aiKeys.mistralKey, fast:true},
+    proxy:           {name:'proxy', fn:proxyComplete, has:true, fast:true}
   };
 
   var chain = [];
@@ -2343,7 +2223,7 @@ function getRoutedChain(taskType) {
 
 // ── Provider health summary ──
 function getProviderHealthSummary() {
-  var providers = ['proxy','groq','nvidia','ollama','opencode','gemini','openrouter','cerebras','sambanova','mistral','deepseek','together','cloudflare'];
+  var providers = ['groq','nvidiaGlm','nvidiaNemotron','nvidiaDeepseek','ollama','gemini','openrouter','cerebras','mistral','proxy'];
   var summary = [];
   for (var i = 0; i < providers.length; i++) {
     var name = providers[i];
@@ -2478,7 +2358,119 @@ function translateText(text, targetLang, sourceLang) {
   });
 }
 
+// ── Firecrawl (REST scrape — fallback for JS-heavy/protected pages that
+//    chrome.scripting.executeScript can't read, e.g. bot-walled or SPA content
+//    that hasn't rendered yet) ──
+function firecrawlScrape(url) {
+  var key = aiKeys.firecrawlKey;
+  if (!key) return Promise.resolve(null);
+  return fetch('https://api.firecrawl.dev/v1/scrape', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key},
+    body: JSON.stringify({url: url, formats: ['markdown']}),
+    signal: AbortSignal.timeout(20000)
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    if (!data || data.success === false) { console.error('[X1] Firecrawl error:', data && data.error); return null; }
+    var md = data.data && data.data.markdown;
+    return md ? md.substring(0, 8000) : null;
+  }).catch(function(e) { console.error('[X1] Firecrawl fail:', e.message); return null; });
+}
+
+// ── CRM Integration (Pipedrive / HubSpot) ──
+function pushLeadToPipedrive(lead) {
+  var key = aiKeys.pipedriveKey;
+  if (!key) return Promise.resolve({ok:false, error:'no_key'});
+  var body = {name: lead.name || 'Sin nombre'};
+  if (lead.email) body.email = [{value: lead.email, primary: true}];
+  if (lead.company) body.org_name = lead.company;
+  return fetch('https://api.pipedrive.com/v1/persons?api_token=' + encodeURIComponent(key), {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(15000)
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    if (!data.success) { console.error('[X1] Pipedrive error:', data.error); return {ok: false, error: data.error}; }
+    return {ok: true, id: data.data && data.data.id};
+  }).catch(function(e) { console.error('[X1] Pipedrive fail:', e.message); return {ok: false, error: e.message}; });
+}
+
+function pushLeadToHubspot(lead) {
+  var key = aiKeys.hubspotKey;
+  if (!key) return Promise.resolve({ok:false, error:'no_key'});
+  var nameParts = (lead.name || '').trim().split(/\s+/).filter(Boolean);
+  var properties = {
+    email: lead.email || '',
+    firstname: nameParts[0] || '',
+    lastname: nameParts.slice(1).join(' ') || ''
+  };
+  if (lead.company) properties.company = lead.company;
+  return fetch('https://api.hubapi.com/crm/v3/objects/contacts', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key},
+    body: JSON.stringify({properties: properties}),
+    signal: AbortSignal.timeout(15000)
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    if (data.status === 'error') { console.error('[X1] HubSpot error:', data.message); return {ok: false, error: data.message}; }
+    return {ok: true, id: data.id};
+  }).catch(function(e) { console.error('[X1] HubSpot fail:', e.message); return {ok: false, error: e.message}; });
+}
+
+function pushLeadToCRM(crmName, lead) {
+  if (crmName === 'pipedrive') return pushLeadToPipedrive(lead);
+  if (crmName === 'hubspot') return pushLeadToHubspot(lead);
+  return Promise.resolve({ok: false, error: 'unknown_crm'});
+}
+
+// ── Financial / Market Data (Finnhub) ──
+function getFinancialQuote(ticker) {
+  var key = aiKeys.finnhubKey;
+  if (!key) return Promise.resolve(null);
+  return fetch('https://finnhub.io/api/v1/quote?symbol=' + encodeURIComponent(ticker) + '&token=' + key, {
+    signal: AbortSignal.timeout(10000)
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    if (!data || typeof data.c !== 'number' || data.c === 0) return null;
+    return {
+      ticker: ticker, current: data.c, change: data.d, changePercent: data.dp,
+      high: data.h, low: data.l, open: data.o, prevClose: data.pc
+    };
+  }).catch(function(e) { console.error('[X1] Finnhub fail:', e.message); return null; });
+}
+
+// ── Automated Invoicing (Invoice-Generator.com) ──
+function generateInvoicePdf(config) {
+  var key = aiKeys.invoiceGeneratorKey; // optional — the service allows limited anonymous use
+  var headers = {'Content-Type': 'application/json'};
+  if (key) headers['Authorization'] = 'Bearer ' + key;
+  var body = {
+    to: config.clientName || '',
+    items: [{name: config.description || 'Servicios', quantity: config.hours || 1, unit_cost: config.rate || 0}],
+    notes: 'Generado por X1'
+  };
+  return fetch('https://invoice-generator.com', {
+    method: 'POST',
+    headers: headers,
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(20000)
+  }).then(function(r) {
+    if (!r.ok) return r.text().then(function(t) { throw new Error('HTTP ' + r.status + ': ' + t.substring(0, 200)); });
+    return r.arrayBuffer();
+  }).then(function(buf) {
+    var bytes = new Uint8Array(buf);
+    var binary = '';
+    var chunkSize = 0x8000;
+    for (var i = 0; i < bytes.length; i += chunkSize) {
+      binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+    }
+    return {ok: true, dataUrl: 'data:application/pdf;base64,' + btoa(binary)};
+  }).catch(function(e) { console.error('[X1] Invoice-Generator fail:', e.message); return {ok: false, error: e.message}; });
+}
+
 // ── Data Extraction to JSON/CSV ──
+// Below this threshold, the injected script likely hit an SPA that hasn't
+// rendered, a bot-walled page, or a restricted chrome:// URL — try Firecrawl
+// before giving up (Master Prompt v3 section 17.5).
+var EXTRACT_MIN_TEXT_LENGTH = 200;
+
 function extractStructuredData(tabId, schema) {
   return new Promise(function(resolve) {
     chrome.scripting.executeScript({
@@ -2500,27 +2492,58 @@ function extractStructuredData(tabId, schema) {
           }
           tables.push(rows);
         }
-        return {text: text.substring(0, 5000), tables: tables};
+        return {text: text.substring(0, 5000), tables: tables, url: window.location.href};
       }
     }).then(function(results) {
-      if (!results || !results[0] || !results[0].result) { resolve(null); return; }
-      var pageData = results[0].result;
-      var prompt = 'Extract structured data from this page content.\n\n';
-      if (schema) prompt += 'Schema requested: ' + schema + '\n\n';
-      prompt += 'Page text:\n' + pageData.text + '\n\n';
-      if (pageData.tables.length > 0) {
-        prompt += 'Tables found:\n' + JSON.stringify(pageData.tables) + '\n\n';
+      var pageData = (results && results[0] && results[0].result) || null;
+      if (pageData && pageData.text && pageData.text.length >= EXTRACT_MIN_TEXT_LENGTH) {
+        return runExtractionPrompt(pageData.text, pageData.tables, schema);
       }
-      prompt += 'Return ONLY valid JSON. If the data contains a list/table, return as array of objects. Include all relevant fields.';
-
-      aiComplete(prompt).then(function(result) {
-        resolve(result);
+      // Thin/empty page or executeScript blocked entirely — try Firecrawl.
+      return new Promise(function(res) {
+        chrome.tabs.get(tabId, function(tab) {
+          var url = (pageData && pageData.url) || (tab && tab.url);
+          if (!url) { res(null); return; }
+          firecrawlScrape(url).then(function(markdown) {
+            if (!markdown) { res(null); return; }
+            res(runExtractionPrompt(markdown, [], schema));
+          });
+        });
       });
+    }).then(function(result) {
+      resolve(result);
     }).catch(function(e) {
       console.error('[X1] extractStructuredData error:', e);
       resolve(null);
     });
   });
+}
+
+function runExtractionPrompt(text, tables, schema) {
+  var prompt = 'Extract structured data from this page content.\n\n';
+  if (schema) prompt += 'Schema requested: ' + schema + '\n\n';
+  prompt += 'Page text:\n' + text + '\n\n';
+  if (tables && tables.length > 0) {
+    prompt += 'Tables found:\n' + JSON.stringify(tables) + '\n\n';
+  }
+  prompt += 'Return ONLY valid JSON. If the data contains a list/table, return as array of objects. Include all relevant fields.';
+  return aiComplete(prompt);
+}
+
+// aiComplete()'s internal parseJSON wraps any JSON array the model returns as
+// {steps: [...]} (it's built for action-command parsing, not raw extraction) —
+// unwrap that here so extraction results reach jsonToCsv() instead of being
+// stringified back into a chat message.
+function extractArrayFromAIResult(result) {
+  if (!result) return null;
+  if (Array.isArray(result)) return result;
+  if (Array.isArray(result.steps)) return result.steps;
+  var txt = (typeof result === 'string') ? result : result.text;
+  if (typeof txt === 'string') {
+    var m = txt.match(/\[[\s\S]*\]/);
+    if (m) { try { return JSON.parse(m[0]); } catch (e) { /* not valid JSON, fall through */ } }
+  }
+  return null;
 }
 
 function jsonToCsv(jsonData) {
@@ -2901,12 +2924,6 @@ var promptTemplates = {
       return {system: sys + '\nThink step by step before answering.', user: usr};
     }
   },
-  deepseek: {
-    style: 'reasoning',
-    wrapper: function(sys, usr) {
-      return {system: sys + '\nReason carefully through each step.', user: usr};
-    }
-  },
   mistral: {
     style: 'structured',
     wrapper: function(sys, usr) {
@@ -2955,13 +2972,12 @@ function groupChat(userMsg, models) {
     groq: groqComplete,
     gemini: geminiComplete,
     ollama: ollamaComplete,
-    nvidia: nvidiaComplete,
+    nvidiaGlm: nvidiaGlmComplete,
+    nvidiaNemotron: nvidiaNemotronComplete,
+    nvidiaDeepseek: nvidiaDeepseekComplete,
     openrouter: openrouterComplete,
     cerebras: cerebrasComplete,
-    mistral: mistralComplete,
-    deepseek: deepseekComplete,
-    together: togetherComplete,
-    opencode: opencodeComplete
+    mistral: mistralComplete
   };
 
   var promises = models.map(function(model) {
@@ -2991,7 +3007,185 @@ function markProviderHealth(name, ok) {
   providerHealth[name] = ok ? (providerHealth[name] || 0) + 1 : -1;
 }
 
-function aiComplete(userMsg) {
+// ═══════════════════════════════════════════
+// PANEL + JUDGE (selective activation — decisión #2: no siempre activo)
+// ═══════════════════════════════════════════
+// El Juez solo entra en juego para tareas de alto riesgo/complejidad o petición
+// manual del usuario ("compara respuestas"), y nunca para SENSITIVE (eso se queda
+// en Ollama local, sin llamada externa). Fuera de esos casos, aiComplete sigue
+// usando el ganador por heurística de scoreResponse() (ya existente, gratis, sin
+// llamada extra) — eso ES la activación selectiva.
+
+var RUBRICS = {
+  conversational: { criteria: [
+    { name: 'utilidad', weight: 0.4, description: 'Responde directamente lo que se pidió' },
+    { name: 'concision', weight: 0.3, description: 'Sin relleno, apto para salida de voz' },
+    { name: 'tono', weight: 0.3, description: 'Tono natural y apropiado' }
+  ]},
+  reasoning: { criteria: [
+    { name: 'exactitud', weight: 0.4, description: 'Hechos y lógica correctos' },
+    { name: 'completitud', weight: 0.25, description: 'Cubre todas las partes de la pregunta' },
+    { name: 'estructura', weight: 0.15, description: 'Estructura clara, sin relleno' },
+    { name: 'razonamiento_auditable', weight: 0.2, description: 'El razonamiento se puede verificar paso a paso' }
+  ]},
+  long_context: { criteria: [
+    { name: 'cobertura', weight: 0.5, description: 'Refleja el documento/página completos, no solo el inicio' },
+    { name: 'fidelidad', weight: 0.3, description: 'No inventa datos que no están en el contexto' },
+    { name: 'concision', weight: 0.2, description: 'Resume sin perder lo esencial' }
+  ]},
+  code: { criteria: [
+    { name: 'correccion_funcional', weight: 0.6, description: 'El código o solución es correcto y funciona' },
+    { name: 'legibilidad', weight: 0.25, description: 'Buenas prácticas, nombres claros' },
+    { name: 'completitud', weight: 0.15, description: 'No deja partes a medias' }
+  ]},
+  agentic: { criteria: [
+    { name: 'plan_correcto', weight: 0.5, description: 'Los pasos propuestos realmente cumplen el objetivo' },
+    { name: 'seguridad', weight: 0.3, description: 'No propone acciones irreversibles sin confirmación' },
+    { name: 'eficiencia', weight: 0.2, description: 'Mínimo número de pasos razonable' }
+  ]},
+  multimodal: { criteria: [
+    { name: 'precision_visual', weight: 0.6, description: 'Describe correctamente lo que hay en la imagen/captura' },
+    { name: 'relevancia', weight: 0.4, description: 'Responde a lo que se preguntó sobre la imagen' }
+  ]},
+  translation: { criteria: [
+    { name: 'fidelidad', weight: 0.5, description: 'Traducción fiel al significado original' },
+    { name: 'naturalidad', weight: 0.5, description: 'Suena natural en el idioma destino, no literal' }
+  ]}
+};
+
+// Judges candidatos por tipo de tarea. pickJudgeProvider() descarta cualquiera
+// que ya haya respondido como candidato en esa misma llamada (decisión #5).
+var JUDGE_ROTATION = {
+  conversational: ['mistral', 'openrouter', 'nvidiaNemotron'],
+  reasoning: ['nvidiaNemotron', 'nvidiaDeepseek', 'mistral', 'openrouter'],
+  long_context: ['nvidiaNemotron', 'mistral'],
+  code: ['nvidiaDeepseek', 'openrouter'],
+  agentic: ['mistral', 'openrouter', 'nvidiaNemotron'],
+  multimodal: ['nvidiaNemotron', 'mistral'],
+  translation: ['nvidiaNemotron', 'mistral']
+};
+
+var JUDGE_PROVIDER_FN = {
+  groq: groqComplete, nvidiaGlm: nvidiaGlmComplete, nvidiaNemotron: nvidiaNemotronComplete,
+  nvidiaDeepseek: nvidiaDeepseekComplete, gemini: geminiComplete,
+  cerebras: cerebrasComplete, mistral: mistralComplete, openrouter: openrouterComplete
+};
+
+var JUDGE_KEY_FIELD = {
+  groq: 'groqKey', nvidiaGlm: 'nvidiaKey', nvidiaNemotron: 'nvidiaKey', nvidiaDeepseek: 'nvidiaKey',
+  gemini: 'geminiKey', cerebras: 'cerebrasKey', mistral: 'mistralKey', openrouter: 'openrouterKey'
+};
+
+function isHighRiskTask(userMsg, taskType) {
+  if (taskType === TASK_TYPES.SENSITIVE) return false; // Sensitive se queda solo en Ollama, sin Juez externo
+  var msg = (userMsg || '').toLowerCase();
+  var highRisk = /\b(contrato|cl[aá]usula|demanda|indemnizaci[oó]n|factura|presupuesto|inversi[oó]n|impuesto|declaraci[oó]n de (renta|hacienda)|n[oó]mina|despido|diagn[oó]stico|dosis|s[ií]ntoma|due diligence|valoraci[oó]n de empresa)\b/i;
+  if (highRisk.test(msg)) return true;
+  if (taskType === TASK_TYPES.REASONING && msg.length > 250) return true;
+  return false;
+}
+
+var PANEL_JUDGE_DAILY_LIMIT = 15;
+function canUsePanelJudgeToday() {
+  return new Promise(function(resolve) {
+    var today = new Date().toISOString().slice(0, 10);
+    chrome.storage.local.get('x1PanelJudgeUsage', function(r) {
+      var usage = (r && r.x1PanelJudgeUsage) || { date: today, count: 0 };
+      if (usage.date !== today) usage = { date: today, count: 0 };
+      resolve(usage.count < PANEL_JUDGE_DAILY_LIMIT);
+    });
+  });
+}
+function incrementPanelJudgeUsage() {
+  var today = new Date().toISOString().slice(0, 10);
+  chrome.storage.local.get('x1PanelJudgeUsage', function(r) {
+    var usage = (r && r.x1PanelJudgeUsage) || { date: today, count: 0 };
+    if (usage.date !== today) usage = { date: today, count: 0 };
+    usage.count++;
+    chrome.storage.local.set({ x1PanelJudgeUsage: usage });
+  });
+}
+
+// Histórico de veredictos — el activo defendible descrito en la sección 6 del
+// documento de Ensemble. userPick queda null hasta que exista UI de "ver
+// alternativas" con override manual (fuera de alcance de este cambio).
+function recordCalibration(taskType, judgePick, userPick) {
+  chrome.storage.local.get('x1PanelCalibration', function(r) {
+    var records = (r && r.x1PanelCalibration) || [];
+    records.push({
+      id: 'cal_' + Date.now(),
+      sector: taskType,
+      judgePick: judgePick ? { provider: judgePick.provider } : null,
+      userPick: userPick ? { provider: userPick.provider } : null,
+      agreement: userPick ? (!!judgePick && judgePick.provider === userPick.provider) : null,
+      timestamp: Date.now()
+    });
+    if (records.length > 500) records = records.slice(-500);
+    chrome.storage.local.set({ x1PanelCalibration: records });
+  });
+}
+
+function pickJudgeProvider(taskType, candidateNames) {
+  var rotation = JUDGE_ROTATION[taskType] || JUDGE_ROTATION.conversational;
+  var dayIndex = new Date().getDate();
+  for (var offset = 0; offset < rotation.length; offset++) {
+    var name = rotation[(dayIndex + offset) % rotation.length];
+    if (candidateNames.indexOf(name) !== -1) continue; // nunca juzga su propia familia de candidatos
+    if (!aiKeys[JUDGE_KEY_FIELD[name]]) continue;
+    return name;
+  }
+  return null;
+}
+
+function judgeRound(validResults, taskType, userMsg) {
+  var rubric = RUBRICS[taskType] || RUBRICS.conversational;
+  var candidateNames = validResults.map(function(r) { return r.provider; });
+  var judgeName = pickJudgeProvider(taskType, candidateNames);
+  if (!judgeName) return Promise.resolve(null);
+
+  var prompt = 'Estás evaluando ' + validResults.length + ' respuestas candidatas a la misma consulta, con este rubric: ' +
+    JSON.stringify(rubric) +
+    '.\n\nConsulta original: ' + userMsg +
+    '\n\nCandidatas:\n' + validResults.map(function(r, i) { return '[' + i + '] (' + r.provider + '): ' + r.txt; }).join('\n\n') +
+    '\n\nResponde SOLO con JSON, sin texto adicional: {"winnerIndex": number, "justification": "máx 2 frases"}';
+
+  return JUDGE_PROVIDER_FN[judgeName](prompt).then(function(raw) {
+    if (!raw) return null;
+    var m = raw.match(/\{[\s\S]*\}/);
+    if (!m) return null;
+    var verdict;
+    try { verdict = JSON.parse(m[0]); } catch (e) { return null; }
+    if (!verdict || typeof verdict.winnerIndex !== 'number' || !validResults[verdict.winnerIndex]) return null;
+    return {
+      winner: validResults[verdict.winnerIndex],
+      judge: judgeName,
+      justification: verdict.justification || '',
+      alternatives: validResults.filter(function(_, i) { return i !== verdict.winnerIndex; })
+    };
+  }).catch(function() { return null; });
+}
+
+function heuristicWinner(valid, results) {
+  valid.sort(function(a, b) {
+    if (b.score !== a.score) return b.score - a.score;
+    return a.elapsed - b.elapsed;
+  });
+  var winner = valid[0];
+  console.log('[X1] Panel winner:', winner.provider, '(score:', winner.score, ', ' + winner.elapsed + 'ms)');
+  if (valid.length > 1) {
+    console.log('[X1] Panel alternatives:', valid.slice(1).map(function(r) {
+      return r.provider + ' (score:' + r.score + ', ' + r.elapsed + 'ms)';
+    }).join(', '));
+  }
+  var failed = results.filter(function(r) { return r.error; });
+  if (failed.length > 0) {
+    console.log('[X1] Panel failures:', failed.map(function(r) { return r.provider + ':' + r.error; }).join(', '));
+  }
+  return winner.parsed;
+}
+
+function aiComplete(userMsg, opts) {
+  opts = opts || {};
   var timeoutMs = 22000;
   var timeoutPromise = new Promise(function(resolve) {
     setTimeout(function() {
@@ -3046,19 +3240,16 @@ function aiComplete(userMsg) {
 
   function getAllProviders() {
     return [
-      {name:'proxy', fn:proxyComplete, has:!!PROXY_URL, fast:true},
       {name:'groq', fn:groqComplete, has:!!aiKeys.groqKey, fast:true},
-      {name:'nvidia', fn:nvidiaComplete, has:!!aiKeys.nvidiaKey, fast:true},
+      {name:'nvidiaGlm', fn:nvidiaGlmComplete, has:!!aiKeys.nvidiaKey, fast:true},
+      {name:'nvidiaNemotron', fn:nvidiaNemotronComplete, has:!!aiKeys.nvidiaKey, fast:true},
+      {name:'nvidiaDeepseek', fn:nvidiaDeepseekComplete, has:!!aiKeys.nvidiaKey, fast:false},
       {name:'gemini', fn:geminiComplete, has:!!aiKeys.geminiKey, fast:true},
       {name:'cerebras', fn:cerebrasComplete, has:!!aiKeys.cerebrasKey, fast:true},
-      {name:'sambanova', fn:sambanovaComplete, has:!!aiKeys.sambanovaKey, fast:true},
       {name:'mistral', fn:mistralComplete, has:!!aiKeys.mistralKey, fast:true},
-      {name:'deepseek', fn:deepseekComplete, has:!!aiKeys.deepseekKey, fast:false},
-      {name:'together', fn:togetherComplete, has:!!aiKeys.togetherKey, fast:false},
       {name:'openrouter', fn:openrouterComplete, has:!!aiKeys.openrouterKey, fast:false},
-      {name:'cloudflare', fn:cloudflareComplete, has:!!(aiKeys.cloudflareAccountId && aiKeys.cloudflareKey), fast:false},
-      {name:'ollama', fn:ollamaComplete, has:true, fast:false},
-      {name:'opencode', fn:opencodeComplete, has:!!aiKeys.opencodeKey, fast:false}
+      {name:'proxy', fn:proxyComplete, has:true, fast:true},
+      {name:'ollama', fn:ollamaComplete, has:true, fast:false}
     ];
   }
 
@@ -3075,7 +3266,7 @@ function aiComplete(userMsg) {
   }
 
   function ensureKeysLoaded() {
-    if (aiKeys && (aiKeys.groqKey || aiKeys.opencodeKey)) return Promise.resolve(aiKeys);
+    if (aiKeys && aiKeys.groqKey) return Promise.resolve(aiKeys);
     return loadAIKeys();
   }
 
@@ -3127,22 +3318,30 @@ function aiComplete(userMsg) {
       var valid = results.filter(function(r) { return r.parsed && r.score >= 0; });
 
       if (valid.length > 0) {
-        valid.sort(function(a, b) {
-          if (b.score !== a.score) return b.score - a.score;
-          return a.elapsed - b.elapsed;
-        });
-        var winner = valid[0];
-        console.log('[X1] Panel winner:', winner.provider, '(score:', winner.score, ', ' + winner.elapsed + 'ms)');
-        if (valid.length > 1) {
-          console.log('[X1] Panel alternatives:', valid.slice(1).map(function(r) {
-            return r.provider + ' (score:' + r.score + ', ' + r.elapsed + 'ms)';
-          }).join(', '));
+        var taskTypeForJudge = classifyTask(userMsg);
+        var wantsJudge = !!opts.forceJudge || isHighRiskTask(userMsg, taskTypeForJudge);
+        var canJudge = valid.length >= 2 && taskTypeForJudge !== TASK_TYPES.SENSITIVE && wantsJudge;
+
+        if (canJudge) {
+          return canUsePanelJudgeToday().then(function(allowed) {
+            if (!allowed) {
+              console.log('[X1] Panel+Juez: límite diario alcanzado, uso ganador por heurística');
+              return heuristicWinner(valid, results);
+            }
+            return judgeRound(valid, taskTypeForJudge, userMsg).then(function(verdict) {
+              if (!verdict) {
+                console.warn('[X1] Panel+Juez: el juez no dio veredicto válido, uso heurística');
+                return heuristicWinner(valid, results);
+              }
+              incrementPanelJudgeUsage();
+              recordCalibration(taskTypeForJudge, verdict.winner, null);
+              console.log('[X1] Panel+Juez winner:', verdict.winner.provider, '| Juez:', verdict.judge, '|', verdict.justification);
+              return verdict.winner.parsed;
+            });
+          });
         }
-        var failed = results.filter(function(r) { return r.error; });
-        if (failed.length > 0) {
-          console.log('[X1] Panel failures:', failed.map(function(r) { return r.provider + ':' + r.error; }).join(', '));
-        }
-        return winner.parsed;
+
+        return heuristicWinner(valid, results);
       }
 
       console.warn('[X1] All panel candidates failed, falling back to cascade...');
@@ -4353,6 +4552,18 @@ function execAction(act, tabId) {
         var edIdx = stepProgress(tabId, 'Extract', 'Extrayendo datos...');
         extractStructuredData(tabId, act.schema || '').then(function(result) {
           stepDone(tabId, edIdx);
+          var rows = extractArrayFromAIResult(result);
+          if (rows && rows.length > 0) {
+            var csv = jsonToCsv(rows);
+            if (csv) {
+              var dataUrl = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+              chrome.downloads.download({url: dataUrl, filename: 'x1-extract-' + Date.now() + '.csv', saveAs: false}, function() {
+                if (chrome.runtime.lastError) console.error('[X1] CSV download failed:', chrome.runtime.lastError.message);
+              });
+              resolve({text: 'Extraidos ' + rows.length + ' registros. Descargando CSV.', showText: true});
+              return;
+            }
+          }
           if (result && result.text) {
             resolve({text: result.text, showText: true});
           } else if (result) {
@@ -4428,6 +4639,52 @@ function execAction(act, tabId) {
         resolve({text: 'Alerta de precio creada para ' + (act.productName || 'producto') + '. Te aviso cuando baje de ' + pa.currency + ' ' + pa.targetPrice + '.', showText: true});
         break;
 
+      case 'crmPush':
+        var crmIdx = stepProgress(tabId, 'CRM', 'Enviando a ' + act.crm + '...');
+        pushLeadToCRM(act.crm, act.lead || {}).then(function(pushResult) {
+          stepDone(tabId, crmIdx);
+          if (pushResult && pushResult.ok) {
+            resolve({text: 'Lead enviado a ' + act.crm + ' (id ' + pushResult.id + ').', showText: true});
+          } else {
+            resolve({text: 'No se pudo enviar a ' + act.crm + ': ' + ((pushResult && pushResult.error) || 'sin clave configurada'), showText: true});
+          }
+        }).catch(function(e) {
+          stepError(tabId, crmIdx);
+          resolve({text: 'Error CRM: ' + e.message, showText: true});
+        });
+        break;
+
+      case 'financialQuote':
+        var fqIdx = stepProgress(tabId, 'Finance', 'Consultando cotizacion...');
+        getFinancialQuote(act.ticker).then(function(quote) {
+          stepDone(tabId, fqIdx);
+          if (!quote) { resolve({text: 'No se pudo obtener la cotizacion de ' + act.ticker + '.', showText: true}); return; }
+          var arrow = quote.change >= 0 ? '+' : '';
+          resolve({text: quote.ticker + ': $' + quote.current + ' (' + arrow + quote.change + ', ' + arrow + quote.changePercent + '%)', showText: true});
+        }).catch(function(e) {
+          stepError(tabId, fqIdx);
+          resolve({text: 'Error cotizacion: ' + e.message, showText: true});
+        });
+        break;
+
+      case 'generateInvoicePdf':
+        var invIdx = stepProgress(tabId, 'Invoice', 'Generando factura...');
+        generateInvoicePdf(act).then(function(invResult) {
+          stepDone(tabId, invIdx);
+          if (invResult && invResult.ok) {
+            chrome.downloads.download({url: invResult.dataUrl, filename: 'factura-' + Date.now() + '.pdf', saveAs: false}, function() {
+              if (chrome.runtime.lastError) console.error('[X1] Invoice download failed:', chrome.runtime.lastError.message);
+            });
+            resolve({text: 'Factura generada y descargada.', showText: true});
+          } else {
+            resolve({text: 'No se pudo generar la factura: ' + ((invResult && invResult.error) || 'error desconocido'), showText: true});
+          }
+        }).catch(function(e) {
+          stepError(tabId, invIdx);
+          resolve({text: 'Error factura: ' + e.message, showText: true});
+        });
+        break;
+
       case 'groupChat':
         var gcIdx = stepProgress(tabId, 'Group Chat', 'Comparando modelos...');
         var models = act.models || ['groq', 'gemini', 'ollama'];
@@ -4480,7 +4737,7 @@ function execAction(act, tabId) {
         if (typeof X1FinancialData === 'undefined') { stepError(tabId, cnIdx); resolve({text: 'Modulo financiero no disponible.', showText: true}); break; }
         X1FinancialData.getCompanyNews(act.symbol || '', act.days || 7).then(function(news) {
           stepDone(tabId, cnIdx);
-          if (!news || news.length === 0) { resolve({text: 'No hay noticias recientes.', showText: true}); break; }
+          if (!news || news.length === 0) { resolve({text: 'No hay noticias recientes.', showText: true}); return; }
           var nText = 'Noticias de ' + (act.symbol || '') + ':\n';
           news.forEach(function(n, i) { nText += (i+1) + '. ' + n.headline + ' (' + n.source + ')\n'; });
           resolve({text: nText, showText: true});
@@ -5032,14 +5289,14 @@ function runAgentLoop(tabId, goal, url, resolve) {
           }
           function tryProxy() {
             if(!PROXY_URL) return Promise.reject('no proxy');
-            return fetch(PROXY_URL+'/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:[
+            var proxyHeaders = {'Content-Type':'application/json', 'X-X1-Auth': aiKeys.proxySecret || PROXY_SHARED_SECRET};
+            return fetch(PROXY_URL+'/v1/chat/completions',{method:'POST',headers:proxyHeaders,body:JSON.stringify({messages:[
               {role:'system',content:'Eres X1, agente web experto. Responde SOLO con una accion: click, type, typeIn, scroll, search, navigate, back, done. Formato: accion "parametro".'},
               {role:'user',content:prompt}
             ]}),signal:AbortSignal.timeout(15000)}).then(function(r){return r.json();}).then(function(d){var t=(d.choices&&d.choices[0]&&d.choices[0].message&&d.choices[0].message.content||'').trim();if(!isValidContent(t)) throw new Error('bad');return t;});
           }
           var fallbacks = [];
           if(aiKeys.groqKey) fallbacks.push(function(){return callOpenAICompat('https://api.groq.com/openai/v1/chat/completions',aiKeys.groqKey,'llama-3.3-70b-versatile');});
-          if(aiKeys.opencodeKey) fallbacks.push(function(){return callOpenAICompat('https://opencode.ai/zen/v1/chat/completions',aiKeys.opencodeKey,'big-pickle');});
           function tryFallback(i) { if(i>=fallbacks.length) return Promise.resolve(null); return fallbacks[i]().catch(function(){return tryFallback(i+1);}); }
           return tryProxy().catch(function(){return tryFallback(0);});
         }
@@ -5197,7 +5454,7 @@ function handleVoice(cmd, wantsText, sendResponse) {
     }
   }
 
-  var hasAnyKey = !!(aiKeys.groqKey || aiKeys.opencodeKey || aiKeys.nvidiaKey || aiKeys.geminiKey || aiKeys.deepseekKey || aiKeys.openrouterKey || aiKeys.cerebrasKey || aiKeys.sambanovaKey || aiKeys.mistralKey || aiKeys.togetherKey || (aiKeys.cloudflareAccountId && aiKeys.cloudflareKey));
+  var hasAnyKey = !!(aiKeys.groqKey || aiKeys.nvidiaKey || aiKeys.geminiKey || aiKeys.openrouterKey || aiKeys.cerebrasKey || aiKeys.mistralKey);
   var hasProxy = !!PROXY_URL;
   var hasOllama = ollamaModels && ollamaModels.length > 0;
   if (!hasAnyKey && !hasProxy && !hasOllama) {
@@ -5252,6 +5509,25 @@ function handleVoice(cmd, wantsText, sendResponse) {
     var tabUrl = tab.url || '';
     var isRestricted = tabUrl.indexOf('chrome://') === 0 || tabUrl.indexOf('chrome-extension://') === 0 || tabUrl.indexOf('about:') === 0 || tabUrl.indexOf('edge://') === 0;
     console.log('[X1] Active tab:', tabId, tabUrl, isRestricted ? '(restricted)' : '');
+
+    // ── Activación manual del Panel+Juez (sección 4.1: alto riesgo o petición explícita) ──
+    var mForcePanel = cmd.match(/^(?:compara respuestas|activa el juez|quiero varias opiniones|verifica con el juez)\s*(.*)$/i);
+    if (mForcePanel) {
+      clearTimeout(fastTimer); clearTimeout(slowTimer);
+      var forcedQuery = mForcePanel[1].trim();
+      if (!forcedQuery) {
+        respond({text: 'Vale, ¿qué pregunta quieres que compare entre varias IAs?', showText: true});
+        return;
+      }
+      console.log('[X1] Panel+Juez forzado manualmente:', forcedQuery);
+      aiComplete(forcedQuery, {forceJudge: true}).then(function(llmAction) {
+        var text = (llmAction && llmAction.text) || 'No he podido comparar respuestas ahora mismo.';
+        respond({text: text, showText: true});
+      }).catch(function(e) {
+        respond({text: 'Error al comparar respuestas: ' + e.message, showText: true});
+      });
+      return;
+    }
 
     var action = parseCommand(cmd);
     if(action){
@@ -6157,10 +6433,8 @@ var aiProviders = {
   openai: {name: "OpenAI", models: ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo"], baseUrl: "https://api.openai.com/v1/chat/completions"},
   gemini: {name: "Gemini", models: ["gemini-2.0-flash", "gemini-1.5-pro"], baseUrl: "https://generativelanguage.googleapis.com/v1beta/models/"},
   anthropic: {name: "Anthropic", models: ["claude-3-5-sonnet-20241022", "claude-3-haiku-20240307"], baseUrl: "https://api.anthropic.com/v1/messages"},
-  deepseek: {name: "DeepSeek", models: ["deepseek-chat", "deepseek-reasoner"], baseUrl: "https://api.deepseek.com/v1/chat/completions"},
-  opencode: {name: "OpenCode", models: ["opencode-model"], baseUrl: "https://opencode.ai/v1/chat/completions"},
   ollama: {name: "Ollama", models: ["llama3", "mistral", "codellama"], baseUrl: "http://localhost:11434/api/chat"},
-  nvidia: {name: "NVIDIA", models: ["nemotron-3-ultra", "nemotron-4-340b-instruct", "llama-3.1-nemotron-70b-instruct"], baseUrl: "https://integrate.api.nvidia.com/v1/chat/completions"}
+  nvidia: {name: "NVIDIA NIM", models: ["z-ai/glm-5.1", "nvidia/nemotron-3-ultra-550b-a55b", "deepseek-ai/deepseek-v4-pro"], baseUrl: "https://integrate.api.nvidia.com/v1/chat/completions"}
 };
 
 function getAvailableProviders() {
@@ -6292,10 +6566,12 @@ async function executeWorkflow(workflowId, input) {
     startedAt: Date.now()
   };
   workflowEngine.executions[execId] = execution;
+  var stepResults = {}; // keyed by step.id — lets a later step (e.g. calculate) read an earlier step's output
   for (var i = 0; i < wf.steps.length; i++) {
     var step = wf.steps[i];
     try {
-      var result = await executeWorkflowStep(execId, step, input);
+      var result = await executeWorkflowStep(execId, step, input, stepResults);
+      if (step.id) stepResults[step.id] = result;
       execution.steps.push({stepId: step.id, result: result, status: "completed", time: Date.now()});
     } catch(e) {
       execution.steps.push({stepId: step.id, error: e.message, status: "error", time: Date.now()});
@@ -6312,8 +6588,153 @@ async function executeWorkflow(workflowId, input) {
   return execution;
 }
 
-async function executeWorkflowStep(execId, step, input) {
+// ── Safe arithmetic evaluator for the 'calculate' step type (B.19) ──
+// No npm dep (mathjs assumes a bundler this project doesn't have — manifest.json
+// loads service-worker.js as a plain unbundled file) and no eval()/new Function()
+// per the codebase's own banned-patterns rule. Hand-rolled recursive-descent
+// parser: + - * / % ^, parentheses, unary minus, variables from scope, and a
+// small whitelisted function set (sum/avg/min/max/round/abs).
+function safeEvaluate(expr, scope) {
+  scope = scope || {};
+  var pos = 0;
+
+  function peek() { return expr[pos]; }
+  function isDigit(c) { return c >= '0' && c <= '9'; }
+  function isIdentStart(c) { return !!c && /[A-Za-z_]/.test(c); }
+  function isIdentPart(c) { return !!c && /[A-Za-z0-9_]/.test(c); }
+  function skipWs() { while (pos < expr.length && /\s/.test(expr[pos])) pos++; }
+
+  function flattenNumbers(args) {
+    var out = [];
+    args.forEach(function(a) {
+      if (Array.isArray(a)) a.forEach(function(x) { out.push(Number(x)); });
+      else out.push(Number(a));
+    });
+    return out;
+  }
+
+  function callSafeFunction(name, args) {
+    switch (name) {
+      case 'sum': return flattenNumbers(args).reduce(function(a, b) { return a + b; }, 0);
+      case 'avg':
+        var nums = flattenNumbers(args);
+        return nums.length ? nums.reduce(function(a, b) { return a + b; }, 0) / nums.length : 0;
+      case 'min': return Math.min.apply(null, flattenNumbers(args));
+      case 'max': return Math.max.apply(null, flattenNumbers(args));
+      case 'round':
+        var decimals = Math.pow(10, args[1] || 0);
+        return Math.round(args[0] * decimals) / decimals;
+      case 'abs': return Math.abs(args[0]);
+      default: throw new Error('Unknown function: ' + name);
+    }
+  }
+
+  function lookupVar(name) {
+    if (Object.prototype.hasOwnProperty.call(scope, name)) return scope[name];
+    throw new Error('Unknown variable: ' + name);
+  }
+
+  function parseExpression() { return parseAddSub(); }
+
+  function parseAddSub() {
+    var left = parseMulDiv();
+    for (;;) {
+      skipWs();
+      var c = peek();
+      if (c === '+' || c === '-') {
+        pos++;
+        var right = parseMulDiv();
+        left = c === '+' ? left + right : left - right;
+      } else break;
+    }
+    return left;
+  }
+
+  function parseMulDiv() {
+    var left = parsePow();
+    for (;;) {
+      skipWs();
+      var c = peek();
+      if (c === '*' || c === '/' || c === '%') {
+        pos++;
+        var right = parsePow();
+        if (c === '*') left = left * right;
+        else if (c === '/') left = left / right;
+        else left = left % right;
+      } else break;
+    }
+    return left;
+  }
+
+  function parsePow() {
+    var left = parseUnary();
+    skipWs();
+    if (peek() === '^') {
+      pos++;
+      return Math.pow(left, parsePow());
+    }
+    return left;
+  }
+
+  function parseUnary() {
+    skipWs();
+    if (peek() === '-') { pos++; return -parseUnary(); }
+    if (peek() === '+') { pos++; return parseUnary(); }
+    return parseAtom();
+  }
+
+  function parseAtom() {
+    skipWs();
+    var c = peek();
+    if (c === '(') {
+      pos++;
+      var v = parseExpression();
+      skipWs();
+      if (peek() !== ')') throw new Error('Expected )');
+      pos++;
+      return v;
+    }
+    if (isDigit(c) || c === '.') {
+      var start = pos;
+      while (pos < expr.length && (isDigit(expr[pos]) || expr[pos] === '.')) pos++;
+      return parseFloat(expr.slice(start, pos));
+    }
+    if (isIdentStart(c)) {
+      var start = pos;
+      while (pos < expr.length && isIdentPart(expr[pos])) pos++;
+      var name = expr.slice(start, pos);
+      skipWs();
+      if (peek() === '(') {
+        pos++;
+        var args = [];
+        skipWs();
+        if (peek() !== ')') {
+          args.push(parseExpression());
+          skipWs();
+          while (peek() === ',') { pos++; args.push(parseExpression()); skipWs(); }
+        }
+        skipWs();
+        if (peek() !== ')') throw new Error('Expected ) after function args');
+        pos++;
+        return callSafeFunction(name, args);
+      }
+      return lookupVar(name);
+    }
+    throw new Error('Unexpected character "' + c + '" at position ' + pos);
+  }
+
+  var result = parseExpression();
+  skipWs();
+  if (pos < expr.length) throw new Error('Unexpected trailing input at position ' + pos);
+  return result;
+}
+
+async function executeWorkflowStep(execId, step, input, stepResults) {
   switch (step.type) {
+    case "calculate":
+      if (!step.expression) throw new Error("calculate step requires 'expression'");
+      var calcScope = Object.assign({}, input, stepResults || {}, step.scope || {});
+      return safeEvaluate(step.expression, calcScope);
     case "navigate":
       if (step.url) {
         var tab = await getActiveTab();
