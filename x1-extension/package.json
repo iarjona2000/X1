@@ -9,7 +9,7 @@
     "dev": "webpack --config webpack.config.js --mode development",
     "test": "jest",
     "test:watch": "jest --watch",
-    "lint": "eslint src/**/*.js"
+    "lint": "eslint ../background/x1-core/**/*.js"
   },
   "dependencies": {
     "crypto-js": "^4.1.0",
