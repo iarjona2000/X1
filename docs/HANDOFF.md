@@ -195,8 +195,8 @@ Claves requeridas en `chrome.storage.local`:
 
 ## CONTACT
 
-User: Tomas Calero (@tomas)  
-Email: marc.calero@iese.net  
+User: Iván Arjona (@iarjona2000) — Co-fundador  
+Marc Calero (@tomas) — Co-fundador  
 Timezone: Europe/Madrid  
 Preferences: Spanish user-facing, English code, no emojis unless asked, ULTRATHINK mode  
 Session Length: Prefer longer focused sessions over many short ones

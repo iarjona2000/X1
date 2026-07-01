@@ -289,10 +289,11 @@ See `docs/HANDOFF.md` for detailed 7-step testing roadmap.
 
 ---
 
-## Author
+## Authors / Fundadores
 
-Tomas Calero (@tomas)  
-marc.calero@iese.net  
-Co-founder, voice-first AI enthusiast.
+Iván Arjona (@iarjona2000) — Co-fundador, arquitectura backend e integración de agentes.  
+Marc Calero (@tomas) — Co-fundador, diseño de voz y experiencia de usuario.
+
+Ambos co-fundadores de X1 — agente de navegador voice-first.
 
 **X1 Mission**: Replace the keyboard with your voice as the primary input modality. See everything, act on everything.

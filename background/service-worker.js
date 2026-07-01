@@ -1598,7 +1598,7 @@ function buildSystemPrompt(pageCtx, userQuery) {
     if (parts.length) semantic = parts.join('\n\n');
   }
   
-  var userEmail = (googleUser && googleUser.email) ? googleUser.email : 'marc.calero@iese.net';
+  var userEmail = (googleUser && googleUser.email) ? googleUser.email : 'cofounder@x1.ai';
   var pc = pageCtx || lastPageContext || 'desconocida';
   var prompt = SYSTEM_PROMPT.replace('{DATE}', date).replace('{DATE}', date);
   prompt = prompt.replace('{MEMORY}', mem || '(ninguna)');
