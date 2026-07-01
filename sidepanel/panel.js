@@ -83,7 +83,7 @@
     });
   }
 
-  function addMessage(role, text) {
+  function addMessage(role, text, stream) {
     var welcomeEl = messagesEl.querySelector('.welcome');
     if (welcomeEl) welcomeEl.remove();
 
@@ -94,7 +94,12 @@
     body.className = 'msg-body';
 
     if (role === 'ai') {
-      body.innerHTML = formatText(text);
+      if (stream) {
+        body.textContent = '';
+        msg._streaming = true;
+      } else {
+        body.innerHTML = formatText(text);
+      }
     } else {
       body.textContent = text;
     }
@@ -106,6 +111,28 @@
     messages.push({ role: role, text: text });
 
     return msg;
+  }
+
+  function streamAiText(msgElement, fullText) {
+    if (!msgElement || !msgElement._streaming) return;
+    var body = msgElement.querySelector('.msg-body');
+    if (!body) return;
+    
+    var index = 0;
+    var chunkSize = 3;
+    var interval = setInterval(function() {
+      if (index < fullText.length) {
+        var chunk = fullText.substring(0, index + chunkSize);
+        body.innerHTML = formatText(chunk);
+        index += chunkSize;
+        scrollToBottom();
+      } else {
+        clearInterval(interval);
+        body.innerHTML = formatText(fullText);
+        msgElement._streaming = false;
+        scrollToBottom();
+      }
+    }, 16);
   }
 
   function showThinking() {
@@ -228,7 +255,8 @@
             return;
           }
           if (response && response.text) {
-            addMessage('ai', response.text);
+            var aiMsg = addMessage('ai', response.text, true);
+            streamAiText(aiMsg, response.text);
             speak(response.text);
           } else if (response && response.error) {
             addMessage('ai', response.error);
@@ -657,7 +685,8 @@
     if (msg.type === 'X1_VOICE_RESULT') {
       removeThinking();
       if (msg.text) {
-        addMessage('ai', msg.text);
+        var aiMsg = addMessage('ai', msg.text, true);
+        streamAiText(aiMsg, msg.text);
       }
     }
   });
