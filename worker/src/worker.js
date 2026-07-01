@@ -23,15 +23,21 @@ async function handleRequest(request, env, ctx) {
     return new Response(null, { status: 204, headers: CORS_HEADERS });
   }
 
-  // Health
+  // Health — left open, no secrets or spend-relevant info exposed.
   if (url.pathname === '/health') {
     return jsonResponse({
       status: 'ok',
       version: 'x1-proxy-v4',
-      timestamp: Date.now(),
-      providers: providerStatus(env)
+      timestamp: Date.now()
     });
   }
+
+  // Everything past this point costs money or leaks infra info — gate it.
+  var authError = checkAuth(request, env);
+  if (authError) return authError;
+
+  var rateLimitError = await checkRateLimit(request, env, ctx);
+  if (rateLimitError) return rateLimitError;
 
   // Debug
   if (url.pathname === '/debug') {
@@ -98,6 +104,37 @@ async function handleRequest(request, env, ctx) {
 }
 
 // ── helpers ──
+
+// Shared-secret gate. Fails closed: if PROXY_SHARED_SECRET isn't set, every
+// paid/info-leaking route is refused rather than silently staying open.
+// Set it with: npx wrangler secret put PROXY_SHARED_SECRET
+// The extension must send the same value in the X-X1-Auth header (Settings → proxySecret).
+function checkAuth(request, env) {
+  var configured = env.PROXY_SHARED_SECRET;
+  if (!configured) {
+    return jsonResponse({ error: 'proxy_not_configured' }, 503);
+  }
+  var provided = request.headers.get('X-X1-Auth');
+  if (provided !== configured) {
+    return jsonResponse({ error: 'unauthorized' }, 401);
+  }
+  return null;
+}
+
+// Per-IP rate limit backed by KV. No-ops until X1_KV is bound in wrangler.toml
+// (see the Phase 5 comment there) — the shared secret above is the primary gate.
+async function checkRateLimit(request, env, ctx) {
+  if (!env.X1_KV) return null;
+  var ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+  var limit = parseInt(env.RATE_LIMIT_PER_MIN) || 30;
+  var bucket = 'rl:' + ip + ':' + Math.floor(Date.now() / 60000);
+  var current = parseInt(await env.X1_KV.get(bucket)) || 0;
+  if (current >= limit) {
+    return jsonResponse({ error: 'rate_limited' }, 429);
+  }
+  ctx.waitUntil(env.X1_KV.put(bucket, String(current + 1), { expirationTtl: 90 }));
+  return null;
+}
 
 function providerStatus(env) {
   var out = {};

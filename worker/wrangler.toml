@@ -1,7 +1,7 @@
 name = "x1-proxy"
 main = "src/worker.js"
 compatibility_date = "2026-06-01"
-account_id = "130e823c470feb5c46d25d59a5f9bcd3"
+account_id = "64bb1a5452d4edc505546d47e5f99959"
 
 # ═══════════════════════════════════════════
 # Worker config — X1 AI Gateway (v4)
@@ -25,6 +25,12 @@ account_id = "130e823c470feb5c46d25d59a5f9bcd3"
 #   npx wrangler secret put OPENCODE_KEY
 #   npx wrangler secret put ANTHROPIC_KEY      # disabled in v4, ready for Phase 6
 #   npx wrangler secret put TAVILY_KEY         # web search (Phase 6)
+#
+#   npx wrangler secret put PROXY_SHARED_SECRET
+#     Required. Gates /v1/chat/completions and /debug — without it the worker
+#     fails closed (503) rather than staying open to anyone who finds the URL.
+#     The extension must send the identical value in the X-X1-Auth header
+#     (set it once in X1 Settings → "Proxy secret" — same value, never in code).
 
 # === Vars (non-secret, set inline) ===
 [vars]
@@ -44,7 +50,12 @@ BREAKER_FAILS = "3"
 # Circuit breaker: cooldown before re-trying a tripped provider (ms).
 BREAKER_COOLDOWN_MS = "60000"
 
-# === KV namespaces (Phase 5: per-IP rate limiting + cross-worker breaker state) ===
+# Max requests per IP per minute — only enforced once X1_KV is bound below.
+RATE_LIMIT_PER_MIN = "30"
+
+# === KV namespaces (per-IP rate limiting + cross-worker breaker state) ===
+# Optional but recommended now that /v1/chat/completions is auth-gated: the
+# shared secret stops randoms, but if it ever leaks, this caps the damage.
 # To create: npx wrangler kv:namespace create X1_KV
 # Then paste the id below:
 # [[kv_namespaces]]

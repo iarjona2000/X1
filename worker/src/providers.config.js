@@ -26,8 +26,8 @@ export const PROVIDERS = [
     tier: 'fast',
     cost: 1,
     authStyle: 'bearer',
-    active: true,
-    notes: 'Ultra-fast Llama 70B. Best price/perf for fast tier.'
+    active: false,
+    notes: 'Ultra-fast Llama 70B. Desactivado temporalmente — solo GLM 5.1 (nvidia) activo mientras se valida el Panel+Juez.'
   },
   {
     name: 'cerebras',
@@ -38,8 +38,8 @@ export const PROVIDERS = [
     tier: 'fast',
     cost: 1,
     authStyle: 'bearer',
-    active: true,
-    notes: 'Ultra-fast inference. Llama 70B variant.'
+    active: false,
+    notes: 'Ultra-fast inference. Desactivado temporalmente.'
   },
   {
     name: 'sambanova',
@@ -50,8 +50,8 @@ export const PROVIDERS = [
     tier: 'fast',
     cost: 1,
     authStyle: 'bearer',
-    active: true,
-    notes: 'Fast Llama 70B. RDU accelerator.'
+    active: false,
+    notes: 'Descartado del catálogo objetivo (sin free tier real y durable).'
   },
   {
     name: 'grok',
@@ -62,8 +62,8 @@ export const PROVIDERS = [
     tier: 'fast',
     cost: 2,
     authStyle: 'bearer',
-    active: true,
-    notes: 'xAI Grok. Cheap fast tier.'
+    active: false,
+    notes: 'Descartado del catálogo objetivo.'
   },
   {
     name: 'openai',
@@ -74,8 +74,8 @@ export const PROVIDERS = [
     tier: 'slow',
     cost: 3,
     authStyle: 'bearer',
-    active: true,
-    notes: 'gpt-4o-mini. Use for tool-calling + JSON-mode tasks.'
+    active: false,
+    notes: 'Descartado del catálogo objetivo.'
   },
   {
     name: 'gemini',
@@ -86,8 +86,8 @@ export const PROVIDERS = [
     tier: 'fast',
     cost: 1,
     authStyle: 'bearer',
-    active: true,
-    notes: 'Google Gemini 2.0 Flash via OpenAI-compat endpoint.'
+    active: false,
+    notes: 'Google Gemini 2.0 Flash via OpenAI-compat endpoint. Desactivado temporalmente.'
   },
   {
     name: 'mistral',
@@ -98,8 +98,8 @@ export const PROVIDERS = [
     tier: 'slow',
     cost: 2,
     authStyle: 'bearer',
-    active: true,
-    notes: 'Mistral small. European option.'
+    active: false,
+    notes: 'Mistral small. Desactivado temporalmente.'
   },
   {
     name: 'deepseek',
@@ -110,8 +110,8 @@ export const PROVIDERS = [
     tier: 'slow',
     cost: 1,
     authStyle: 'bearer',
-    active: true,
-    notes: 'DeepSeek V3. Very cheap, strong reasoning.'
+    active: false,
+    notes: 'Descartado del catálogo objetivo.'
   },
   {
     name: 'together',
@@ -122,8 +122,8 @@ export const PROVIDERS = [
     tier: 'slow',
     cost: 1,
     authStyle: 'bearer',
-    active: true,
-    notes: 'Open-weights aggregator.'
+    active: false,
+    notes: 'Descartado del catálogo objetivo.'
   },
   {
     name: 'openrouter',
@@ -134,8 +134,8 @@ export const PROVIDERS = [
     tier: 'slow',
     cost: 2,
     authStyle: 'bearer',
-    active: true,
-    notes: 'Multi-provider router. Fallback of fallbacks.'
+    active: false,
+    notes: 'Multi-provider router. Desactivado temporalmente.'
   },
   {
     name: 'opencode',
@@ -146,20 +146,44 @@ export const PROVIDERS = [
     tier: 'slow',
     cost: 0,
     authStyle: 'bearer',
-    active: true,
-    notes: 'Free tier via OpenCode Zen.'
+    active: false,
+    notes: 'Descartado del catálogo objetivo.'
   },
   {
-    name: 'nvidia',
-    label: 'NVIDIA NIM',
+    name: 'nvidia-glm',
+    label: 'NVIDIA NIM — GLM 5.1',
     envKey: 'NVIDIA_KEY',
     url: 'https://integrate.api.nvidia.com/v1/chat/completions',
-    model: 'meta/llama-3.1-70b-instruct',
+    model: 'z-ai/glm-5.1',
+    tier: 'fast',
+    cost: 0,
+    authStyle: 'bearer',
+    active: true,
+    notes: 'Modelo primario por decisión explícita. Requiere NVIDIA_KEY como wrangler secret (nunca en código fuente).'
+  },
+  {
+    name: 'nvidia-nemotron',
+    label: 'NVIDIA NIM — Nemotron 3 Ultra',
+    envKey: 'NVIDIA_KEY',
+    url: 'https://integrate.api.nvidia.com/v1/chat/completions',
+    model: 'nvidia/nemotron-3-ultra-550b-a55b',
+    tier: 'fast',
+    cost: 0,
+    authStyle: 'bearer',
+    active: true,
+    notes: 'Misma clave que nvidia-glm (NVIDIA_KEY). Fallback si el modelo GLM 5.1 falla o se retira del catálogo NIM.'
+  },
+  {
+    name: 'nvidia-deepseek',
+    label: 'NVIDIA NIM — DeepSeek V4 Pro',
+    envKey: 'NVIDIA_KEY',
+    url: 'https://integrate.api.nvidia.com/v1/chat/completions',
+    model: 'deepseek-ai/deepseek-v4-pro',
     tier: 'slow',
     cost: 0,
     authStyle: 'bearer',
     active: true,
-    notes: 'NVIDIA NIM catalog. Free credits on signup.'
+    notes: 'Misma clave que nvidia-glm (NVIDIA_KEY). Tercer fallback — los 3 comparten cuota/infraestructura NVIDIA, no son independientes entre sí ante una caída de NVIDIA o revocación de clave.'
   },
   {
     name: 'cloudflare',
@@ -170,8 +194,8 @@ export const PROVIDERS = [
     tier: 'fast',
     cost: 0,
     authStyle: 'cf',
-    active: true,
-    notes: 'Workers AI. Free tier: 10k neurons/day.'
+    active: false,
+    notes: 'Descartado del catálogo objetivo.'
   },
   {
     name: 'anthropic',
