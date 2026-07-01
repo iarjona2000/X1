@@ -6214,7 +6214,29 @@ chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
   }
   if(msg.type==='VOICE_COMMAND_EXEC'){
     console.log('[X1-SW] VOICE_COMMAND_EXEC handler firing');
-    handleVoice(msg.command||'', msg.wantsText||false, sendResponse);
+    var cmdText = msg.command || '';
+    var wantsText = !!msg.wantsText;
+    var sideSender = sender;
+    try { sendResponse({ack: true}); } catch(_) {}
+    (function processVoice(){
+      handleVoice(cmdText, wantsText, function(data){
+        var payload = {
+          type: 'X1_VOICE_RESPONSE',
+          source: 'x1-voice-response',
+          text: (data && data.text) || '',
+          showText: !!(data && data.showText),
+          error: (data && data.error) || null
+        };
+        try {
+          if (sideSender && sideSender.tab && sideSender.tab.id) {
+            chrome.tabs.sendMessage(sideSender.tab.id, payload).catch(function(){});
+          }
+        } catch(_) {}
+        try {
+          chrome.runtime.sendMessage(payload).catch(function(){});
+        } catch(_) {}
+      });
+    })();
     return true;
   }
   if(msg.type==='X1_MEETING_END'){

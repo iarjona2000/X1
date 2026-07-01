@@ -244,32 +244,23 @@
     }, 28000);
 
     function doSend() {
-      console.log('[X1-sidepanel] Sending VOICE_COMMAND_EXEC:', text.substring(0, 50));
+      var requestId = Date.now() + '-' + Math.floor(Math.random() * 10000);
+      console.log('[X1-sidepanel] Sending VOICE_COMMAND_EXEC:', text.substring(0, 50), 'requestId:', requestId);
       chrome.runtime.sendMessage(
-        { type: 'VOICE_COMMAND_EXEC', command: text, raw: text, wantsText: true },
+        { type: 'VOICE_COMMAND_EXEC', command: text, raw: text, wantsText: true, requestId: requestId },
         function(response) {
           console.log('[X1-sidepanel] VOICE_COMMAND_EXEC response:', response, 'lastError:', chrome.runtime.lastError);
-          if (responded) return;
-          responded = true;
-          clearTimeout(panelTimeout);
-          removeThinking();
           if (chrome.runtime.lastError) {
-            var errMsg = chrome.runtime.lastError.message || '';
-            if (errMsg.indexOf('Receiving end does not exist') !== -1) {
+            if (!responded) {
+              responded = true;
+              clearTimeout(panelTimeout);
+              removeThinking();
               addMessage('ai', 'Service worker no disponible. Recarga la extension desde chrome://extensions.');
-            } else {
-              addMessage('ai', 'Error de conexion: ' + errMsg);
             }
             return;
           }
-          if (response && response.text) {
-            var aiMsg = addMessage('ai', response.text, true);
-            streamAiText(aiMsg, response.text);
-            speak(response.text);
-          } else if (response && response.error) {
-            addMessage('ai', response.error);
-          } else {
-            addMessage('ai', 'Sin respuesta. Revisa tus API keys en Settings.');
+          if (response && response.ack) {
+            console.log('[X1-sidepanel] VOICE_COMMAND_EXEC ack received, waiting for response...');
           }
         }
       );
