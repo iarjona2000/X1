@@ -10,7 +10,6 @@ sidepanel/chunks/
 
 # x1-core build artifacts
 background/x1-core/node_modules/
-background/x1-core/bundle/
 background/x1-core/.wrangler/
 
 # x1-extension reference (full copy)
