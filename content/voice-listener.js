@@ -985,72 +985,47 @@
     }
   });
 
-  // ─── CHROME MESSAGES ───
+  // ─── CHROME MESSAGES (direct, non-relayed) ───
 
   chrome.runtime.onMessage.addListener(function(msg) {
+    // Only handle messages that don't go through the bridge
     if (msg.type === 'X1_TOGGLE') togglePanel();
-    if (msg.type === 'X1_AGENT_STATUS') setStatus(msg.text || 'procesando');
-    if (msg.type === 'X1_STEP_PROGRESS') {
-      var cardId = showStepProgress(msg.app, msg.description, msg.status || 'active');
-      if (msg.stepId && cardId) stepCards[msg.stepId] = cardId;
-    }
-    // X1 API responses from backend
-    if (msg.type === 'X1_API_RESULT') {
-      setStatus('respuesta recibida');
-      if (msg.data && typeof msg.data === 'object') {
-        var txt = msg.data.text || msg.data.answer || JSON.stringify(msg.data, null, 2);
-        showBubble(txt.substring(0, 500), 'assistant');
-        if (txt.length > 500) showBubble('... (resultado truncado, revisa la consola)', 'assistant');
-      } else if (typeof msg.data === 'string') {
-        showBubble(msg.data, 'assistant');
-      }
-    }
-    // X1 Agent progress steps (for process bar)
-    if (msg.type === 'X1_AGENT_PROGRESS') {
-      if (msg.stepName) showStepProgress(msg.icon || '🤖', msg.stepName, msg.status || 'active');
-      if (msg.status === 'done' || msg.status === 'error') {
-        setTimeout(function() {
-          var bar = document.getElementById('x1-process-bar');
-          if (bar && bar.children.length > 0) {
-            var last = bar.children[bar.children.length - 1];
-            if (last) last.style.opacity = '0.6';
-          }
-        }, 2000);
-      }
-    }
-    // X1 Budget alert
-    if (msg.type === 'X1_BUDGET_ALERT') {
-      showBubble('⚠️ ' + (msg.text || 'Alerta de presupuesto'), 'system');
-    }
   });
 
-  // ─── X1 API CALLER (sends message to backend via bridge) ───
+  // ─── X1 API CALLER ───
+  var _x1ReqCounter = 0;
   window.x1Call = function(action, payload) {
     return new Promise(function(resolve, reject) {
       try {
+        _x1ReqCounter++;
+        var requestId = 'x1call_' + _x1ReqCounter + '_' + Date.now();
+
         var event = new CustomEvent('x1-api-request', {
-          detail: { action: action, payload: payload || {} }
+          detail: { action: action, payload: payload || {}, requestId: requestId }
         });
         window.dispatchEvent(event);
-        // The bridge (voice-bridge) will forward via postMessage → SW
+
         window.postMessage({
           source: 'x1-api-request',
           action: action,
-          payload: payload || {}
+          payload: payload || {},
+          requestId: requestId
         }, '*');
-        // Listen for the response
+
         function handler(e) {
-          if (e.data && e.data.source === 'x1-api-response' && e.data.action === action) {
+          if (!e.data || e.data.source !== 'x1-api-response') return;
+          if (e.data.requestId === requestId || (e.data.action === action && !e.data.requestId)) {
             window.removeEventListener('message', handler);
-            resolve(e.data.result);
+            clearTimeout(timer);
+            resolve({ ok: e.data.ok !== false, data: e.data.data || null, error: e.data.error || null });
           }
         }
         window.addEventListener('message', handler);
-        // Timeout fallback
-        setTimeout(function() {
+
+        var timer = setTimeout(function() {
           window.removeEventListener('message', handler);
           reject(new Error('X1 API timeout: ' + action));
-        }, 30000);
+        }, 35000);
       } catch(e) {
         reject(e);
       }

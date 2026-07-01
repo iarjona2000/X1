@@ -230,6 +230,12 @@
 
         // X1 Agent run action
         if (act.action === 'x1agent') {
+          var agentStepIdx = -1;
+          try {
+            if (typeof stepProgress === 'function') {
+              agentStepIdx = stepProgress(tabId, 'X1 Agent', 'Ejecutando agente: ' + (act.agentName || act.agentId || ''), 'active');
+            }
+          } catch(e) {}
           return Promise.resolve().then(function() {
             if (act.agentId) {
               return x1Agent.run(act.agentId, act.goal || act.text || '', []);
@@ -243,7 +249,15 @@
             }
             return { text: 'Especifica agentId o agentName para ejecutar un agente X1.' };
           }).then(function(r) {
+            try {
+              if (typeof stepDone === 'function' && agentStepIdx >= 0) stepDone(tabId, agentStepIdx);
+            } catch(e) {}
             return { text: (r && r.text) || (r && r.answer) || 'Agente ejecutado.' };
+          }).catch(function(e) {
+            try {
+              if (typeof stepError === 'function' && agentStepIdx >= 0) stepError(tabId, agentStepIdx);
+            } catch(e) {}
+            return { text: 'Error ejecutando agente: ' + (e.message || 'desconocido') };
           });
         }
 
@@ -258,14 +272,20 @@
 
         // X1 Compare action  
         if (act.action === 'x1compare') {
+          var cmpIdx = -1;
+          try { if (typeof stepProgress === 'function') cmpIdx = stepProgress(tabId, 'X1 Compare', 'Comparando modelos de IA...', 'active'); } catch(e) {}
           var models = act.models || ['gpt-4o-mini', 'gemini-1.5-flash', 'deepseek-chat'];
           return x1Compare(act.text || act.query || '', models, act.sector).then(function(r) {
+            try { if (typeof stepDone === 'function' && cmpIdx >= 0) stepDone(tabId, cmpIdx); } catch(e) {}
             if (!r) return { text: 'Error al comparar modelos.' };
             var best = r.options && r.options.length ? r.options.sort(function(a,b){return (b.score||0)-(a.score||0);})[0] : null;
             var txt = 'Comparacion completada.\n';
             if (best) txt += 'Mejor: ' + best.model + ' (puntuacion: ' + best.score + ')\n';
             txt += 'Modelos evaluados: ' + (r.options||[]).map(function(o){return o.model+'('+o.score+')';}).join(', ');
             return { text: txt, showText: true };
+          }).catch(function(e) {
+            try { if (typeof stepError === 'function' && cmpIdx >= 0) stepError(tabId, cmpIdx); } catch(e) {}
+            return { text: 'Error: ' + e.message, showText: true };
           });
         }
 
@@ -285,18 +305,27 @@
 
         // X1 Plan task with Tree-of-Thoughts
         if (act.action === 'x1plan') {
+          var planIdx = -1;
+          try { if (typeof stepProgress === 'function') planIdx = stepProgress(tabId, 'X1 Plan', 'Planificando con Tree-of-Thoughts...', 'active'); } catch(e) {}
           return x1PlanTask(act.goal || act.text || '', {}).then(function(r) {
+            try { if (typeof stepDone === 'function' && planIdx >= 0) stepDone(tabId, planIdx); } catch(e) {}
             if (!r || !r.plan || !r.plan.length) return { text: 'No se pudo generar plan.' };
             var txt = 'Plan generado (Tree-of-Thoughts):\n';
             r.plan.forEach(function(p, i) { txt += (i+1) + '. ' + p + '\n'; });
             txt += '\nPuntuacion: ' + (r.score || 0) + '/10';
             return { text: txt, showText: true };
+          }).catch(function(e) {
+            try { if (typeof stepError === 'function' && planIdx >= 0) stepError(tabId, planIdx); } catch(e) {}
+            return { text: 'Error: ' + e.message, showText: true };
           });
         }
 
         // X1 Fact check
         if (act.action === 'x1factcheck') {
+          var fcIdx = -1;
+          try { if (typeof stepProgress === 'function') fcIdx = stepProgress(tabId, 'X1 Fact Check', 'Verificando hechos...', 'active'); } catch(e) {}
           return x1FactCheck(act.text || '', act.query || '').then(function(r) {
+            try { if (typeof stepDone === 'function' && fcIdx >= 0) stepDone(tabId, fcIdx); } catch(e) {}
             if (!r) return { text: 'Fact checker no disponible.' };
             var claims = r.claims || [];
             var supported = claims.filter(function(c){return c.status === 'supported';}).length;
@@ -306,6 +335,9 @@
               txt += '\nDetalle:\n' + claims.map(function(c){return '  - ' + c.claim + ' [' + c.status + ']';}).join('\n');
             }
             return { text: txt, showText: true };
+          }).catch(function(e) {
+            try { if (typeof stepError === 'function' && fcIdx >= 0) stepError(tabId, fcIdx); } catch(e) {}
+            return { text: 'Error: ' + e.message, showText: true };
           });
         }
 

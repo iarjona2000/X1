@@ -16,15 +16,12 @@
   var recognition = null;
   var currentThinking = null;
   var messages = [];
-
-  // ——— Init ———
+  var responded = false;
 
   showWelcome();
   initVoice();
   loadTabs();
   checkConnection();
-
-  // ——— Tab switching ———
 
   tabs.forEach(function(tab) {
     tab.addEventListener('click', function() {
@@ -39,26 +36,24 @@
     });
   });
 
-  // ——— Welcome ———
-
   function checkConnection() {
     if (!chrome.runtime || !chrome.runtime.sendMessage) {
-      statusDot.style.background = '#ef4444';
+      statusDot.style.background = 'var(--destructive)';
       statusText.textContent = 'Offline';
       return;
     }
     try {
       chrome.runtime.sendMessage({ type: 'PING' }, function(response) {
         if (chrome.runtime.lastError || !response) {
-          statusDot.style.background = '#ef4444';
+          statusDot.style.background = 'var(--destructive)';
           statusText.textContent = 'Offline';
         } else {
-          statusDot.style.background = '#22c55e';
+          statusDot.style.background = 'var(--primary)';
           statusText.textContent = 'Ready';
         }
       });
     } catch(e) {
-      statusDot.style.background = '#ef4444';
+      statusDot.style.background = 'var(--destructive)';
       statusText.textContent = 'Offline';
     }
   }
@@ -87,8 +82,6 @@
       });
     });
   }
-
-  // ——— Messages ———
 
   function addMessage(role, text) {
     var welcomeEl = messagesEl.querySelector('.welcome');
@@ -199,8 +192,6 @@
     chatView.scrollTop = chatView.scrollHeight;
   }
 
-  // ——— Send message ———
-
   function sendMessage() {
     var text = input.value.trim();
     if (!text) return;
@@ -210,7 +201,7 @@
     addMessage('user', text);
     showThinking();
 
-    var responded = false;
+    responded = false;
     var panelTimeout = setTimeout(function() {
       if (!responded) {
         responded = true;
@@ -278,8 +269,6 @@
     }
   }
 
-  // ——— Input handling ———
-
   input.addEventListener('keydown', function(e) {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -295,8 +284,6 @@
   }
 
   btnSend.addEventListener('click', sendMessage);
-
-  // ——— Voice ———
 
   function initVoice() {
     var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -351,8 +338,6 @@
     try { recognition.stop(); } catch(e) {}
   }
 
-  // ——— TTS ———
-
   function speak(text) {
     if (!window.speechSynthesis) return;
     window.speechSynthesis.cancel();
@@ -380,14 +365,10 @@
     window.speechSynthesis.onvoiceschanged = function() {};
   }
 
-  // ——— New conversation ———
-
   btnNew.addEventListener('click', function() {
     messages = [];
     showWelcome();
   });
-
-  // ——— Settings ———
 
   btnSettings.addEventListener('click', function() {
     showSettings();
@@ -437,7 +418,7 @@
           '</div>' +
           '<div class="setting-row">' +
             '<span class="setting-label">NVIDIA</span>' +
-            '<input class="setting-input" type="password" data-key="nvidiaKey" placeholder="nvapi-...">' +
+            '<input class="setting-input" type="password" data-key="nvidiaKey" placeholder="nvapi_...">' +
           '</div>' +
           '<div class="setting-row">' +
             '<span class="setting-label">Firecrawl</span>' +
@@ -536,8 +517,6 @@
     });
   }
 
-  // ——— Load tab data ———
-
   function loadTabs() {
     loadTasks();
   }
@@ -619,7 +598,7 @@
           list.innerHTML = '';
           var p = document.createElement('div');
           p.style.padding = '12px 0';
-          p.style.fontFamily = 'var(--serif)';
+          p.style.fontFamily = 'var(--font-heading)';
           p.style.fontSize = '15px';
           p.style.lineHeight = '1.6';
           p.innerHTML = formatText(response.text);
@@ -647,7 +626,7 @@
           list.innerHTML = '';
           var p = document.createElement('div');
           p.style.padding = '12px 0';
-          p.style.fontFamily = 'var(--serif)';
+          p.style.fontFamily = 'var(--font-heading)';
           p.style.fontSize = '15px';
           p.style.lineHeight = '1.6';
           p.innerHTML = formatText(response.text);
@@ -660,8 +639,6 @@
       }
     );
   }
-
-  // ——— Messages from service worker ———
 
   chrome.runtime.onMessage.addListener(function(msg) {
     if (!msg || !msg.type) return;
@@ -685,8 +662,6 @@
     }
   });
 
-  // ——— Keyboard shortcut ———
-
   document.addEventListener('keydown', function(e) {
     if (e.ctrlKey && e.code === 'Space') {
       e.preventDefault();
@@ -697,8 +672,6 @@
       }
     }
   });
-
-  // ——— Utilities ———
 
   function escapeHtml(str) {
     if (!str) return '';
