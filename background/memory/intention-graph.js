@@ -45,7 +45,7 @@ var X1IntentionGraph = (function() {
     if (/documento|doc|nota|notas|write|escribe|crea.*doc/i.test(l)) return CATEGORIES.DOCUMENT;
     if (/meeting|reuni[oó]n|prep[aá]ra/i.test(l)) return CATEGORIES.MEETING;
     if (/linkedin|twitter|social|post|tweet/i.test(l)) return CATEGORIES.SOCIAL;
-    if /compr[aá]|wallapop|vinted|amazon|precio|price/i.test(l)) return CATEGORIES.SHOPPING;
+    if (/compr[aá]|wallapop|vinted|amazon|precio|price/i.test(l)) return CATEGORIES.SHOPPING;
     if (/analiza|compare|compar|difference/i.test(l)) return CATEGORIES.ANALYSIS;
     if (/crea|generate|haz|make|creativ|diseñ/i.test(l)) return CATEGORIES.CREATIVE;
     if (/config|setup|api key|provider|cambia/i.test(l)) return CATEGORIES.SYSTEM;

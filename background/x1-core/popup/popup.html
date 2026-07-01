@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>X1 Chat</title>
+    <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+    <div class="x1-container">
+        <!-- Header -->
+        <header class="x1-header">
+            <div class="header-top">
+                <h1>X1</h1>
+                <div class="header-actions">
+                    <button id="settings-btn" class="icon-btn" title="Configuración">⚙️</button>
+                    <button id="history-btn" class="icon-btn" title="Historial">📋</button>
+                </div>
+            </div>
+            <div class="header-subtitle">Tu asistente de IA personalizado</div>
+        </header>
+
+        <!-- Chat Messages -->
+        <div class="x1-chat" id="chat-messages">
+            <div class="welcome-message">
+                <div class="welcome-icon">🤖</div>
+                <h2>Bienvenido a X1</h2>
+                <p>Soy tu asistente personalizable de IA.</p>
+                <p class="welcome-tips">💡 Prueba escribir una pregunta o usa el botón <strong>⚖️ Comparar</strong> para que varios modelos compitan.</p>
+            </div>
+        </div>
+
+        <!-- Input Area -->
+        <div class="x1-input-area">
+            <textarea
+                id="user-input"
+                class="x1-textarea"
+                placeholder="Pregunta algo... o escribe 'comparar: tu pregunta' para activar modo comparativo"
+                rows="3"
+            ></textarea>
+
+            <div class="input-actions">
+                <button id="send-btn" class="btn btn-send">Enviar</button>
+                <button id="compare-btn" class="btn btn-compare">⚖️ Comparar</button>
+            </div>
+
+            <div id="input-status" class="input-status"></div>
+        </div>
+
+        <!-- Comparison View -->
+        <div id="comparison-view" class="comparison-view" style="display: none;">
+            <div class="comparison-header">
+                <h3>Comparación de Modelos</h3>
+                <button id="close-comparison-btn" class="close-btn">✕</button>
+            </div>
+
+            <div class="comparison-options" id="comparison-options">
+                <!-- Se llena dinámicamente -->
+            </div>
+
+            <div class="comparison-footer">
+                <p>Haz clic en <strong>👍 Esta es la mejor</strong> para indicar cuál te gusta más</p>
+            </div>
+        </div>
+
+        <!-- Loading Indicator -->
+        <div id="loading-indicator" class="loading-indicator" style="display: none;">
+            <div class="spinner"></div>
+            <p id="loading-text">Procesando...</p>
+        </div>
+    </div>
+
+    <!-- Modal de Historial -->
+    <div id="history-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>📋 Historial de Chat</h2>
+                <button class="close-btn" onclick="closeHistoryModal()">✕</button>
+            </div>
+            <div id="history-list" class="history-list">
+                <!-- Se llena dinámicamente -->
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeHistoryModal()">Cerrar</button>
+                <button class="btn btn-warning" onclick="clearHistoryConfirm()">🧹 Limpiar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Configuración -->
+    <div id="settings-modal" class="modal" style="display: none;">
+        <div class="modal-content small">
+            <div class="modal-header">
+                <h2>⚙️ Configuración Rápida</h2>
+                <button class="close-btn" onclick="closeSettingsModal()">✕</button>
+            </div>
+
+            <div class="setting-item">
+                <label>Modelo por defecto:</label>
+                <select id="quick-model-select" class="select-small">
+                    <!-- Se llena dinámicamente -->
+                </select>
+            </div>
+
+            <div class="setting-item">
+                <label>Sector actual:</label>
+                <select id="quick-sector-select" class="select-small">
+                    <option value="general">General</option>
+                    <option value="legal">Legal</option>
+                    <option value="marketing">Marketing</option>
+                    <option value="finance">Finanzas</option>
+                    <option value="support">Atención al Cliente</option>
+                    <option value="technical">Técnico</option>
+                </select>
+            </div>
+
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeSettingsModal()">Cerrar</button>
+                <button class="btn btn-primary" onclick="openFullSettings()">⚙️ Configuración Completa</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="popup.js"></script>
+</body>
+</html>

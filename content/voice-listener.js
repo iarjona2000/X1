@@ -828,13 +828,11 @@
       removeThinkBubble();
       var elapsed = Date.now() - startTime;
       if (resp && resp.text) {
-        var cleanText = resp.text.replace(/^ERROR:\s*/i, '').trim();
-        if (!cleanText || /cannot read|does not support image|image\.png|image\.jpg|image\.jpeg|image\.gif|image\.webp|image\.bmp|image\.svg|image\.ico|model does not support|vision not supported|no image support|inform the user/i.test(cleanText)) {
-          cleanText = 'Hecho. ¿Algo más?';
-        }
+        var cleanText = resp.text;
+        if (!cleanText) cleanText = 'Hecho. ¿Algo más?';
+        humanSpeak(cleanText);
         addMessage('assistant', cleanText);
-        addBubble(cleanText, 'assistant');
-        if (resp.showText) humanSpeak(cleanText);
+        if (resp.showText) addBubble(cleanText, 'assistant');
       } else if (resp && resp.error) {
         addError('Error: ' + resp.error.replace(/^ERROR:\s*/i, ''));
       } else {
@@ -842,6 +840,8 @@
       }
       setStatus('listo');
       updateGlow('idle');
+      if (restartTimer) clearTimeout(restartTimer);
+      restartTimer = setTimeout(function() { if (!isActive && !processing) startVoice(); }, 1500);
     }).catch(function(e) {
       processing = false;
       removeThinkBubble();
@@ -861,6 +861,8 @@
     }, timeoutMs);
   }
 
+  var restartTimer = null;
+
   function toggleVoice() { if (isActive) stopVoice(); else startVoice(); }
 
   function startVoice() {
@@ -868,6 +870,7 @@
       addError('Voz no soportada en este navegador.');
       return;
     }
+    if (recognition) stopVoice();
     try {
       var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       recognition = new SpeechRecognition();
@@ -939,9 +942,11 @@
       showStepProgress(e.data.app, e.data.description, e.data.status);
     }
     if (e.data.source === 'x1-voice-response') {
-      addBubble(e.data.text || 'Respuesta recibida', 'assistant');
+      humanSpeak(e.data.text || 'Respuesta recibida');
       removeThinkBubble();
-      if (e.data.speak) humanSpeak(e.data.text);
+      if (e.data.showText) addBubble(e.data.text || 'Respuesta recibida', 'assistant');
+      if (restartTimer) clearTimeout(restartTimer);
+      restartTimer = setTimeout(function() { if (!isActive && !processing) startVoice(); }, 1500);
     }
     if (e.data.source === 'x1-agent-status') {
       if (e.data.text === 'thinking' || e.data.text === 'processing') {
@@ -951,6 +956,21 @@
         removeThinkBubble();
         updateGlow('idle');
       }
+    }
+    if (e.data.source === 'x1-api-response') {
+      removeThinkBubble();
+      if (e.data.ok && e.data.data) {
+        var txt = e.data.data.text || e.data.data.answer || JSON.stringify(e.data.data).substring(0, 400);
+        showBubble(txt, 'assistant');
+      } else if (e.data.error) {
+        showBubble('Error: ' + e.data.error, 'system');
+      }
+    }
+    if (e.data.source === 'x1-agent-progress') {
+      showStepProgress(e.data.icon || '🤖', e.data.stepName || e.data.agentName, e.data.status || 'active');
+    }
+    if (e.data.source === 'x1-budget-alert') {
+      showBubble('⚠️ ' + (e.data.text || 'Alerta de presupuesto'), 'system');
     }
   });
 
@@ -974,7 +994,153 @@
       var cardId = showStepProgress(msg.app, msg.description, msg.status || 'active');
       if (msg.stepId && cardId) stepCards[msg.stepId] = cardId;
     }
+    // X1 API responses from backend
+    if (msg.type === 'X1_API_RESULT') {
+      setStatus('respuesta recibida');
+      if (msg.data && typeof msg.data === 'object') {
+        var txt = msg.data.text || msg.data.answer || JSON.stringify(msg.data, null, 2);
+        showBubble(txt.substring(0, 500), 'assistant');
+        if (txt.length > 500) showBubble('... (resultado truncado, revisa la consola)', 'assistant');
+      } else if (typeof msg.data === 'string') {
+        showBubble(msg.data, 'assistant');
+      }
+    }
+    // X1 Agent progress steps (for process bar)
+    if (msg.type === 'X1_AGENT_PROGRESS') {
+      if (msg.stepName) showStepProgress(msg.icon || '🤖', msg.stepName, msg.status || 'active');
+      if (msg.status === 'done' || msg.status === 'error') {
+        setTimeout(function() {
+          var bar = document.getElementById('x1-process-bar');
+          if (bar && bar.children.length > 0) {
+            var last = bar.children[bar.children.length - 1];
+            if (last) last.style.opacity = '0.6';
+          }
+        }, 2000);
+      }
+    }
+    // X1 Budget alert
+    if (msg.type === 'X1_BUDGET_ALERT') {
+      showBubble('⚠️ ' + (msg.text || 'Alerta de presupuesto'), 'system');
+    }
   });
+
+  // ─── X1 API CALLER (sends message to backend via bridge) ───
+  window.x1Call = function(action, payload) {
+    return new Promise(function(resolve, reject) {
+      try {
+        var event = new CustomEvent('x1-api-request', {
+          detail: { action: action, payload: payload || {} }
+        });
+        window.dispatchEvent(event);
+        // The bridge (voice-bridge) will forward via postMessage → SW
+        window.postMessage({
+          source: 'x1-api-request',
+          action: action,
+          payload: payload || {}
+        }, '*');
+        // Listen for the response
+        function handler(e) {
+          if (e.data && e.data.source === 'x1-api-response' && e.data.action === action) {
+            window.removeEventListener('message', handler);
+            resolve(e.data.result);
+          }
+        }
+        window.addEventListener('message', handler);
+        // Timeout fallback
+        setTimeout(function() {
+          window.removeEventListener('message', handler);
+          reject(new Error('X1 API timeout: ' + action));
+        }, 30000);
+      } catch(e) {
+        reject(e);
+      }
+    });
+  };
+
+  // ─── X1 AGENT RUNNER (convenience) ───
+  window.x1RunAgent = function(agentName, goal) {
+    showStepProgress('🤖', 'Lanzando agente: ' + agentName, 'active');
+    return x1Call('agentRun', { agentName: agentName, goal: goal }).then(function(result) {
+      if (result && result.ok) {
+        showStepProgress('🤖', 'Agente completado: ' + agentName, 'done');
+        return result.data;
+      }
+      showStepProgress('🤖', 'Error en agente: ' + agentName, 'error');
+      throw new Error((result && result.error) || 'Agent run failed');
+    });
+  };
+
+  // ─── X1 COMPARE (convenience) ───
+  window.x1CompareModels = function(query, models) {
+    showStepProgress('⚖️', 'Comparando modelos...', 'active');
+    return x1Call('compare', { query: query, models: models }).then(function(result) {
+      if (result && result.ok) {
+        showStepProgress('⚖️', 'Comparación completada', 'done');
+        return result.data;
+      }
+      showStepProgress('⚖️', 'Error en comparación', 'error');
+      throw new Error((result && result.error) || 'Compare failed');
+    });
+  };
+
+  // ─── X1 MEMORY SEARCH (convenience) ───
+  window.x1SearchMemory = function(query, k) {
+    showStepProgress('🧠', 'Buscando en memoria...', 'active');
+    return x1Call('memoryRecall', { query: query, k: k || 5 }).then(function(result) {
+      showStepProgress('🧠', 'Búsqueda completada', 'done');
+      return result && result.ok ? result.data : [];
+    });
+  };
+
+  // ─── X1 PLAN TASK (convenience) ───
+  window.x1Plan = function(goal) {
+    showStepProgress('📋', 'Planificando tarea...', 'active');
+    return x1Call('planTask', { goal: goal }).then(function(result) {
+      if (result && result.ok) {
+        showStepProgress('📋', 'Plan generado', 'done');
+        return result.data;
+      }
+      showStepProgress('📋', 'Error en planificación', 'error');
+      throw new Error((result && result.error) || 'Plan failed');
+    });
+  };
+
+  // ─── X1 BUDGET STATUS (convenience) ───
+  window.x1ShowBudget = function() {
+    return x1Call('budgetStatus', {}).then(function(result) {
+      if (result && result.ok && result.data) {
+        var s = result.data;
+        var txt = 'Presupuesto X1:\n' +
+          '  Diario: $' + (s.daily ? s.daily.spent.toFixed(2) : '0') +
+          ' / $' + (s.daily ? s.daily.limit : '0') + '\n' +
+          '  Mensual: $' + (s.monthly ? s.monthly.spent.toFixed(2) : '0') +
+          ' / $' + (s.monthly ? s.monthly.limit : '0');
+        showBubble(txt, 'assistant');
+        return result.data;
+      }
+      showBubble('Budget manager no disponible', 'system');
+      return null;
+    });
+  };
+
+  // ─── X1 FACT CHECK (convenience) ───
+  window.x1FactCheckText = function(text) {
+    showStepProgress('🔍', 'Verificando hechos...', 'active');
+    return x1Call('factCheck', { text: text }).then(function(result) {
+      showStepProgress('🔍', 'Verificación completada', 'done');
+      if (result && result.ok && result.data) {
+        var claims = result.data.claims || [];
+        var supported = claims.filter(function(c) { return c.status === 'supported'; }).length;
+        var txt = claims.length
+          ? 'Verificación: ' + supported + '/' + claims.length + ' correctas'
+          : 'No se encontraron afirmaciones que verificar.';
+        showBubble(txt, supported === claims.length ? 'assistant' : 'system');
+        return result.data;
+      }
+      showBubble('Fact checker no disponible', 'system');
+      return null;
+    });
+  };
 
   // ─── SPEAK FUNCTION (public) ───
   window.x1Speak = humanSpeak;

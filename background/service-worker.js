@@ -14,6 +14,68 @@ try {
 } catch(_) { /* trap registration itself failed, ignore */ }
 console.log('[X1] Global error traps armed');
 
+// ── Load modular subsystem files ──
+try {
+  importScripts(
+    'memory/indexeddb.js',
+    'memory/op-graph.js',
+    'memory/encryption.js',
+    'memory/intention-graph.js',
+    'memory/world-model.js',
+    'memory/ai-memo.js',
+    'cascade/rate-limiter.js',
+    'cascade/providers/groq.js',
+    'cascade/providers/gemini.js',
+    'cascade/providers/openai.js',
+    'cascade/providers/deepseek.js',
+    'cascade/providers/ollama.js',
+    'cascade/providers/nvidia.js',
+    'cascade/providers/cerebras.js',
+    'cascade/providers/sambanova.js',
+    'cascade/providers/mistral.js',
+    'cascade/providers/together.js',
+    'cascade/providers/openrouter.js',
+    'cascade/providers/cloudflare.js',
+    'cascade/router.js',
+    'google/auth.js',
+    'google/gmail.js',
+    'google/calendar.js',
+    'google/drive.js',
+    'agents/agent-manager.js',
+    'agents/workspace.js',
+    'plugins/engine.js',
+    'automation/rule-engine.js',
+    'monitor/page-monitor.js',
+    'research/deep-research.js',
+    'style/writing-style.js',
+    'chat/group-chat.js',
+    'finance/financial-data.js',
+    'image/image-generation.js',
+    'extract/data-extractor.js',
+    'seo/seo-analyzer.js',
+    'mcp/client.js',
+    'skills/engine.js',
+    'prompts/assembler.js',
+    'x1-core/bundle/x1-core.js',
+    'x1-bridge.js',
+    'x1-integration.js',
+    'x1-api.js',
+    'agents-x1.js'
+  );
+  console.log('[X1] Modules loaded:',
+    typeof X1IndexedDB !== 'undefined' ? 'indexeddb' : 'FAIL',
+    typeof X1CascadeRouter !== 'undefined' ? 'router' : 'FAIL',
+    typeof X1GoogleAuth !== 'undefined' ? 'auth' : 'FAIL',
+    typeof X1AgentManager !== 'undefined' ? 'agents' : 'FAIL',
+    typeof X1PluginEngine !== 'undefined' ? 'plugins' : 'FAIL',
+    typeof X1FinancialData !== 'undefined' ? 'finance' : 'FAIL',
+    typeof X1SkillEngine !== 'undefined' ? 'skills' : 'FAIL',
+    typeof X1Bridge !== 'undefined' && X1Bridge.loaded ? 'x1-core' : 'FAIL',
+    typeof x1DetectSector === 'function' ? 'x1-integration' : 'FAIL');
+} catch(e) {
+  console.error('[X1] Module import failed:', e && e.message);
+}
+
 // ═══════════════════════════════════════════
 // CONVERSATION MEMORY
 // ═══════════════════════════════════════════
@@ -517,6 +579,8 @@ function classifyIntent(cmd) {
   var best = 'action';
   var max = 0;
   for (var k in scores) { if (scores[k] > max) { max = scores[k]; best = k; } }
+  var routerTask = (typeof X1CascadeRouter !== 'undefined') ? X1CascadeRouter.classifyTask(cmd, lastPageContext) : null;
+  if (routerTask && scores[routerTask] !== undefined) scores[routerTask] += 2;
   return {type: best, scores: scores, urgency: worldModel.userState.urgency};
 }
 
@@ -1215,6 +1279,7 @@ function loadAIKeys() {
       'groqKey','opencodeKey','nvidiaKey','geminiKey','openrouterKey',
       'cerebrasKey','sambanovaKey','mistralKey','deepseekKey','togetherKey',
       'cloudflareAccountId','cloudflareKey','tavilyKey','elevenlabsKey',
+      'openaiKey','finnhubKey','alphaVantageKey',
       'aiProvider'
     ], function(r) {
       aiKeys = r || {};
@@ -1242,7 +1307,7 @@ function loadGoogleUser() {
 loadGoogleUser();
 
 chrome.storage.onChanged.addListener(function(changes) {
-  if (changes.groqKey || changes.opencodeKey || changes.nvidiaKey || changes.geminiKey || changes.openrouterKey || changes.cerebrasKey || changes.sambanovaKey || changes.mistralKey || changes.deepseekKey || changes.togetherKey || changes.cloudflareAccountId || changes.cloudflareKey || changes.tavilyKey || changes.aiProvider) loadAIKeys();
+  if (changes.groqKey || changes.opencodeKey || changes.nvidiaKey || changes.geminiKey || changes.openrouterKey || changes.cerebrasKey || changes.sambanovaKey || changes.mistralKey || changes.deepseekKey || changes.togetherKey || changes.cloudflareAccountId || changes.cloudflareKey || changes.tavilyKey || changes.openaiKey || changes.finnhubKey || changes.alphaVantageKey || changes.aiProvider) loadAIKeys();
   if (changes.google_user) loadGoogleUser();
 });
 
@@ -1289,6 +1354,17 @@ var SYSTEM_PROMPT = [
 '  content: copywriting, blogs, newsletters, guiones, SEO → newDoc/gmailSend/gmailDraft',
 '  support: tickets, help desk, escalacion, FAQ, satisfaccion → gmailSearch/speak',
 'SISTEMA: speak(text), showText(text), notify(title,message), ask(question,options?), wait(ms), done, research(topic), loginGoogle, logoutGoogle, checkGoogle, readAndSummarize, focusMode(mode:work|relax,sites?), timer(duration,label?), contactLookup(name), meetingPrep(eventId?), openApps(apps:[nombres]), dailyDigest, smartReply(query?), saveWorkspace(name), restoreWorkspace(name), listWorkspaces, runSwarm(goal), generateChapter, checkNoise, blockDomain, setAutonomy',
+'FINANZAS: stockQuote(symbol), marketSummary, companyNews(symbol,days?), cryptoQuote(symbol) — datos en tiempo real via Finnhub/Alpha Vantage',
+'IMAGEN: generateImage(prompt,provider?:auto|cloudflare|openai) — genera imagen con Flux/DALL-E',
+'INVESTIGACION: deepResearch(query,depth?:standard|deep|thorough,maxSteps?) — busqueda multi-fuente con sintesis IA',
+'SKILLS: runSkill(name,params?), registerSkill(name,trigger,steps,description?), listSkills — flujos reutilizables',
+'MCP: mcpCall(server,tool,params?), mcpListServers, mcpAddServer(name,url) — Model Context Protocol',
+'DEBATE: debate(topic,providers?:[],rounds?) — debate multi-modelo paralelo',
+'EXTRACCION: extractAI(query) — extraccion inteligente de datos de pagina con IA',
+'SEO: seoAnalysis — analisis completo SEO de la pagina actual',
+'AGENTES: createAgent(name,provider,systemPrompt,description?), callAgent(name,message), listAgents — agentes personalizados',
+'PLUGINS: runPlugin(name,params?) — ejecutar plugin declarativo',
+'ESTILO: learnStyle(text,userId?) — aprende estilo de escritura del usuario',
 'MULTI-TAREA: steps(steps:[{accion1},{accion2},...]) — encadena acciones en secuencia. readPage pasa datos a newDoc/speak automaticamente. Cada paso muestra progreso con icono real.',
 'INTENCIONES: trackIntention(cmd,context), findIntention(query), updateIntention(id,action,context) — memoria de proposito, no solo dialogo.',
 '',
@@ -1391,6 +1467,9 @@ function loadKnowledge() {
   });
 }
 loadKnowledge();
+if (typeof X1WritingStyle !== 'undefined') X1WritingStyle.loadStyles();
+if (typeof X1SkillEngine !== 'undefined') X1SkillEngine.loadSkills();
+if (typeof X1MCPClient !== 'undefined') X1MCPClient.loadServers();
 
 function saveGraph(){chrome.storage.local.set({x1_graph:JSON.stringify(opGraph)});}
 function saveManual(){chrome.storage.local.set({x1_manual:JSON.stringify(knowledgeManual)});}
@@ -2225,7 +2304,7 @@ var ROUTE_MATRIX = {
 function getRoutedChain(taskType) {
   var route = ROUTE_MATRIX[taskType] || ROUTE_MATRIX.conversational;
   var providerMap = {
-    proxy:      {name:'proxy', fn:proxyComplete, has:true, fast:true},
+    proxy:      {name:'proxy', fn:proxyComplete, has:!!PROXY_URL, fast:true},
     groq:       {name:'groq', fn:groqComplete, has:!!aiKeys.groqKey, fast:true},
     nvidia:     {name:'nvidia', fn:nvidiaComplete, has:!!aiKeys.nvidiaKey, fast:true},
     ollama:     {name:'ollama', fn:ollamaComplete, has:true, fast:false},
@@ -2967,7 +3046,7 @@ function aiComplete(userMsg) {
 
   function getAllProviders() {
     return [
-      {name:'proxy', fn:proxyComplete, has:true, fast:true},
+      {name:'proxy', fn:proxyComplete, has:!!PROXY_URL, fast:true},
       {name:'groq', fn:groqComplete, has:!!aiKeys.groqKey, fast:true},
       {name:'nvidia', fn:nvidiaComplete, has:!!aiKeys.nvidiaKey, fast:true},
       {name:'gemini', fn:geminiComplete, has:!!aiKeys.geminiKey, fast:true},
@@ -4376,6 +4455,160 @@ function execAction(act, tabId) {
         resolve({text: healthText, showText: true});
         break;
 
+      case 'stockQuote':
+        var sqIdx = stepProgress(tabId, 'Finance', 'Consultando ' + (act.symbol || ''));
+        if (typeof X1FinancialData === 'undefined') { stepError(tabId, sqIdx); resolve({text: 'Modulo financiero no disponible.', showText: true}); break; }
+        X1FinancialData.getQuote(act.symbol || 'AAPL').then(function(q) {
+          stepDone(tabId, sqIdx);
+          resolve({text: q.symbol + ': $' + q.current + ' (' + (q.changePercent > 0 ? '+' : '') + q.changePercent + '%) | High: $' + q.high + ' Low: $' + q.low, showText: true});
+        }).catch(function(e) { stepError(tabId, sqIdx); resolve({text: 'Error: ' + e.message, showText: true}); });
+        break;
+
+      case 'marketSummary':
+        var msIdx = stepProgress(tabId, 'Finance', 'Resumen de mercados...');
+        if (typeof X1FinancialData === 'undefined') { stepError(tabId, msIdx); resolve({text: 'Modulo financiero no disponible.', showText: true}); break; }
+        X1FinancialData.getMarketSummary().then(function(summary) {
+          stepDone(tabId, msIdx);
+          var mText = 'Market Summary:\n';
+          Object.keys(summary).forEach(function(sym) { var s = summary[sym]; mText += sym + ': $' + s.current + ' (' + (s.changePercent > 0 ? '+' : '') + s.changePercent + '%)\n'; });
+          resolve({text: mText, showText: true});
+        }).catch(function(e) { stepError(tabId, msIdx); resolve({text: 'Error: ' + e.message, showText: true}); });
+        break;
+
+      case 'companyNews':
+        var cnIdx = stepProgress(tabId, 'Finance', 'Noticias de ' + (act.symbol || ''));
+        if (typeof X1FinancialData === 'undefined') { stepError(tabId, cnIdx); resolve({text: 'Modulo financiero no disponible.', showText: true}); break; }
+        X1FinancialData.getCompanyNews(act.symbol || '', act.days || 7).then(function(news) {
+          stepDone(tabId, cnIdx);
+          if (!news || news.length === 0) { resolve({text: 'No hay noticias recientes.', showText: true}); break; }
+          var nText = 'Noticias de ' + (act.symbol || '') + ':\n';
+          news.forEach(function(n, i) { nText += (i+1) + '. ' + n.headline + ' (' + n.source + ')\n'; });
+          resolve({text: nText, showText: true});
+        }).catch(function(e) { stepError(tabId, cnIdx); resolve({text: 'Error: ' + e.message, showText: true}); });
+        break;
+
+      case 'generateImage':
+        var giIdx = stepProgress(tabId, 'Image', 'Generando imagen...');
+        if (typeof X1ImageGen === 'undefined') { stepError(tabId, giIdx); resolve({text: 'Modulo de imagen no disponible.', showText: true}); break; }
+        X1ImageGen.generate(act.prompt || act.text || '', act).then(function(img) {
+          stepDone(tabId, giIdx);
+          resolve({text: 'Imagen generada con ' + img.provider + '.', imageUrl: img.url, showText: true});
+        }).catch(function(e) { stepError(tabId, giIdx); resolve({text: 'Error generando imagen: ' + e.message, showText: true}); });
+        break;
+
+      case 'deepResearch':
+        var drIdx = stepProgress(tabId, 'Research', 'Investigando: ' + (act.query || '').substring(0, 40));
+        if (typeof X1DeepResearch === 'undefined') { stepError(tabId, drIdx); resolve({text: 'Modulo de research no disponible.', showText: true}); break; }
+        X1DeepResearch.research(act.query || act.text || '', {tabId: tabId, depth: act.depth || 'standard', maxSteps: act.maxSteps || 8}).then(function(report) {
+          stepDone(tabId, drIdx);
+          var rText = 'Research: ' + report.query + '\n(' + report.sources.length + ' fuentes, ' + Math.round(report.duration / 1000) + 's)\n\n' + (report.synthesis || 'Sin sintesis.');
+          resolve({text: rText, showText: true});
+        }).catch(function(e) { stepError(tabId, drIdx); resolve({text: 'Error investigando: ' + e.message, showText: true}); });
+        break;
+
+      case 'runSkill':
+        var skIdx = stepProgress(tabId, 'Skills', 'Ejecutando skill: ' + (act.name || ''));
+        if (typeof X1SkillEngine === 'undefined') { stepError(tabId, skIdx); resolve({text: 'Modulo de skills no disponible.', showText: true}); break; }
+        X1SkillEngine.runSkill(act.name || '', act.params || {}, tabId).then(function(result) {
+          stepDone(tabId, skIdx);
+          resolve({text: 'Skill "' + result.skill + '" completado en ' + Math.round(result.duration / 1000) + 's.', showText: true});
+        }).catch(function(e) { stepError(tabId, skIdx); resolve({text: 'Error en skill: ' + e.message, showText: true}); });
+        break;
+
+      case 'registerSkill':
+        if (typeof X1SkillEngine === 'undefined') { resolve({text: 'Modulo de skills no disponible.', showText: true}); break; }
+        X1SkillEngine.registerSkill(act).then(function(skill) {
+          resolve({text: 'Skill "' + skill.name + '" registrado con ' + (skill.steps ? skill.steps.length : 0) + ' pasos.', showText: true});
+        }).catch(function(e) { resolve({text: 'Error registrando skill: ' + e.message, showText: true}); });
+        break;
+
+      case 'mcpCall':
+        var mcIdx = stepProgress(tabId, 'MCP', 'Llamando ' + (act.server || '') + '/' + (act.tool || ''));
+        if (typeof X1MCPClient === 'undefined') { stepError(tabId, mcIdx); resolve({text: 'Cliente MCP no disponible.', showText: true}); break; }
+        X1MCPClient.callTool(act.server || '', act.tool || '', act.params || {}).then(function(result) {
+          stepDone(tabId, mcIdx);
+          resolve({text: typeof result === 'string' ? result : JSON.stringify(result, null, 2), showText: true});
+        }).catch(function(e) { stepError(tabId, mcIdx); resolve({text: 'Error MCP: ' + e.message, showText: true}); });
+        break;
+
+      case 'mcpListServers':
+        if (typeof X1MCPClient === 'undefined') { resolve({text: 'Cliente MCP no disponible.', showText: true}); break; }
+        X1MCPClient.getServers().then(function(servers) {
+          if (!servers || servers.length === 0) { resolve({text: 'No hay servidores MCP configurados.', showText: true}); return; }
+          var sText = 'Servidores MCP:\n';
+          servers.forEach(function(s, i) { sText += (i+1) + '. ' + s.name + ' (' + s.url + ') ' + (s.enabled ? '[ON]' : '[OFF]') + '\n'; });
+          resolve({text: sText, showText: true});
+        });
+        break;
+
+      case 'debate':
+        var dbIdx = stepProgress(tabId, 'Debate', 'Iniciando debate...');
+        if (typeof X1GroupChat === 'undefined') { stepError(tabId, dbIdx); resolve({text: 'Group Chat no disponible.', showText: true}); break; }
+        X1GroupChat.debate(act.topic || act.text || '', act.providers || null, act.rounds || 2).then(function(result) {
+          stepDone(tabId, dbIdx);
+          var dText = 'Debate: ' + result.topic + ' (' + result.rounds + ' rondas)\n\n';
+          result.responses.forEach(function(r) { dText += '[' + r.provider.toUpperCase() + ']: ' + r.text.substring(0, 300) + '\n\n'; });
+          resolve({text: dText, showText: true});
+        }).catch(function(e) { stepError(tabId, dbIdx); resolve({text: 'Error en debate: ' + e.message, showText: true}); });
+        break;
+
+      case 'learnStyle':
+        if (typeof X1WritingStyle === 'undefined') { resolve({text: 'Modulo de estilo no disponible.', showText: true}); break; }
+        X1WritingStyle.learnFrom(act.userId || 'default', act.text || '', act.context || null).then(function(profile) {
+          if (profile) resolve({text: 'Estilo aprendido: ' + profile.tone + ', ' + profile.complexity + '. ' + profile.sampleCount + ' muestras.', showText: true});
+          else resolve({text: 'Texto insuficiente para analizar.', showText: true});
+        });
+        break;
+
+      case 'createAgent':
+        if (typeof X1AgentManager === 'undefined') { resolve({text: 'Agent Manager no disponible.', showText: true}); break; }
+        var agent = X1AgentManager.createAgent(act);
+        resolve({text: 'Agente "' + agent.name + '" creado con provider ' + agent.provider + '.', showText: true});
+        break;
+
+      case 'callAgent':
+        var caIdx = stepProgress(tabId, 'Agent', 'Consultando agente: ' + (act.name || ''));
+        if (typeof X1AgentManager === 'undefined') { stepError(tabId, caIdx); resolve({text: 'Agent Manager no disponible.', showText: true}); break; }
+        X1AgentManager.callAgent(act.name || '', act.message || act.text || '', act).then(function(result) {
+          stepDone(tabId, caIdx);
+          resolve({text: result || 'Sin respuesta del agente.', showText: true});
+        }).catch(function(e) { stepError(tabId, caIdx); resolve({text: 'Error del agente: ' + e.message, showText: true}); });
+        break;
+
+      case 'listAgents':
+        if (typeof X1AgentManager === 'undefined') { resolve({text: 'Agent Manager no disponible.', showText: true}); break; }
+        var allAgents = X1AgentManager.listAgents();
+        if (allAgents.length === 0) { resolve({text: 'No hay agentes registrados.', showText: true}); break; }
+        var aText = 'Agentes (' + allAgents.length + '):\n';
+        allAgents.forEach(function(a, i) { aText += (i+1) + '. ' + a.name + ' (' + a.provider + ') - ' + (a.description || '').substring(0, 60) + '\n'; });
+        resolve({text: aText, showText: true});
+        break;
+
+      case 'runPlugin':
+        var plIdx = stepProgress(tabId, 'Plugin', 'Ejecutando plugin: ' + (act.name || ''));
+        if (typeof X1PluginEngine === 'undefined') { stepError(tabId, plIdx); resolve({text: 'Plugin Engine no disponible.', showText: true}); break; }
+        X1PluginEngine.runPlugin(act.name || '', act.params || {}, tabId).then(function(result) {
+          stepDone(tabId, plIdx);
+          resolve({text: typeof result === 'string' ? result : JSON.stringify(result), showText: true});
+        }).catch(function(e) { stepError(tabId, plIdx); resolve({text: 'Error en plugin: ' + e.message, showText: true}); });
+        break;
+
+      case 'addAutomation':
+        if (typeof X1AutomationEngine === 'undefined') { resolve({text: 'Automation Engine no disponible.', showText: true}); break; }
+        X1AutomationEngine.addRule(act).then(function(rule) {
+          resolve({text: 'Regla de automatizacion creada: ' + (rule.name || rule.id), showText: true});
+        }).catch(function(e) { resolve({text: 'Error: ' + e.message, showText: true}); });
+        break;
+
+      case 'extractAI':
+        var eaIdx = stepProgress(tabId, 'Extract', 'Extrayendo con IA...');
+        if (typeof X1DataExtractor === 'undefined') { stepError(tabId, eaIdx); resolve({text: 'Data Extractor no disponible.', showText: true}); break; }
+        X1DataExtractor.extractWithAI(tabId, act.query || act.text || '').then(function(data) {
+          stepDone(tabId, eaIdx);
+          resolve({text: JSON.stringify(data, null, 2), showText: true});
+        }).catch(function(e) { stepError(tabId, eaIdx); resolve({text: 'Error extrayendo: ' + e.message, showText: true}); });
+        break;
+
       case 'webSearch':
         var wsIdx = stepProgress(tabId, 'Search', 'Buscando: ' + (act.query || '').substring(0, 30));
         tavilySearch(act.query || '', {maxResults: act.maxResults || 5}).then(function(searchResult) {
@@ -4959,7 +5192,9 @@ function handleVoice(cmd, wantsText, sendResponse) {
       data.showText = false;
     }
     console.log('[X1] Responding after ' + elapsed + 'ms:', text.substring(0, 50));
-    sendResponse(data);
+    try { sendResponse(data); } catch(e) {
+      console.warn('[X1] sendResponse failed (port closed):', e.message);
+    }
   }
 
   var hasAnyKey = !!(aiKeys.groqKey || aiKeys.opencodeKey || aiKeys.nvidiaKey || aiKeys.geminiKey || aiKeys.deepseekKey || aiKeys.openrouterKey || aiKeys.cerebrasKey || aiKeys.sambanovaKey || aiKeys.mistralKey || aiKeys.togetherKey || (aiKeys.cloudflareAccountId && aiKeys.cloudflareKey));
@@ -5604,22 +5839,6 @@ chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
     handleVoice(msg.command||'', msg.wantsText||false, sendResponse);
     return true;
   }
-  if(msg.type==='X1_GET_HISTORY'){
-    chrome.storage.local.get('x1ChatHistory', function(r){
-      sendResponse({history: r.x1ChatHistory || []});
-    });
-    return true;
-  }
-  if(msg.type==='X1_ADD_MESSAGE'){
-    chrome.storage.local.get('x1ChatHistory', function(r){
-      var hist = r.x1ChatHistory || [];
-      hist.push({role: msg.role, text: msg.text, time: Date.now()});
-      if (hist.length > 200) hist = hist.slice(-100);
-      chrome.storage.local.set({x1ChatHistory: hist});
-      sendResponse({ok: true});
-    });
-    return true;
-  }
   if(msg.type==='X1_OPEN_PANEL' && sender && sender.tab){
     chrome.sidePanel.open({ tabId: sender.tab.id }).catch(function(e) {
       console.error('[X1] sidePanel.open error:', e);
@@ -5650,6 +5869,47 @@ chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
       });
     });
     return false;
+  }
+  if(msg.type==='X1_OPEN_TERMINAL' && sender && sender.tab){
+    chrome.sidePanel.open({ tabId: sender.tab.id }).catch(function() {});
+    sendResponse({ opened: true });
+    return false;
+  }
+  if(msg.type==='X1_TERMINAL_COMMAND'){
+    handleTerminalCommand(msg.command, msg.tabId || sender.tab && sender.tab.id).then(function(result){
+      sendResponse(result);
+    }).catch(function(e){
+      sendResponse({ success: false, error: e.message });
+    });
+    return true;
+  }
+  if(msg.type==='X1_GET_TASKS'){
+    sendResponse({ tasks: getTasks() });
+    return false;
+  }
+  if(msg.type==='X1_ADD_TASK'){
+    addTask(msg.text).then(function(task){
+      sendResponse({ success: true, task: task });
+    });
+    return true;
+  }
+  if(msg.type==='X1_TOGGLE_TASK'){
+    toggleTask(msg.id).then(function(){
+      sendResponse({ success: true });
+    });
+    return true;
+  }
+  if(msg.type==='X1_GET_CALENDAR'){
+    getUpcomingEvents().then(function(events){
+      sendResponse({ events: events });
+    });
+    return true;
+  }
+  if(msg.type==='X1_GET_EMAILS'){
+    getRecentEmails().then(function(emails){
+      sendResponse({ emails: emails });
+    });
+    return true;
   }
 });
 
@@ -5711,41 +5971,53 @@ function addPlanStep(planId, step) {
   return s;
 }
 
-async function executePlan(planId) {
-  var plan = taskPlanner.plans[planId];
-  if (!plan) return {error: "Plan not found"};
-  plan.status = "running";
-  for (var i = 0; i < plan.steps.length; i++) {
-    var step = plan.steps[i];
-    try {
-      var result = await executePlanStep(planId, step);
-      step.status = "completed";
-      step.result = result;
-      plan.results.push(result);
-    } catch(e) {
-      step.status = "error";
-      step.error = e.message;
-      plan.status = "error";
-      return {plan: plan, error: e.message, stepIndex: i};
+function executePlan(planId) {
+  return new Promise(function(resolve) {
+    var plan = taskPlanner.plans[planId];
+    if (!plan) { resolve({error: "Plan not found"}); return; }
+    plan.status = "running";
+    var index = 0;
+    function nextStep() {
+      if (index >= plan.steps.length) {
+        plan.status = "completed";
+        resolve({plan: plan, status: "completed"});
+        return;
+      }
+      var step = plan.steps[index];
+      index++;
+      executePlanStep(planId, step).then(function(result) {
+        step.status = "completed";
+        step.result = result;
+        plan.results.push(result);
+        nextStep();
+      }).catch(function(e) {
+        step.status = "error";
+        step.error = e.message;
+        plan.status = "error";
+        resolve({plan: plan, error: e.message, stepIndex: index - 1});
+      });
     }
-  }
-  plan.status = "completed";
-  return {plan: plan, status: "completed"};
+    nextStep();
+  });
 }
 
-async function executePlanStep(planId, step) {
-  var tab = await getActiveTab();
-  if (!tab) throw new Error("No active tab");
-  try {
+function executePlanStep(planId, step) {
+  return getActiveTab().then(function(tab) {
+    if (!tab) return Promise.reject(new Error("No active tab"));
     switch (step.action) {
     case "navigate":
-      if (step.url) { await chrome.tabs.update(tab.id, {url: step.url}); return "Navigated to " + step.url; }
-      return "No URL";
+      if (step.url) {
+        return new Promise(function(resolve) {
+          chrome.tabs.update(tab.id, {url: step.url}, function() { resolve("Navigated to " + step.url); });
+        });
+      }
+      return Promise.resolve("No URL");
     case "wait":
-      await new Promise(function(r) { setTimeout(r, step.duration || 1000); });
-      return "Waited " + (step.duration || 1000) + "ms";
+      return new Promise(function(resolve) {
+        setTimeout(function() { resolve("Waited " + (step.duration || 1000) + "ms"); }, step.duration || 1000);
+      });
     case "click":
-      return await execFn(tab.id, function(text) {
+      return execFn(tab.id, function(text) {
         var els = document.querySelectorAll("a, button, [role=button]");
         for (var i = 0; i < els.length; i++) {
           if (els[i].textContent.toLowerCase().indexOf(text.toLowerCase()) !== -1) { els[i].click(); return "clicked"; }
@@ -5753,135 +6025,114 @@ async function executePlanStep(planId, step) {
         return "not found";
       }, [step.text || ""]);
     case "type":
-      return await execFn(tab.id, function(text) {
+      return execFn(tab.id, function(text) {
         var inp = document.querySelector("input:not([type=hidden]), textarea");
         if (inp) { inp.value = text; inp.dispatchEvent(new Event("input", {bubbles: true})); return "typed"; }
         return "no input";
       }, [step.text || ""]);
     case "read":
-      return await capturePageContext(tab.id);
+      return capturePageContext(tab.id);
     case "summarize":
-      var ctx = await capturePageContext(tab.id);
-      return await generateSummary(ctx.text || ctx.title || "", 200);
+      return capturePageContext(tab.id).then(function(ctx) {
+        return generateSummary(ctx.text || ctx.title || "", 200);
+      });
     case "screenshot":
-      return await new Promise(function(resolve) {
+      return new Promise(function(resolve) {
         chrome.tabs.captureVisibleTab(null, {format: "png"}, function(dataUrl) {
           resolve({screenshot: dataUrl});
         });
       });
     case "vision":
-      return "Vision not available";
+      return Promise.resolve("Vision not available");
     default:
-      return "Unknown step action: " + step.action;
+      return Promise.resolve("Unknown step action: " + step.action);
     }
-  } catch(e) {
-    return "Error executing step: " + e.message;
-  }
+  }).catch(function(e) {
+    return Promise.resolve("Error executing step: " + e.message);
+  });
 }
 
-async function handleAgentVision(tabId, step) {
-  var dataUrl = await new Promise(function(resolve, reject) {
+function handleAgentVision(tabId, step) {
+  return new Promise(function(resolve) {
     chrome.tabs.captureVisibleTab(tabId, {format: "png"}, function(dataUrl) {
-      if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
-      else resolve(dataUrl);
+      if (chrome.runtime.lastError) {
+        resolve({text: "Error capturando imagen: " + chrome.runtime.lastError.message, showText: true});
+        return;
+      }
+      var base64 = dataUrl.replace(/^data:image\/png;base64,/, "");
+      var providersToTry = ["gemini", "openai", "groq"];
+      var lastError = null;
+      function tryNextProvider(index) {
+        if (index >= providersToTry.length) {
+          resolve({text: "No pude analizar la imagen. Error: " + (lastError ? lastError.message : "desconocido"), showText: true});
+          return;
+        }
+        var provider = providersToTry[index];
+        callVisionProvider(provider, base64, step.text || "Describe lo que ves en esta pantalla.").then(function(result) {
+          resolve({text: result, showText: true});
+        }).catch(function(e) {
+          lastError = e;
+          var msg = (e.message || "").toLowerCase();
+          if (msg.indexOf("does not support") !== -1 || msg.indexOf("not supported") !== -1 || msg.indexOf("invalid request") !== -1) {
+            tryNextProvider(index + 1);
+          } else {
+            resolve({text: "Error de vision: " + e.message, showText: true});
+          }
+        });
+      }
+      tryNextProvider(0);
     });
   });
-
-  var base64 = dataUrl.replace(/^data:image\/png;base64,/, "");
-
-  var providersToTry = ["gemini", "openai", "groq"];
-  var lastError = null;
-
-  for (var i = 0; i < providersToTry.length; i++) {
-    var provider = providersToTry[i];
-    try {
-      var result = await callVisionProvider(provider, base64, step.text || "Describe lo que ves en esta pantalla.");
-      return {text: result, showText: true};
-    } catch(e) {
-      lastError = e;
-      var msg = (e.message || "").toLowerCase();
-      if (msg.indexOf("does not support") !== -1 || msg.indexOf("not supported") !== -1 || msg.indexOf("invalid request") !== -1) {
-        continue;
-      }
-      break;
-    }
-  }
-
-  return {text: "No pude analizar la imagen. Error: " + (lastError ? lastError.message : "desconocido"), showText: true};
 }
 
-async function callVisionProvider(provider, base64Image, prompt) {
-  var providerConfig = aiProviders[provider];
-  if (!providerConfig) throw new Error("Provider not found: " + provider);
+function callVisionProvider(provider, base64Image, prompt) {
+  return new Promise(function(resolve, reject) {
+    var providerConfig = aiProviders[provider];
+    if (!providerConfig) { reject(new Error("Provider not found: " + provider)); return; }
+    var apiKey = aiKeys[provider + "Key"];
+    if (!apiKey && provider !== "ollama") { reject(new Error("No API key for " + provider)); return; }
 
-  var apiKey = aiKeys[provider + "Key"];
-  if (!apiKey && provider !== "ollama") throw new Error("No API key for " + provider);
+    if (provider === "gemini") {
+      var url = providerConfig.baseUrl + providerConfig.models[0] + ":generateContent?key=" + apiKey;
+      var body = { contents: [{parts: [{text: prompt}, {inline_data: {mime_type: "image/png", data: base64Image}}]}] };
+      fetch(url, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)})
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (data.error) { reject(new Error(data.error.message)); return; }
+          var text = data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0].text ? data.candidates[0].content.parts[0].text : JSON.stringify(data).substring(0, 500);
+          resolve(text);
+        }).catch(reject);
+      return;
+    }
 
-  if (provider === "gemini") {
-    var url = providerConfig.baseUrl + providerConfig.models[0] + ":generateContent?key=" + apiKey;
-    var body = {
-      contents: [{
-        parts: [
-          {text: prompt},
-          {inline_data: {mime_type: "image/png", data: base64Image}}
-        ]
-      }]
-    };
-    var response = await fetch(url, {
-      method: "POST",
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify(body)
-    });
-    var data = await response.json();
-    if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
-    return data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0].text
-      ? data.candidates[0].content.parts[0].text
-      : JSON.stringify(data).substring(0, 500);
-  }
+    if (provider === "openai") {
+      var url = "https://api.openai.com/v1/chat/completions";
+      var body = {model: "gpt-4o", messages: [{role: "user", content: [{type: "text", text: prompt}, {type: "image_url", image_url: {url: "data:image/png;base64," + base64Image}}]}]};
+      fetch(url, {method: "POST", headers: {"Content-Type": "application/json", "Authorization": "Bearer " + apiKey}, body: JSON.stringify(body)})
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (data.error) { reject(new Error(data.error.message)); return; }
+          var text = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content ? data.choices[0].message.content : JSON.stringify(data).substring(0, 500);
+          resolve(text);
+        }).catch(reject);
+      return;
+    }
 
-  if (provider === "openai") {
-    var url = providerConfig.baseUrl + "chat/completions";
-    var body = {
-      model: "gpt-4o",
-      messages: [{
-        role: "user",
-        content: [
-          {type: "text", text: prompt},
-          {type: "image_url", image_url: {url: "data:image/png;base64," + base64Image}}
-        ]
-      }]
-    };
-    var response = await fetch(url, {
-      method: "POST",
-      headers: {"Content-Type": "application/json", "Authorization": "Bearer " + apiKey},
-      body: JSON.stringify(body)
-    });
-    var data = await response.json();
-    if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
-    return data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content
-      ? data.choices[0].message.content
-      : JSON.stringify(data).substring(0, 500);
-  }
+    if (provider === "groq") {
+      var url = "https://api.groq.com/openai/v1/chat/completions";
+      var body = {model: providerConfig.models[0], messages: [{role: "user", content: prompt}]};
+      fetch(url, {method: "POST", headers: {"Content-Type": "application/json", "Authorization": "Bearer " + apiKey}, body: JSON.stringify(body)})
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (data.error) { reject(new Error(data.error.message)); return; }
+          var text = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content ? data.choices[0].message.content : JSON.stringify(data).substring(0, 500);
+          resolve(text);
+        }).catch(reject);
+      return;
+    }
 
-  if (provider === "groq") {
-    var url = providerConfig.baseUrl + "chat/completions";
-    var body = {
-      model: providerConfig.models[0],
-      messages: [{role: "user", content: prompt}]
-    };
-    var response = await fetch(url, {
-      method: "POST",
-      headers: {"Content-Type": "application/json", "Authorization": "Bearer " + apiKey},
-      body: JSON.stringify(body)
-    });
-    var data = await response.json();
-    if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
-    return data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content
-      ? data.choices[0].message.content
-      : JSON.stringify(data).substring(0, 500);
-  }
-
-  throw new Error("Unsupported vision provider: " + provider);
+    reject(new Error("Unsupported vision provider: " + provider));
+  });
 }
 
 function getPlan(planId) {
@@ -17347,58 +17598,8 @@ var TimeTracker = (function() {
 
 
 // ═══════════════════════════════════════════════════════════════
-// SIDEPANEL TERMINAL BRIDGE
+// TERMINAL HELPER FUNCTIONS
 // ═══════════════════════════════════════════════════════════════
-
-chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
-  if (msg.type === 'X1_OPEN_TERMINAL') {
-    chrome.sidePanel.open({ tabId: msg.tabId }).catch(function() {});
-    sendResponse({ opened: true });
-    return false;
-  }
-  
-  if (msg.type === 'X1_TERMINAL_COMMAND') {
-    handleTerminalCommand(msg.command, msg.tabId).then(function(result) {
-      sendResponse(result);
-    }).catch(function(e) {
-      sendResponse({ success: false, error: e.message });
-    });
-    return true;
-  }
-  
-  if (msg.type === 'X1_GET_TASKS') {
-    sendResponse({ tasks: getTasks() });
-    return false;
-  }
-  
-  if (msg.type === 'X1_ADD_TASK') {
-    addTask(msg.text).then(function(task) {
-      sendResponse({ success: true, task: task });
-    });
-    return true;
-  }
-  
-  if (msg.type === 'X1_TOGGLE_TASK') {
-    toggleTask(msg.id).then(function() {
-      sendResponse({ success: true });
-    });
-    return true;
-  }
-  
-  if (msg.type === 'X1_GET_CALENDAR') {
-    getUpcomingEvents().then(function(events) {
-      sendResponse({ events: events });
-    });
-    return true;
-  }
-  
-  if (msg.type === 'X1_GET_EMAILS') {
-    getRecentEmails().then(function(emails) {
-      sendResponse({ emails: emails });
-    });
-    return true;
-  }
-});
 
 async function handleTerminalCommand(command, tabId) {
   var parts = command.split(' ');
@@ -17623,109 +17824,4 @@ async function getRecentEmails() {
       resolve(r.x1RecentEmails || []);
     });
   });
-}
-
-async function handleAgentVision(tabId, step) {
-  var dataUrl = await new Promise(function(resolve, reject) {
-    chrome.tabs.captureVisibleTab(tabId, {format: "png"}, function(dataUrl) {
-      if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
-      else resolve(dataUrl);
-    });
-  });
-
-  var base64 = dataUrl.replace(/^data:image\/png;base64,/, "");
-
-  var providersToTry = ["gemini", "openai", "groq"];
-  var lastError = null;
-
-  for (var i = 0; i < providersToTry.length; i++) {
-    var provider = providersToTry[i];
-    try {
-      var result = await callVisionProvider(provider, base64, step.text || "Describe lo que ves en esta pantalla.");
-      return {text: result, showText: true};
-    } catch(e) {
-      lastError = e;
-      var msg = (e.message || "").toLowerCase();
-      if (msg.indexOf("does not support") !== -1 || msg.indexOf("not supported") !== -1 || msg.indexOf("invalid request") !== -1) {
-        continue;
-      }
-      break;
-    }
-  }
-
-  return {text: "No pude analizar la imagen. Error: " + (lastError ? lastError.message : "desconocido"), showText: true};
-}
-
-async function callVisionProvider(provider, base64Image, prompt) {
-  var providerConfig = aiProviders[provider];
-  if (!providerConfig) throw new Error("Provider not found: " + provider);
-
-  var apiKey = aiKeys[provider + "Key"];
-  if (!apiKey && provider !== "ollama") throw new Error("No API key for " + provider);
-
-  if (provider === "gemini") {
-    var url = providerConfig.baseUrl + providerConfig.models[0] + ":generateContent?key=" + apiKey;
-    var body = {
-      contents: [{
-        parts: [
-          {text: prompt},
-          {inline_data: {mime_type: "image/png", data: base64Image}}
-        ]
-      }]
-    };
-    var response = await fetch(url, {
-      method: "POST",
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify(body)
-    });
-    var data = await response.json();
-    if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
-    return data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0].text
-      ? data.candidates[0].content.parts[0].text
-      : JSON.stringify(data).substring(0, 500);
-  }
-
-  if (provider === "openai") {
-    var url = providerConfig.baseUrl + "chat/completions";
-    var body = {
-      model: "gpt-4o",
-      messages: [{
-        role: "user",
-        content: [
-          {type: "text", text: prompt},
-          {type: "image_url", image_url: {url: "data:image/png;base64," + base64Image}}
-        ]
-      }]
-    };
-    var response = await fetch(url, {
-      method: "POST",
-      headers: {"Content-Type": "application/json", "Authorization": "Bearer " + apiKey},
-      body: JSON.stringify(body)
-    });
-    var data = await response.json();
-    if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
-    return data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content
-      ? data.choices[0].message.content
-      : JSON.stringify(data).substring(0, 500);
-  }
-
-  if (provider === "groq") {
-    var url = providerConfig.baseUrl + "chat/completions";
-    var body = {
-      model: providerConfig.models[0],
-      messages: [{role: "user", content: prompt}]
-    };
-    var response = await fetch(url, {
-      method: "POST",
-      headers: {"Content-Type": "application/json", "Authorization": "Bearer " + apiKey},
-      body: JSON.stringify(body)
-    });
-    var data = await response.json();
-    if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
-    return data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content
-      ? data.choices[0].message.content
-      : JSON.stringify(data).substring(0, 500);
-  }
-
-  throw new Error("Unsupported vision provider: " + provider);
 }

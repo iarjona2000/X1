@@ -82,6 +82,30 @@
         index: msg.index != null ? msg.index : -1
       }, "*");
     }
+    if (msg?.type === "X1_API_RESULT") {
+      window.postMessage({
+        source: "x1-api-response",
+        action: msg.action || "",
+        ok: msg.ok !== false,
+        data: msg.data || null,
+        error: msg.error || null
+      }, "*");
+    }
+    if (msg?.type === "X1_AGENT_PROGRESS") {
+      window.postMessage({
+        source: "x1-agent-progress",
+        agentName: msg.agentName || "",
+        stepName: msg.stepName || "",
+        status: msg.status || "active",
+        icon: msg.icon || ""
+      }, "*");
+    }
+    if (msg?.type === "X1_BUDGET_ALERT") {
+      window.postMessage({
+        source: "x1-budget-alert",
+        text: msg.text || ""
+      }, "*");
+    }
   });
 
 })()

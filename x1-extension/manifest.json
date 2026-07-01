@@ -1,0 +1,85 @@
+{
+  "manifest_version": 3,
+  "name": "X1 — IA Personalizada",
+  "version": "1.0.0",
+  "description": "Tu asistente de IA personalizable y entrenable para Google Workspace. Compara modelos, aprende de tus preferencias y ejecuta tareas autónomamente.",
+  "icons": {
+    "16": "src/assets/icons/icon16.png",
+    "48": "src/assets/icons/icon48.png",
+    "128": "src/assets/icons/icon128.png"
+  },
+  "permissions": [
+    "storage",
+    "activeTab",
+    "scripting",
+    "notifications",
+    "alarms"
+  ],
+  "host_permissions": [
+    "https://mail.google.com/*",
+    "https://docs.google.com/*",
+    "https://sheets.google.com/*",
+    "https://calendar.google.com/*",
+    "https://api.openai.com/*",
+    "https://api.anthropic.com/*",
+    "https://generativelanguage.googleapis.com/*",
+    "https://api-inference.huggingface.co/*",
+    "https://router.huggingface.co/*",
+    "http://localhost:11434/*",
+    "https://api.groq.com/*",
+    "https://api.cohere.ai/*",
+    "https://api.deepseek.com/*",
+    "https://api.minimaxi.com/*",
+    "https://api.moonshot.cn/*",
+    "https://open.bigmodel.cn/*",
+    "http://localhost:8080/*"
+  ],
+  "oauth2": {
+    "client_id": "YOUR_GOOGLE_OAUTH_CLIENT_ID.apps.googleusercontent.com",
+    "scopes": [
+      "https://www.googleapis.com/auth/gmail.modify",
+      "https://www.googleapis.com/auth/documents",
+      "https://www.googleapis.com/auth/spreadsheets",
+      "https://www.googleapis.com/auth/calendar"
+    ]
+  },
+  "background": {
+    "service_worker": "src/background/service-worker.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["src/content/chat.js"],
+      "run_at": "document_end"
+    },
+    {
+      "matches": [
+        "https://mail.google.com/*",
+        "https://docs.google.com/*",
+        "https://sheets.google.com/*",
+        "https://calendar.google.com/*"
+      ],
+      "js": ["src/content/workspace.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "src/popup/popup.html",
+    "default_icon": {
+      "16": "src/assets/icons/icon16.png",
+      "48": "src/assets/icons/icon48.png",
+      "128": "src/assets/icons/icon128.png"
+    },
+    "default_title": "X1 — IA Personalizada"
+  },
+  "options_page": "src/options/options.html",
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "src/assets/icons/*",
+        "src/assets/styles/*"
+      ],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}
