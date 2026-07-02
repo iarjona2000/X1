@@ -58,12 +58,21 @@ try {
     'prompts/assembler.js',
     'x1-core/bundle/x1-core.js',
     'x1-bridge.js',
-    'x1-integration.js',
-    'x1-api.js',
-    'agents-x1.js',
+    // protocol.js/registry.js/continue-bridge.js load here, BEFORE
+    // x1-integration.js/x1-api.js/agents-x1.js: those three unconditionally
+    // reference `window`, which doesn't exist in an MV3 service worker —
+    // they throw and abort the rest of the importScripts() call, so anything
+    // listed after them silently never loads. Not fixed here on purpose:
+    // x1-integration.js monkey-patches aiComplete/execAction/parseCommand and
+    // exposes x1CompareResponses/x1EvaluateResponse/x1RecordVote, which reads
+    // as judge/panel-adjacent — activating it is a behavior decision, not a
+    // mechanical bug fix, so it's left exactly as inert as it already was.
+    'protocol.js',
     'integrations/registry.js',
     'ai/continue-bridge.js',
-    'protocol.js'
+    'x1-integration.js',
+    'x1-api.js',
+    'agents-x1.js'
   );
   console.log('[X1] Modules loaded:',
     typeof X1IndexedDB !== 'undefined' ? 'indexeddb' : 'FAIL',

@@ -31,6 +31,31 @@ No es urgente nada de esto salvo que quieras usar la función correspondiente. L
 - **Permisos del manifest (`host_permissions` con comodín `https://*/*`)**: el documento pedía restringirlo a una lista de dominios de IA concretos. No lo toqué — X1 es un agente web que necesita ejecutar acciones en cualquier página que visites (extracción, monitorización, Alt+Click, etc.), así que restringir esto rompería esas funciones. Es un cambio deliberado, no un olvido.
 - **Colisión de datos arreglada**: el motor de Skills de tu socio y un código antiguo mío escribían en la misma clave de almacenamiento (`x1_skills`) con formatos incompatibles — podían pisarse entre sí. Renombré la clave del código antiguo a `x1_skills_legacy`, sin tocar el motor nuevo.
 
+## Aviso importante para tu socio: bundle desactualizado
+
+`background/x1-core/bundle/x1-core.js` (el archivo que la extensión realmente carga) **no contiene los cambios de `protocol.js`** que subió en su último push — comprobé el contenido del bundle y no aparece ni una vez la palabra "protocol". Es decir: sus mejoras de `background/x1-core/utils/protocol.js` y `message-router.js` están en el repositorio pero **no están activas en la extensión** hasta que alguien ejecute el build.
+
+No lo he ejecutado yo porque es su sistema de build (webpack) y no tiene `node_modules` instalado en esta máquina — no quise lanzar una instalación/build a ciegas sobre código que no es mío. Si él (o tú) ejecuta esto, quedaría al día:
+```
+cd background/x1-core
+npm install
+npm run build
+```
+
+## Bug crítico encontrado y arreglado: cadena de carga rota
+
+`background/x1-integration.js`, `background/x1-api.js` y `background/ai/continue-bridge.js` (antes de mi arreglo) usan `window.algo = ...` sin comprobar si existe — pero el service worker de una extensión MV3 no tiene `window`, solo `self`. Como `importScripts()` para en el primer error, esto rompía la carga de **todo lo que venía después en la lista**: `x1-api.js`, `agents-x1.js`, `integrations/registry.js`, `ai/continue-bridge.js`, y el propio `background/protocol.js` que tu socio acababa de escribir para arreglar justo el problema del bundle desactualizado que te comenté antes — es decir, su arreglo nunca llegó a ejecutarse.
+
+**Arreglado:** `protocol.js`, `integrations/registry.js` y `ai/continue-bridge.js` ahora cargan antes en la lista y usan `self.` en vez de `window.` — verificado con una simulación de verdad, cargan sin errores.
+
+**Dejado tal cual, a propósito:** `background/x1-integration.js` sigue roto (falla igual que antes, no peor). Ese archivo intercepta `aiComplete`/`execAction`/`parseCommand` y expone `x1CompareResponses`/`x1EvaluateResponse`/`x1RecordVote` — nombres que apuntan a lógica de panel/juez. Activarlo sería una decisión de comportamiento, no un arreglo mecánico, así que lo dejo para que tu socio decida si quiere activarlo (arreglando sus `window.` → `self.` igual que hice en los otros tres) y lo revise él mismo.
+
+## Bugs reales encontrados y arreglados esta ronda
+
+- `case 'runPlugin'` llamaba a un método (`X1PluginEngine.runPlugin`) que no existe — se corrigió a `executePlugin`, la función real.
+- `case 'addAutomation'` llamaba a `X1AutomationEngine.addRule`, que tampoco existe — se corrigió para usar `parseNaturalLanguageRule` + `createRule` (los métodos reales), y se añadió el comando de voz que le faltaba (`automatiza: ...`).
+- Verifiqué sistemáticamente el resto de llamadas cruzadas entre módulos (alarmas duplicadas, handlers de mensajes duplicados, colisiones de formato en storage) — no encontré nada más roto.
+
 ## Sin construir todavía (no estaba en lo que pediste hoy, ni urgente)
 
 - Certificación por profesionales del sector (8.3) y memoria de sector compartida anonimizada (8.1) — son iniciativas "post-MVP" que el propio documento marca como no prioritarias y requieren infraestructura de backend propia, no solo código de la extensión.

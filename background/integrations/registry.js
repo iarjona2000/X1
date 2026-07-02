@@ -139,8 +139,9 @@
     }
   };
 
-  // Exponer globalmente
-  window.X1Integrations = IntegrationsRegistry;
+  // Exponer globalmente. `self` (not `window`) — this loads inside the MV3
+  // service worker via importScripts(), which has no `window` global.
+  self.X1Integrations = IntegrationsRegistry;
 
   // Configuración por defecto de integraciones conocidas
   IntegrationsRegistry.register({

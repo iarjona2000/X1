@@ -11,7 +11,7 @@
 (function() {
   'use strict';
 
-  var log = x1Log ? x1Log('ContinueBridge') : { info: console.log, warn: console.warn, error: console.error };
+  var log = (typeof x1Log !== 'undefined' && x1Log) ? x1Log('ContinueBridge') : { info: console.log, warn: console.warn, error: console.error };
 
   // ─── Clase base abstracta (patrón Continue) ───
 
@@ -297,7 +297,7 @@
 
   // ─── API pública para X1 ───
 
-  window.X1ContinueBridge = {
+  self.X1ContinueBridge = {
     version: '1.0.0',
     license: 'Apache-2.0',
     source: 'https://github.com/continuedev/continue (core/llm/, core/context/, core/autocomplete/)',
@@ -327,14 +327,14 @@
   };
 
   // Registrar en registry de integraciones
-  if (window.X1Integrations) {
-    window.X1Integrations.register({
+  if (self.X1Integrations) {
+    self.X1Integrations.register({
       name: 'continue',
       version: '1.0.0',
       license: 'Apache-2.0',
       path: 'background/integrations/continue/',
       description: 'Motor LLM multi-provider (Continue.dev core)',
-      healthCheck: function() { return window.X1ContinueBridge.healthCheck(); },
+      healthCheck: function() { return self.X1ContinueBridge.healthCheck(); },
       dependencies: []
     });
     log.info('Continue Bridge registrado en X1Integrations');
