@@ -3794,7 +3794,7 @@ function execAction(act, tabId) {
           .then(function(r){
             if(r.error) return resolve({text:'Error leyendo calendario: '+(r.error.message||'conecta Google.'), showText:true});
             var items=(r.items||[]).map(function(e){return '• '+e.summary+' '+((e.start?.dateTime||e.start?.date||'').replace('T',' a las ').substring(0,16));});
-            resolve({text:items.length?'Eventos del '+listDate+':\n'+items.join('\n'):'No hay eventos el '+listDate+'.'});
+            resolve({text:items.length?'Eventos del '+listDate+':\n'+items.join('\n'):'No hay eventos el '+listDate+'.', calendarData: r.items || []});
           }).catch(function(e){resolve({text:'Error Calendar: '+e.message+'. Di "conecta Google".', showText:true});});
         break;
       case 'tabGroup':
@@ -13093,6 +13093,17 @@ function createTask(title, options) {
     taskManager.tags[tag].push(task.id);
   });
   try { chrome.storage.local.set({x1Tasks: taskManager.tasks}); } catch(e) {}
+  // Also mirror into the flat list the sidepanel's Tasks tab actually reads
+  // (sidepanel/panel.js uses its own 'cbos_tasks' list, disconnected from
+  // taskManager — without this, tasks created here, e.g. meeting action
+  // items, are saved but never show up anywhere the user looks).
+  try {
+    chrome.storage.local.get('cbos_tasks', function(r) {
+      var flat = (r && r.cbos_tasks) || [];
+      flat.push({text: title, done: false, date: new Date().toISOString()});
+      chrome.storage.local.set({cbos_tasks: flat});
+    });
+  } catch(e) {}
   trackEvent("task_created", {title: title, project: task.project});
   return task;
 }
