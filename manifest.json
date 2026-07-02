@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "X1 — AI Voice Agent",
+  "name": "X1 — Multi-Modal AI Agent",
   "version": "2.1.0",
+  "description": "Open-source AI agent for Chrome. Voice + text input. Multi-provider support with intelligent routing based on user preferences and sector. Navigate, click, read, write, search, email, and create.",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAxby3wxothK8kGSwB6ZnvopHjH7AV5x5+YGuYYTNK8iQhuGZHiXNIoHxVLPrF/xCi5vPuWwWPZ5PHh9ObnfJpjk1u7oJwcuhEPsbHGi9uMfNS8E24ywS8YcR335zfxZC0nQF+GUBsXeM24oRhKn3h0+SN/G7c3NNVMv4HpWuevQjYXDyeRIhojNWpvoBhHUUPaDw+nYrUnGxZ5f6nzrBATiizwZIvft2BO7cPfgzdo95TSocTima14rExvQNAvYa+RiAaKQMOc9LFm2bTtBhTs+A/0Lg7XIFTZwxJEgN/GTtuNXLsnDplX/oCnJQp/ASsfWRw00Fi/FhGiojA5Ki33QIDAQAB",
-  "description": "Tu agente de IA con memoria y contexto, integrado con Google Workspace.",
   "permissions": [
     "identity",
     "storage",
