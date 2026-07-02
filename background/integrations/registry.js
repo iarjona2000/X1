@@ -216,6 +216,18 @@
     dependencies: []
   });
 
+  IntegrationsRegistry.register({
+    name: 'huggingface',
+    version: '0.0.0',
+    license: 'MIT',
+    path: 'background/integrations/huggingface/',
+    description: 'Integracion unificada de Hugging Face (Piper TTS + Whisper STT)',
+    healthCheck: function(cfg) {
+      return Promise.resolve({ok: true, message: 'HuggingFace integration loaded'});
+    },
+    dependencies: ['piper', 'whisper']
+  });
+
   console.log('[X1-Registry] Registro inicializado con', Object.keys(IntegrationsRegistry.integrations).length, 'integraciones');
 
 })();

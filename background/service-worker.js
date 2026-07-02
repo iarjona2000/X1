@@ -70,6 +70,12 @@ try {
     'protocol.js',
     'integrations/registry.js',
     'ai/continue-bridge.js',
+    'ai/kilo-bridge.js',
+    'ai/openwebui-bridge.js',
+    'ai/llamaindex-bridge.js',
+    'ai/piper-bridge.js',
+    'ai/whisper-bridge.js',
+    'ai/huggingface-bridge.js',
     'x1-integration.js',
     'x1-api.js',
     'agents-x1.js'
@@ -86,6 +92,12 @@ try {
     typeof x1DetectSector === 'function' ? 'x1-integration' : 'FAIL',
     typeof X1Integrations !== 'undefined' ? 'integrations-registry' : 'FAIL',
     typeof X1ContinueBridge !== 'undefined' ? 'continue-bridge' : 'FAIL',
+    typeof X1KiloBridge !== 'undefined' ? 'kilo-bridge' : 'FAIL',
+    typeof X1OpenWebUIBridge !== 'undefined' ? 'openwebui-bridge' : 'FAIL',
+    typeof X1LlamaIndexBridge !== 'undefined' ? 'llamaindex-bridge' : 'FAIL',
+    typeof X1PiperBridge !== 'undefined' ? 'piper-bridge' : 'FAIL',
+    typeof X1WhisperBridge !== 'undefined' ? 'whisper-bridge' : 'FAIL',
+    typeof X1HuggingFaceBridge !== 'undefined' ? 'huggingface-bridge' : 'FAIL',
     typeof X1Protocol !== 'undefined' ? 'protocol' : 'FAIL');
 } catch(e) {
   console.error('[X1] Module import failed:', e && e.message);
