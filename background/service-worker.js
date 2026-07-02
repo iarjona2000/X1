@@ -62,7 +62,8 @@ try {
     'x1-api.js',
     'agents-x1.js',
     'integrations/registry.js',
-    'ai/continue-bridge.js'
+    'ai/continue-bridge.js',
+    'protocol.js'
   );
   console.log('[X1] Modules loaded:',
     typeof X1IndexedDB !== 'undefined' ? 'indexeddb' : 'FAIL',
@@ -75,7 +76,8 @@ try {
     typeof X1Bridge !== 'undefined' && X1Bridge.loaded ? 'x1-core' : 'FAIL',
     typeof x1DetectSector === 'function' ? 'x1-integration' : 'FAIL',
     typeof X1Integrations !== 'undefined' ? 'integrations-registry' : 'FAIL',
-    typeof X1ContinueBridge !== 'undefined' ? 'continue-bridge' : 'FAIL');
+    typeof X1ContinueBridge !== 'undefined' ? 'continue-bridge' : 'FAIL',
+    typeof X1Protocol !== 'undefined' ? 'protocol' : 'FAIL');
 } catch(e) {
   console.error('[X1] Module import failed:', e && e.message);
 }
