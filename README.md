@@ -1,6 +1,6 @@
-# X1 — Voice-First AI Agent for Chrome
+# X1 — Multi-Modal AI Agent for Chrome
 
-A production-grade Chrome Extension (MV3) that brings voice-controlled AI autonomy to your browser. Navigate, click, read, write, search, email, and create with your voice. X1 is a 7-layer architecture with multi-AI support, persistent memory, and adaptive decision-making.
+An open-source Chrome Extension (MV3) that brings **voice + text AI autonomy** to your browser. Multi-provider support with intelligent routing based on user preferences and sector. Navigate, click, read, write, search, email, and create — with your voice or keyboard. X1 is a 7-layer architecture with persistent memory and adaptive decision-making.
 
 **Status**: Implementation complete. Testing phase. ~34k lines of JavaScript across 40 modules.
 
@@ -296,4 +296,4 @@ Tomás Calero (Tomahawk999) — Co-fundador, diseño de voz y experiencia de usu
 
 Ambos co-fundadores de X1 — agente de navegador voice-first.
 
-**X1 Mission**: Replace the keyboard with your voice as the primary input modality. See everything, act on everything.
+**X1 Mission**: Replace the keyboard with your voice as one primary input modality, while supporting seamless voice + text interaction. See everything, act on everything.
