@@ -406,7 +406,39 @@
     var analysis = analyzeQuery(query);
     log.info('Query analysis: ' + JSON.stringify(analysis));
 
-    // 2. Get available providers
+    // 2. Check if WebLLM brain is available
+    var hasWebLLM = typeof X1WebLLMBridge !== 'undefined' && X1WebLLMBridge.isLoaded();
+
+    if (hasWebLLM) {
+      log.info('Using WebLLM as Judge brain (local inference)');
+      return X1WebLLMBridge.judgeQuery(query, {
+        maxTokens: options.maxTokens || 256,
+        temperature: 0.3
+      }).then(function(result) {
+        var totalElapsed = Date.now() - startTime;
+        return {
+          ok: true,
+          query: query,
+          analysis: analysis,
+          verdict: {
+            winner: result.response || { action: 'speak', text: 'Judge processed locally' },
+            winnerProvider: 'webllm-local',
+            confidence: 0.9,
+            consensus: true,
+            alternatives: [],
+            synthesis: 'local_webllm'
+          },
+          votes: [{ provider: 'webllm-local', score: 10, elapsed: totalElapsed, preview: 'Local WebLLM inference' }],
+          totalElapsed: totalElapsed,
+          timestamp: Date.now(),
+          source: 'webllm'
+        };
+      });
+    }
+
+    // 3. Fallback to external providers
+    log.info('WebLLM not available, using external providers');
+
     var availableProviders = options.providers || getDefaultProviders();
     var activeProviders = availableProviders.filter(function(p) { return p.has; });
 

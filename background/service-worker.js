@@ -94,6 +94,7 @@ try {
     'ai/freeweb-bridge.js',
     'ai/browserai-bridge.js',
     'ai/n0x-bridge.js',
+    'ai/webllm-bridge.js',
     'x1-integration.js',
     'x1-api.js',
     'agents-x1.js'
@@ -134,6 +135,7 @@ try {
     typeof X1FreeWebBridge !== 'undefined' ? 'freeweb-bridge' : 'FAIL',
     typeof X1BrowserAIBridge !== 'undefined' ? 'browserai-bridge' : 'FAIL',
     typeof X1N0xBridge !== 'undefined' ? 'n0x-bridge' : 'FAIL',
+    typeof X1WebLLMBridge !== 'undefined' ? 'webllm-bridge' : 'FAIL',
     typeof X1Protocol !== 'undefined' ? 'protocol' : 'FAIL');
 } catch(e) {
   console.error('[X1] Module import failed:', e && e.message);
