@@ -60,7 +60,10 @@ try {
     'x1-bridge.js',
     'x1-integration.js',
     'x1-api.js',
-    'agents-x1.js'
+    'agents-x1.js',
+    'integrations/registry.js',
+    'ai/continue-bridge.js',
+    'protocol.js'
   );
   console.log('[X1] Modules loaded:',
     typeof X1IndexedDB !== 'undefined' ? 'indexeddb' : 'FAIL',
@@ -71,7 +74,10 @@ try {
     typeof X1FinancialData !== 'undefined' ? 'finance' : 'FAIL',
     typeof X1SkillEngine !== 'undefined' ? 'skills' : 'FAIL',
     typeof X1Bridge !== 'undefined' && X1Bridge.loaded ? 'x1-core' : 'FAIL',
-    typeof x1DetectSector === 'function' ? 'x1-integration' : 'FAIL');
+    typeof x1DetectSector === 'function' ? 'x1-integration' : 'FAIL',
+    typeof X1Integrations !== 'undefined' ? 'integrations-registry' : 'FAIL',
+    typeof X1ContinueBridge !== 'undefined' ? 'continue-bridge' : 'FAIL',
+    typeof X1Protocol !== 'undefined' ? 'protocol' : 'FAIL');
 } catch(e) {
   console.error('[X1] Module import failed:', e && e.message);
 }
@@ -5481,6 +5487,7 @@ function runAgentLoop(tabId, goal, url, resolve) {
 // ═══════════════════════════════════════════
 
 function handleVoice(cmd, wantsText, sendResponse) {
+  console.log('[X1] handleVoice called with:', cmd.substring(0, 50), 'wantsText:', wantsText);
   startKeepalive();
   var done = false;
   var responded = false;
@@ -6138,6 +6145,7 @@ function detectPageContext(host, url, title) {
 // ═══════════════════════════════════════════
 
 chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
+  console.log('[X1-SW] onMessage:', msg && msg.type, 'sender:', sender && (sender.tab && sender.tab.id || sender.url || 'no-tab'));
   if(!msg) return;
   if(msg.type==='X1_GET_CONTEXT'){
     var url = msg.url || '';
@@ -6192,6 +6200,7 @@ chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
     return true;
   }
   if(msg.type==='PING'){
+    console.log('[X1-SW] PING handler firing');
     sendResponse({pong:true, ts:Date.now()});
     return false;
   }
@@ -6219,7 +6228,30 @@ chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
     return true;
   }
   if(msg.type==='VOICE_COMMAND_EXEC'){
-    handleVoice(msg.command||'', msg.wantsText||false, sendResponse);
+    console.log('[X1-SW] VOICE_COMMAND_EXEC handler firing');
+    var cmdText = msg.command || '';
+    var wantsText = !!msg.wantsText;
+    var sideSender = sender;
+    try { sendResponse({ack: true}); } catch(_) {}
+    (function processVoice(){
+      handleVoice(cmdText, wantsText, function(data){
+        var payload = {
+          type: 'X1_VOICE_RESPONSE',
+          source: 'x1-voice-response',
+          text: (data && data.text) || '',
+          showText: !!(data && data.showText),
+          error: (data && data.error) || null
+        };
+        try {
+          if (sideSender && sideSender.tab && sideSender.tab.id) {
+            chrome.tabs.sendMessage(sideSender.tab.id, payload).catch(function(){});
+          }
+        } catch(_) {}
+        try {
+          chrome.runtime.sendMessage(payload).catch(function(){});
+        } catch(_) {}
+      });
+    })();
     return true;
   }
   if(msg.type==='X1_MEETING_END'){

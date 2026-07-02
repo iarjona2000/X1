@@ -18,6 +18,149 @@
   var C = X1Bridge.raw();
   var log = x1Log ? x1Log('API') : { info: function(m){console.log('[X1-API]',m);}, error: function(m){console.error('[X1-API]',m);} };
 
+  // ─── Continue.dev Provider Classes (Apache 2.0 - Continue.dev Contributors) ───
+
+  /** @typedef {{model: string, temperature?: number, maxTokens?: number, systemMessage?: string, apiKey?: string, apiBase?: string, options?: Object}} ContinueLLMOptions */
+
+  /** @typedef {{role: 'system'|'user'|'assistant', content: string}} ChatMessage */
+
+  /** @typedef {{completion: string, usage?: {promptTokens: number, completionTokens: number}}} LLMResponse */
+
+  // Base class
+  function BaseLLMProvider(options) {
+    this.options = options || {};
+    this.model = options.model || 'default';
+    this.temperature = options.temperature !== undefined ? options.temperature : 0.7;
+    this.maxTokens = options.maxTokens || 4096;
+    this.systemMessage = options.systemMessage || '';
+    this.apiKey = options.apiKey || '';
+    this.apiBase = options.apiBase || '';
+  }
+  BaseLLMProvider.prototype.complete = function(messages) { throw new Error('complete() must be implemented'); };
+  BaseLLMProvider.prototype.streamComplete = function(messages, onToken) { throw new Error('streamComplete() must be implemented'); };
+  BaseLLMProvider.prototype.getModel = function() { return this.model; };
+  BaseLLMProvider.prototype.getMaxTokens = function() { return this.maxTokens; };
+
+  // Ollama Provider
+  function OllamaProvider(options) {
+    BaseLLMProvider.call(this, options);
+    this.apiBase = options.apiBase || 'http://localhost:11434';
+  }
+  OllamaProvider.prototype = Object.create(BaseLLMProvider.prototype);
+  OllamaProvider.prototype.constructor = OllamaProvider;
+  OllamaProvider.prototype.complete = function(messages) {
+    var self = this;
+    return fetch(this.apiBase + '/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: this.model,
+        messages: messages,
+        stream: false,
+        options: { temperature: this.temperature, num_predict: this.maxTokens }
+      })
+    }).then(function(r) { return r.json(); })
+    .then(function(data) {
+      return { completion: data.message && data.message.content || '', usage: { promptTokens: data.prompt_eval_count || 0, completionTokens: data.eval_count || 0 } };
+    });
+  };
+  OllamaProvider.prototype.streamComplete = function(messages, onToken) {
+    var self = this;
+    return fetch(this.apiBase + '/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: this.model, messages: messages, stream: true, options: { temperature: this.temperature, num_predict: this.maxTokens } })
+    }).then(function(r) {
+      var reader = r.body.getReader();
+      var decoder = new TextDecoder();
+      var buffer = '';
+      function read() {
+        return reader.read().then(function(result) {
+          if (result.done) return;
+          buffer += decoder.decode(result.value, { stream: true });
+          var lines = buffer.split('\n');
+          buffer = lines.pop();
+          lines.forEach(function(line) {
+            if (line.trim()) {
+              try { var data = JSON.parse(line); if (data.message && data.message.content) onToken(data.message.content); } catch(e) {}
+            }
+          });
+          return read();
+        });
+      }
+      return read().then(function() { return { completion: '', usage: { promptTokens: 0, completionTokens: 0 } }; });
+    });
+  };
+
+  // OpenAI-compatible Provider (Groq, Cerebras, Together, OpenRouter, OpenAI, DeepSeek, etc.)
+  function OpenAICompatibleProvider(options) {
+    BaseLLMProvider.call(this, options);
+    this.apiBase = options.apiBase || 'https://api.openai.com/v1';
+    this.extraHeaders = options.headers || {};
+  }
+  OpenAICompatibleProvider.prototype = Object.create(BaseLLMProvider.prototype);
+  OpenAICompatibleProvider.prototype.constructor = OpenAICompatibleProvider;
+  OpenAICompatibleProvider.prototype.complete = function(messages) {
+    var self = this;
+    var headers = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + this.apiKey };
+    Object.assign(headers, this.extraHeaders);
+    return fetch(this.apiBase + '/chat/completions', {
+      method: 'POST',
+      headers: headers,
+      body: JSON.stringify({ model: this.model, messages: messages, temperature: this.temperature, max_tokens: this.maxTokens, stream: false })
+    }).then(function(r) { return r.json(); })
+    .then(function(data) {
+      var content = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content || '';
+      return { completion: content, usage: data.usage || { promptTokens: 0, completionTokens: 0 } };
+    });
+  };
+  OpenAICompatibleProvider.prototype.streamComplete = function(messages, onToken) {
+    var self = this;
+    var headers = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + this.apiKey };
+    Object.assign(headers, this.extraHeaders);
+    return fetch(this.apiBase + '/chat/completions', {
+      method: 'POST',
+      headers: headers,
+      body: JSON.stringify({ model: this.model, messages: messages, temperature: this.temperature, max_tokens: this.maxTokens, stream: true })
+    }).then(function(r) {
+      var reader = r.body.getReader();
+      var decoder = new TextDecoder();
+      var buffer = '';
+      function read() {
+        return reader.read().then(function(result) {
+          if (result.done) return;
+          buffer += decoder.decode(result.value, { stream: true });
+          var lines = buffer.split('\n');
+          buffer = lines.pop();
+          lines.forEach(function(line) {
+            line = line.trim();
+            if (line.startsWith('data: ')) {
+              line = line.slice(6);
+              if (line === '[DONE]') return;
+              try { var data = JSON.parse(line); var delta = data.choices && data.choices[0] && data.choices[0].delta && data.choices[0].delta.content; if (delta) onToken(delta); } catch(e) {}
+            }
+          });
+          return read();
+        });
+      }
+      return read().then(function() { return { completion: '', usage: { promptTokens: 0, completionTokens: 0 } }; });
+    });
+  };
+
+  // Gemini Provider (OpenAI-compatible endpoint)
+  function GeminiProvider(options) {
+    BaseLLMProvider.call(this, options);
+    this.apiBase = options.apiBase || 'https://generativelanguage.googleapis.com/v1beta/openai/';
+  }
+  GeminiProvider.prototype = Object.create(OpenAICompatibleProvider.prototype);
+  GeminiProvider.prototype.constructor = GeminiProvider;
+
+  // Expose globally for handlers
+  window.BaseLLMProvider = BaseLLMProvider;
+  window.OllamaProvider = OllamaProvider;
+  window.OpenAICompatibleProvider = OpenAICompatibleProvider;
+  window.GeminiProvider = GeminiProvider;
+
   // ── Progress broadcast helper ──
   function broadcastProgress(tabId, app, description, status) {
     try {
@@ -390,6 +533,244 @@
       am ? am.list().then(function(a) { return a.length; }).catch(function() { return 0; }) : Promise.resolve(0)
     ]).then(function(results) {
       return { ok: true, data: { providers: results[0], memory: results[1], agents: results[2] } };
+    });
+  };
+
+  // ── Continue.dev Bridge handlers ───
+
+  var _continueProviders = {};
+
+  function getContinueProvider(name, config) {
+    var key = name + ':' + (config.model || 'default');
+    if (!_continueProviders[key]) {
+      var ProviderClass = null;
+      var opts = {
+        model: config.model || 'llama3.1',
+        temperature: config.temperature,
+        maxTokens: config.maxTokens,
+        systemMessage: config.systemMessage,
+        apiKey: config.apiKey,
+        apiBase: config.apiBase
+      };
+      switch (name.toLowerCase()) {
+        case 'ollama':
+          if (typeof OllamaProvider !== 'undefined') {
+            ProviderClass = OllamaProvider;
+          } else {
+            // Fallback: crear provider simple
+            ProviderClass = function(options) {
+              this.options = options;
+              this.apiBase = options.apiBase || 'http://localhost:11434';
+              this.model = options.model;
+              this.temperature = options.temperature || 0.7;
+              this.maxTokens = options.maxTokens || 4096;
+            };
+            ProviderClass.prototype.complete = function(messages) {
+              var self = this;
+              return fetch(this.apiBase + '/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  model: this.model,
+                  messages: messages,
+                  stream: false,
+                  options: { temperature: this.temperature, num_predict: this.maxTokens }
+                })
+              }).then(function(r) { return r.json(); })
+              .then(function(data) {
+                return { completion: data.message && data.message.content || '', usage: { promptTokens: 0, completionTokens: 0 } };
+              });
+            };
+          }
+          break;
+        case 'groq':
+        case 'cerebras':
+        case 'together':
+        case 'openrouter':
+        case 'deepseek':
+        case 'openai':
+          if (typeof OpenAICompatibleProvider !== 'undefined') {
+            ProviderClass = OpenAICompatibleProvider;
+          } else {
+            ProviderClass = function(options) {
+              this.options = options;
+              this.apiBase = options.apiBase || (name === 'groq' ? 'https://api.groq.com/openai/v1' : 'https://api.openai.com/v1');
+              this.model = options.model;
+              this.apiKey = options.apiKey;
+              this.temperature = options.temperature || 0.7;
+              this.maxTokens = options.maxTokens || 4096;
+            };
+            ProviderClass.prototype.complete = function(messages) {
+              var self = this;
+              return fetch(this.apiBase + '/chat/completions', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + this.apiKey },
+                body: JSON.stringify({
+                  model: this.model,
+                  messages: messages,
+                  temperature: this.temperature,
+                  max_tokens: this.maxTokens,
+                  stream: false
+                })
+              }).then(function(r) { return r.json(); })
+              .then(function(data) {
+                return { completion: data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content || '', usage: data.usage || { promptTokens: 0, completionTokens: 0 } };
+              });
+            };
+          }
+          break;
+        case 'gemini':
+          if (typeof OpenAICompatibleProvider !== 'undefined') {
+            ProviderClass = OpenAICompatibleProvider;
+          } else {
+            ProviderClass = function(options) {
+              this.options = options;
+              this.apiBase = options.apiBase || 'https://generativelanguage.googleapis.com/v1beta/openai/';
+              this.model = options.model;
+              this.apiKey = options.apiKey;
+              this.temperature = options.temperature || 0.7;
+              this.maxTokens = options.maxTokens || 4096;
+            };
+            ProviderClass.prototype.complete = function(messages) {
+              var self = this;
+              return fetch(this.apiBase + 'chat/completions', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + this.apiKey },
+                body: JSON.stringify({
+                  model: this.model,
+                  messages: messages,
+                  temperature: this.temperature,
+                  max_tokens: this.maxTokens,
+                  stream: false
+                })
+              }).then(function(r) { return r.json(); })
+              .then(function(data) {
+                return { completion: data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content || '', usage: data.usage || { promptTokens: 0, completionTokens: 0 } };
+              });
+            };
+          }
+          break;
+        default:
+          return Promise.resolve({ ok: false, error: 'Provider no soportado: ' + name });
+      }
+      try {
+        _continueProviders[key] = new ProviderClass(opts);
+      } catch(e) {
+        return Promise.resolve({ ok: false, error: 'Error creando provider: ' + e.message });
+      }
+    }
+    return Promise.resolve(_continueProviders[key]);
+  }
+
+  handlers.continueComplete = function(payload) {
+    var providerName = payload.provider || 'ollama';
+    var messages = payload.messages || [];
+    var config = payload.config || {};
+    return getContinueProvider(providerName, config).then(function(provider) {
+      if (!provider || provider.ok === false) return provider;
+      return provider.complete(messages).then(function(result) {
+        return { ok: true, data: result };
+      }).catch(function(e) {
+        return { ok: false, error: e.message };
+      });
+    });
+  };
+
+  handlers.continueStreamComplete = function(payload) {
+    var providerName = payload.provider || 'ollama';
+    var messages = payload.messages || [];
+    var config = payload.config || {};
+    var tabId = payload.tabId;
+    return getContinueProvider(providerName, config).then(function(provider) {
+      if (!provider || provider.ok === false) return provider;
+      if (typeof provider.streamComplete !== 'function') {
+        return { ok: false, error: 'Streaming no soportado por este provider' };
+      }
+      // Streaming via stepProgress
+      return new Promise(function(resolve) {
+        var fullText = '';
+        provider.streamComplete(messages, function(token) {
+          fullText += token;
+          if (tabId && typeof stepProgress === 'function') {
+            stepProgress(tabId, 'Continue', 'Streaming: ' + fullText.substring(0, 50), 'active');
+          }
+        }).then(function(result) {
+          if (tabId && typeof stepDone === 'function') {
+            stepDone(tabId, -1); // best effort
+          }
+          resolve({ ok: true, data: { completion: fullText, usage: result.usage } });
+        }).catch(function(e) {
+          resolve({ ok: false, error: e.message });
+        });
+      });
+    });
+  };
+
+  handlers.continueListModels = function(payload) {
+    var providerName = payload.provider || 'ollama';
+    var config = payload.config || {};
+    if (providerName === 'ollama') {
+      var base = config.apiBase || 'http://localhost:11434';
+      return fetch(base + '/api/tags').then(function(r) { return r.json(); })
+        .then(function(data) {
+          var models = (data.models || []).map(function(m) { return m.name; });
+          return { ok: true, data: { models: models } };
+        }).catch(function(e) { return { ok: false, error: e.message }; });
+    }
+    // Para otros providers, retornar modelos conocidos
+    var known = {
+      groq: ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 'mixtral-8x7b-32768'],
+      cerebras: ['llama3.1-8b', 'llama3.1-70b'],
+      together: ['meta-llama/Meta-Llama-3.1-70B-Instruct', 'meta-llama/Meta-Llama-3.1-8B-Instruct'],
+      openrouter: ['anthropic/claude-3.5-sonnet', 'google/gemini-flash-1.5', 'meta-llama/llama-3.1-70b-instruct'],
+      openai: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo'],
+      gemini: ['gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-1.5-flash-8b'],
+      deepseek: ['deepseek-chat', 'deepseek-coder']
+    };
+    return Promise.resolve({ ok: true, data: { models: known[providerName] || [] } });
+  };
+
+  handlers.continueSetProvider = function(payload) {
+    var name = payload.name;
+    var config = payload.config || {};
+    if (!name) return Promise.resolve({ ok: false, error: 'Nombre de provider requerido' });
+    // Guardar config en storage
+    return new Promise(function(resolve) {
+      chrome.storage.local.get('continueConfig', function(data) {
+        var cfg = data.continueConfig || {};
+        cfg[name] = config;
+        chrome.storage.local.set({ continueConfig: cfg }, function() {
+          resolve({ ok: true, data: { saved: true } });
+        });
+      });
+    });
+  };
+
+  handlers.continueGetProvider = function(payload) {
+    var name = payload.name;
+    return new Promise(function(resolve) {
+      chrome.storage.local.get('continueConfig', function(data) {
+        var cfg = data.continueConfig || {};
+        resolve({ ok: true, data: { config: cfg[name] || null } });
+      });
+    });
+  };
+
+  handlers.continueListProviders = function() {
+    return Promise.resolve({
+      ok: true,
+      data: {
+        providers: [
+          { id: 'ollama', name: 'Ollama (Local)', requiresApiKey: false, defaultBase: 'http://localhost:11434' },
+          { id: 'groq', name: 'Groq', requiresApiKey: true, defaultBase: 'https://api.groq.com/openai/v1' },
+          { id: 'cerebras', name: 'Cerebras', requiresApiKey: true, defaultBase: 'https://api.cerebras.ai/v1' },
+          { id: 'together', name: 'Together AI', requiresApiKey: true, defaultBase: 'https://api.together.xyz/v1' },
+          { id: 'openrouter', name: 'OpenRouter', requiresApiKey: true, defaultBase: 'https://openrouter.ai/api/v1' },
+          { id: 'openai', name: 'OpenAI', requiresApiKey: true, defaultBase: 'https://api.openai.com/v1' },
+          { id: 'gemini', name: 'Google Gemini', requiresApiKey: true, defaultBase: 'https://generativelanguage.googleapis.com/v1beta/openai/' },
+          { id: 'deepseek', name: 'DeepSeek', requiresApiKey: true, defaultBase: 'https://api.deepseek.com/v1' }
+        ]
+      }
     });
   };
 

@@ -37,22 +37,28 @@
   });
 
   function checkConnection() {
+    console.log('[X1-sidepanel] checkConnection start');
     if (!chrome.runtime || !chrome.runtime.sendMessage) {
+      console.log('[X1-sidepanel] chrome.runtime or sendMessage missing');
       statusDot.style.background = 'var(--destructive)';
       statusText.textContent = 'Offline';
       return;
     }
     try {
       chrome.runtime.sendMessage({ type: 'PING' }, function(response) {
+        console.log('[X1-sidepanel] PING callback:', response, 'lastError:', chrome.runtime.lastError);
         if (chrome.runtime.lastError || !response) {
+          console.log('[X1-sidepanel] PING failed:', chrome.runtime.lastError && chrome.runtime.lastError.message);
           statusDot.style.background = 'var(--destructive)';
           statusText.textContent = 'Offline';
         } else {
+          console.log('[X1-sidepanel] PING ok');
           statusDot.style.background = 'var(--primary)';
           statusText.textContent = 'Ready';
         }
       });
     } catch(e) {
+      console.log('[X1-sidepanel] PING exception:', e);
       statusDot.style.background = 'var(--destructive)';
       statusText.textContent = 'Offline';
     }
@@ -83,7 +89,7 @@
     });
   }
 
-  function addMessage(role, text) {
+  function addMessage(role, text, stream) {
     var welcomeEl = messagesEl.querySelector('.welcome');
     if (welcomeEl) welcomeEl.remove();
 
@@ -94,7 +100,12 @@
     body.className = 'msg-body';
 
     if (role === 'ai') {
-      body.innerHTML = formatText(text);
+      if (stream) {
+        body.textContent = '';
+        msg._streaming = true;
+      } else {
+        body.innerHTML = formatText(text);
+      }
     } else {
       body.textContent = text;
     }
@@ -106,6 +117,28 @@
     messages.push({ role: role, text: text });
 
     return msg;
+  }
+
+  function streamAiText(msgElement, fullText) {
+    if (!msgElement || !msgElement._streaming) return;
+    var body = msgElement.querySelector('.msg-body');
+    if (!body) return;
+    
+    var index = 0;
+    var chunkSize = 3;
+    var interval = setInterval(function() {
+      if (index < fullText.length) {
+        var chunk = fullText.substring(0, index + chunkSize);
+        body.innerHTML = formatText(chunk);
+        index += chunkSize;
+        scrollToBottom();
+      } else {
+        clearInterval(interval);
+        body.innerHTML = formatText(fullText);
+        msgElement._streaming = false;
+        scrollToBottom();
+      }
+    }, 16);
   }
 
   function showThinking() {
@@ -211,29 +244,23 @@
     }, 28000);
 
     function doSend() {
+      var requestId = Date.now() + '-' + Math.floor(Math.random() * 10000);
+      console.log('[X1-sidepanel] Sending VOICE_COMMAND_EXEC:', text.substring(0, 50), 'requestId:', requestId);
       chrome.runtime.sendMessage(
-        { type: 'VOICE_COMMAND_EXEC', command: text, raw: text, wantsText: true },
+        { type: 'VOICE_COMMAND_EXEC', command: text, raw: text, wantsText: true, requestId: requestId },
         function(response) {
-          if (responded) return;
-          responded = true;
-          clearTimeout(panelTimeout);
-          removeThinking();
+          console.log('[X1-sidepanel] VOICE_COMMAND_EXEC response:', response, 'lastError:', chrome.runtime.lastError);
           if (chrome.runtime.lastError) {
-            var errMsg = chrome.runtime.lastError.message || '';
-            if (errMsg.indexOf('Receiving end does not exist') !== -1) {
+            if (!responded) {
+              responded = true;
+              clearTimeout(panelTimeout);
+              removeThinking();
               addMessage('ai', 'Service worker no disponible. Recarga la extension desde chrome://extensions.');
-            } else {
-              addMessage('ai', 'Error de conexion: ' + errMsg);
             }
             return;
           }
-          if (response && response.text) {
-            addMessage('ai', response.text);
-            speak(response.text);
-          } else if (response && response.error) {
-            addMessage('ai', response.error);
-          } else {
-            addMessage('ai', 'Sin respuesta. Revisa tus API keys en Settings.');
+          if (response && response.ack) {
+            console.log('[X1-sidepanel] VOICE_COMMAND_EXEC ack received, waiting for response...');
           }
         }
       );
@@ -248,6 +275,7 @@
         return;
       }
       chrome.runtime.sendMessage({ type: 'PING' }, function(pong) {
+        console.log('[X1-sidepanel] PING response:', pong, 'lastError:', chrome.runtime.lastError);
         if (chrome.runtime.lastError) {
           if (!responded) {
             responded = true;
@@ -257,6 +285,7 @@
           }
           return;
         }
+        console.log('[X1-sidepanel] PING ok, sending VOICE_COMMAND_EXEC');
         doSend();
       });
     } catch(e) {
@@ -657,7 +686,8 @@
     if (msg.type === 'X1_VOICE_RESULT') {
       removeThinking();
       if (msg.text) {
-        addMessage('ai', msg.text);
+        var aiMsg = addMessage('ai', msg.text, true);
+        streamAiText(aiMsg, msg.text);
       }
     }
   });
