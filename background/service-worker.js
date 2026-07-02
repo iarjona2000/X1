@@ -247,6 +247,10 @@ function parseCommand(cmd) {
   var mPrice = l.match(/^(?:alerta de precio|price alert|av[ií]same cuando)\s+(.+?)\s+(?:baje de|costs? less than|under)\s+(\d+(?:[.,]\d+)?)/i);
   if (mPrice) return {action:'addPriceAlert', productName:mPrice[1].trim(), url:'', targetPrice:parseFloat(mPrice[2].replace(',','.'))};
 
+  // ── AUTOMATION RULE (natural language → parsed via AI) ──
+  var mAutomation = l.match(/^(?:automatiza|crea (?:una )?automatizaci[oó]n|nueva regla|programa que)\s*:?\s*(.+)$/i);
+  if (mAutomation) return {action:'addAutomation', text: mAutomation[1].trim()};
+
   // ── N8N OUTGOING WEBHOOK ──
   var mN8n = l.match(/^(?:env[ií]a|manda|enviar)\s+(?:a\s+)?n8n\s*:?\s*(.+)$/i);
   if (mN8n) return {action:'sendToN8n', message: mN8n[1].trim()};
@@ -4887,7 +4891,7 @@ function execAction(act, tabId) {
       case 'runPlugin':
         var plIdx = stepProgress(tabId, 'Plugin', 'Ejecutando plugin: ' + (act.name || ''));
         if (typeof X1PluginEngine === 'undefined') { stepError(tabId, plIdx); resolve({text: 'Plugin Engine no disponible.', showText: true}); break; }
-        X1PluginEngine.runPlugin(act.name || '', act.params || {}, tabId).then(function(result) {
+        X1PluginEngine.executePlugin(act.name || '', act.params && act.params.query || act.text || '', act.params || {}).then(function(result) {
           stepDone(tabId, plIdx);
           resolve({text: typeof result === 'string' ? result : JSON.stringify(result), showText: true});
         }).catch(function(e) { stepError(tabId, plIdx); resolve({text: 'Error en plugin: ' + e.message, showText: true}); });
@@ -4895,9 +4899,18 @@ function execAction(act, tabId) {
 
       case 'addAutomation':
         if (typeof X1AutomationEngine === 'undefined') { resolve({text: 'Automation Engine no disponible.', showText: true}); break; }
-        X1AutomationEngine.addRule(act).then(function(rule) {
-          resolve({text: 'Regla de automatizacion creada: ' + (rule.name || rule.id), showText: true});
-        }).catch(function(e) { resolve({text: 'Error: ' + e.message, showText: true}); });
+        (function() {
+          // act.rule: already-structured {name,trigger,action} — used by plugins/automation.
+          // Otherwise treat act.text/act.description as natural language and parse it first.
+          var rulePromise = act.rule
+            ? Promise.resolve(act.rule)
+            : X1AutomationEngine.parseNaturalLanguageRule(act.text || act.description || '');
+          rulePromise.then(function(parsedRule) {
+            return X1AutomationEngine.createRule(parsedRule);
+          }).then(function(rule) {
+            resolve({text: 'Regla de automatizacion creada: ' + (rule.name || rule.id), showText: true});
+          }).catch(function(e) { resolve({text: 'Error creando la automatizacion: ' + e.message, showText: true}); });
+        })();
         break;
 
       case 'extractAI':
