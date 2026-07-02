@@ -90,6 +90,10 @@ try {
     'ai/ai-voting.js',
     'ai/ai-router.js',
     'ai/ai-pool.js',
+    'ai/page-agent-bridge.js',
+    'ai/freeweb-bridge.js',
+    'ai/browserai-bridge.js',
+    'ai/n0x-bridge.js',
     'x1-integration.js',
     'x1-api.js',
     'agents-x1.js'
@@ -126,6 +130,10 @@ try {
     typeof X1Voting !== 'undefined' ? 'ai-voting' : 'FAIL',
     typeof X1Router !== 'undefined' ? 'ai-router' : 'FAIL',
     typeof X1Pool !== 'undefined' ? 'ai-pool' : 'FAIL',
+    typeof X1PageAgentBridge !== 'undefined' ? 'page-agent-bridge' : 'FAIL',
+    typeof X1FreeWebBridge !== 'undefined' ? 'freeweb-bridge' : 'FAIL',
+    typeof X1BrowserAIBridge !== 'undefined' ? 'browserai-bridge' : 'FAIL',
+    typeof X1N0xBridge !== 'undefined' ? 'n0x-bridge' : 'FAIL',
     typeof X1Protocol !== 'undefined' ? 'protocol' : 'FAIL');
 } catch(e) {
   console.error('[X1] Module import failed:', e && e.message);
