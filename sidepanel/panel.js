@@ -683,11 +683,13 @@
       });
     }
 
-    if (msg.type === 'X1_VOICE_RESULT') {
+    if (msg.type === 'X1_VOICE_RESPONSE') {
       removeThinking();
       if (msg.text) {
         var aiMsg = addMessage('ai', msg.text, true);
         streamAiText(aiMsg, msg.text);
+      } else if (msg.error) {
+        addMessage('ai', 'Error: ' + msg.error);
       }
     }
   });
