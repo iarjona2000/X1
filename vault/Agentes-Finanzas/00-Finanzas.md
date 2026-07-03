@@ -10,6 +10,7 @@ Candidatos reales investigados para sustituir el "CFO Agent" simulado por prompt
 - [[AI-CFO-Agent]] — **elegido para Fase 1**. Self-hosted, sube un CSV, da KPIs/runway/detección de fraude.
 - [[FinRobot]] — plataforma más completa (trading, riesgo), más pesada de desplegar.
 - [[TradingAgents]] — multi-agente especializado en simular decisiones de trading, no es un CFO generalista.
+- [[OpenBB]] — nuevo (Lote 2, 2026-07-05). Capa de datos de mercado unificada con MCP nativo — infraestructura para los demás, no un competidor directo.
 
 <!-- AGENCY-AGENTS:START (auto-generado, no editar a mano — ver scripts/import-agency-agents.js) -->
 
