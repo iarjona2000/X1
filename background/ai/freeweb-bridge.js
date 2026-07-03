@@ -126,26 +126,28 @@
   ];
 
   function stripNoise(html) {
+    if (typeof document === 'undefined') return html;
     var div = document.createElement('div');
     div.innerHTML = html;
 
-    NOISE_SELECTORS.forEach(function(sel) {
+    for (var si = 0; si < NOISE_SELECTORS.length; si++) {
       try {
+        var sel = NOISE_SELECTORS[si];
         var els = div.querySelectorAll(sel);
-        for (var i = els.length - 1; i >= 0; i--) {
-          els[i].parentNode.removeChild(els[i]);
+        for (var ei = els.length - 1; ei >= 0; ei--) {
+          els[ei].parentNode.removeChild(els[ei]);
         }
       } catch(e) {}
-    });
+    }
 
     return div.innerHTML;
   }
 
   function extractContent(html) {
+    if (typeof document === 'undefined') return html.replace(/<[^>]+>/g, '').trim().substring(0, 5000);
     var div = document.createElement('div');
     div.innerHTML = stripNoise(html);
 
-    // Try main content selectors
     var contentSelectors = ['article', 'main', '[role="main"]', '.content', '.markdown-body', '.post', '.entry'];
     for (var i = 0; i < contentSelectors.length; i++) {
       var el = div.querySelector(contentSelectors[i]);
@@ -154,7 +156,6 @@
       }
     }
 
-    // Fallback: longest text block
     var paragraphs = div.querySelectorAll('p');
     var longest = '';
     for (var j = 0; j < paragraphs.length; j++) {

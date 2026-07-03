@@ -100,6 +100,9 @@ try {
     'ai/ffmpeg-bridge.js',
     'ai/playwright-bridge.js',
     'ai/sharp-bridge.js',
+    // fcc-bridge.js: partner's new "Free Claude Code" proxy bridge (2026-07-04
+    // sync), the new primary Judge provider — kept.
+    'ai/fcc-bridge.js',
     // x1-api.js and agents-x1.js (2026-07-04 fix): both had the same unguarded
     // `window.foo = ...` bug as the 26 bridges above — fixed the same mechanical
     // way (self.foo, plus a `typeof` guard on the one bare `x1Log` reference in
@@ -107,15 +110,15 @@ try {
     // (research/email/code/meeting/writing/analyst) actually get seeded.
     'x1-api.js',
     'agents-x1.js',
-    // x1-integration.js moved LAST, deliberately still unfixed: it unconditionally
-    // references `window` (line 18) same as the others did, but is NOT given the
-    // same mechanical fix — it monkey-patches aiComplete/execAction/parseCommand
-    // and exposes x1CompareResponses/x1EvaluateResponse/x1RecordVote, which reads
-    // as judge/panel-adjacent (partner's territory, see X1-Agents-Vault/00-Indice.md
-    // "Socio: orquestacion... Panel+Juez... No tocar esta parte"). Activating it is
-    // a behavior decision, not a bug fix, so it's left exactly as inert as before —
-    // just moved to the end of the list so its crash no longer takes x1-api.js and
-    // agents-x1.js down with it.
+    // x1-integration.js: kept at the END, NOT restored to this earlier position
+    // (where the partner's diverged branch still had it) — merge-conflict
+    // resolution 2026-07-04. This isn't a stylistic call: x1-integration.js
+    // unconditionally references `window` (line 18), which doesn't exist in an
+    // MV3 service worker, and throws — confirmed via simulation. Loading it
+    // before x1-api.js/agents-x1.js means THOSE crash too (importScripts aborts
+    // the rest of the list on the first failure). The partner's branch predates
+    // that fix (it never touched x1-integration.js), so this is a verified crash
+    // bug, not a preference — moved back to last, same as before the merge.
     'x1-integration.js'
   );
   console.log('[X1] Modules loaded:',
@@ -289,7 +292,10 @@ function parseCommand(cmd) {
   }
 
   // ── CHANGE AI PROVIDER ──
-  var mUseAI = l.match(/^(?:usa|utiliza|cambia\s*a)\s+(gemini|ollama|nvidia|glm|nemotron|gptoss|llama|qwen|auto)$/i);
+  // Merged 2026-07-04: union of both branches' recognized provider names
+  // (mine had the granular NVIDIA model names; partner's added fcc + the
+  // legacy providers). Purely a recognized-word list, no crash risk either way.
+  var mUseAI = l.match(/^(?:usa|utiliza|cambia\s*a)\s+(fcc|groq|gemini|ollama|cerebras|mistral|openrouter|nvidia|glm|nemotron|gptoss|llama|qwen|deepseek|auto)$/i);
   if (mUseAI) {
     var prov = mUseAI[1].toLowerCase();
     if (prov === 'nvidia' || prov === 'glm') prov = 'nvidiaGlm';
@@ -389,8 +395,8 @@ function parseCommand(cmd) {
   // ── PROVIDER HEALTH ──
   if (/^(?:estado providers?|provider health|salud (?:de )?providers?|status ai)$/i.test(l)) return {action:'providerHealth'};
 
-  // ── WEB SEARCH (Tavily) ──
-  var mWebSearch = l.match(/^(?:busca en (?:la )?web|web search|buscar en internet)\s+(.+)$/i);
+  // ── WEB SEARCH (FreeWeb + Tavily fallback) ──
+  var mWebSearch = l.match(/^(?:busca en (?:la )?web|web search|buscar en internet|investiga\s+(?:sobre\s+)?|busca informaci[oó]n\s+(?:sobre\s+)?|b[uú]scame\s+|googlea\s+)\s*(.+)$/i);
   if (mWebSearch) return {action:'webSearch', query:mWebSearch[1].trim()};
 
   // ── CHECK CURRENT AI PROVIDER ──
@@ -1443,20 +1449,27 @@ loadAIKeys();
 function registerDefaultProviders() {
   if (typeof X1Pool === 'undefined') return;
 
-  // NOTA (fix 2026-07-04): esta funcion registraba 'groq'/'cerebras'/'mistral'/'openrouter' con
-  // fn apuntando a funciones que ya no existen en este archivo (descartadas en la consolidacion de
-  // proveedores) — una referencia sin `typeof` guard, a diferencia de cada otro sitio del codebase
-  // que llama a estas mismas funciones. Eso lanzaba un ReferenceError en la primera linea de esta
-  // funcion, así que X1Pool nunca llegaba a registrar NADA (ni siquiera gemini/nvidia/proxy/ollama).
-  // Sustituidas por los 5 modelos NVIDIA NIM realmente activos + gemini/proxy/ollama.
-  X1Pool.register({ name: 'gemini', displayName: 'Google Gemini 2.5', family: 'google', type: 'cloud', fast: true, cost: 'free', maxTokens: 8192, languages: ['es', 'en', 'fr', 'de', 'ja', 'ko', 'zh'], capabilities: ['text', 'code', 'reasoning', 'multimodal', 'vision'], timeout: 20000, priority: 1, fn: geminiComplete, has: !!aiKeys.geminiKey });
-  X1Pool.register({ name: 'nvidiaGlm', displayName: 'NVIDIA GLM-5.1', family: 'nvidia', type: 'cloud', fast: true, cost: 'free', maxTokens: 4096, languages: ['es', 'en'], capabilities: ['text', 'reasoning'], timeout: 20000, priority: 2, fn: nvidiaGlmComplete, has: !!aiKeys.nvidiaKey });
-  X1Pool.register({ name: 'nvidiaNemotron', displayName: 'NVIDIA Nemotron-3 Ultra', family: 'nvidia', type: 'cloud', fast: false, cost: 'free', maxTokens: 4096, languages: ['es', 'en'], capabilities: ['text', 'reasoning'], timeout: 20000, priority: 3, fn: nvidiaNemotronComplete, has: !!aiKeys.nvidiaKey });
-  X1Pool.register({ name: 'nvidiaGptOss', displayName: 'NVIDIA gpt-oss 120B', family: 'nvidia', type: 'cloud', fast: false, cost: 'free', maxTokens: 4096, languages: ['es', 'en'], capabilities: ['text', 'code', 'reasoning'], timeout: 20000, priority: 4, fn: nvidiaGptOssComplete, has: !!aiKeys.nvidiaKey });
-  X1Pool.register({ name: 'nvidiaLlama', displayName: 'NVIDIA Llama 4 Maverick', family: 'nvidia', type: 'cloud', fast: true, cost: 'free', maxTokens: 4096, languages: ['es', 'en'], capabilities: ['text', 'code', 'reasoning', 'multimodal', 'vision'], timeout: 20000, priority: 5, fn: nvidiaLlamaComplete, has: !!aiKeys.nvidiaKey });
-  X1Pool.register({ name: 'nvidiaQwen', displayName: 'NVIDIA Qwen3 Coder 480B', family: 'nvidia', type: 'cloud', fast: false, cost: 'free', maxTokens: 4096, languages: ['es', 'en', 'zh'], capabilities: ['text', 'code', 'reasoning'], timeout: 20000, priority: 6, fn: nvidiaQwenComplete, has: !!aiKeys.nvidiaKey });
-  X1Pool.register({ name: 'proxy', displayName: 'X1 Proxy (Cloudflare)', family: 'x1', type: 'edge', fast: true, cost: 'free', maxTokens: 4096, languages: ['es', 'en'], capabilities: ['text'], timeout: 10000, priority: 7, fn: proxyComplete, has: true });
-  X1Pool.register({ name: 'ollama', displayName: 'Ollama (Local)', family: 'local', type: 'local', fast: false, cost: 'free', maxTokens: 4096, languages: ['es', 'en'], capabilities: ['text', 'code'], timeout: 15000, priority: 8, fn: ollamaComplete, has: true });
+  // NOTA (fix 2026-07-04, actualizada en el merge del mismo dia): esta funcion
+  // registraba 'groq'/'cerebras'/'mistral'/'openrouter' con fn apuntando a
+  // funciones que ya no existian en este archivo — una referencia sin `typeof`
+  // guard que lanzaba un ReferenceError en la primera linea, asi que X1Pool
+  // nunca llegaba a registrar NADA. El merge con la rama del socio trajo de
+  // vuelta una implementacion REAL de groqComplete() (ver mas abajo) y anadio
+  // fccComplete() (nuevo proxy FCC, prioridad 0) — ambas se mantienen aqui.
+  // cerebrasComplete/mistralComplete/openrouterComplete/nvidiaDeepseekComplete
+  // siguen sin existir en ningun sitio del archivo (confirmado tras el merge) —
+  // esas 4 entradas de la rama del socio se excluyen a proposito, habrian
+  // reintroducido el mismo ReferenceError que esta nota describe.
+  X1Pool.register({ name: 'fcc', displayName: 'FCC Proxy (Claude via 18 providers)', family: 'fcc', type: 'local', fast: true, cost: 'free', maxTokens: 32768, languages: ['es', 'en', 'fr', 'de', 'ja', 'ko', 'zh'], capabilities: ['text', 'code', 'reasoning', 'agent', 'tool-use', 'multimodal'], timeout: 15000, priority: 0, fn: fccComplete, has: true });
+  X1Pool.register({ name: 'groq', displayName: 'Groq (Llama 3.3)', family: 'meta', type: 'cloud', fast: true, cost: 'free', maxTokens: 8192, languages: ['es', 'en', 'fr', 'de'], capabilities: ['text', 'code', 'reasoning'], timeout: 15000, priority: 1, fn: groqComplete, has: !!aiKeys.groqKey });
+  X1Pool.register({ name: 'gemini', displayName: 'Google Gemini 2.5', family: 'google', type: 'cloud', fast: true, cost: 'free', maxTokens: 8192, languages: ['es', 'en', 'fr', 'de', 'ja', 'ko', 'zh'], capabilities: ['text', 'code', 'reasoning', 'multimodal', 'vision'], timeout: 20000, priority: 2, fn: geminiComplete, has: !!aiKeys.geminiKey });
+  X1Pool.register({ name: 'nvidiaGlm', displayName: 'NVIDIA GLM-5.1', family: 'nvidia', type: 'cloud', fast: true, cost: 'free', maxTokens: 4096, languages: ['es', 'en'], capabilities: ['text', 'reasoning'], timeout: 20000, priority: 3, fn: nvidiaGlmComplete, has: !!aiKeys.nvidiaKey });
+  X1Pool.register({ name: 'nvidiaNemotron', displayName: 'NVIDIA Nemotron-3 Ultra', family: 'nvidia', type: 'cloud', fast: false, cost: 'free', maxTokens: 4096, languages: ['es', 'en'], capabilities: ['text', 'reasoning'], timeout: 20000, priority: 4, fn: nvidiaNemotronComplete, has: !!aiKeys.nvidiaKey });
+  X1Pool.register({ name: 'nvidiaGptOss', displayName: 'NVIDIA gpt-oss 120B', family: 'nvidia', type: 'cloud', fast: false, cost: 'free', maxTokens: 4096, languages: ['es', 'en'], capabilities: ['text', 'code', 'reasoning'], timeout: 20000, priority: 5, fn: nvidiaGptOssComplete, has: !!aiKeys.nvidiaKey });
+  X1Pool.register({ name: 'nvidiaLlama', displayName: 'NVIDIA Llama 4 Maverick', family: 'nvidia', type: 'cloud', fast: true, cost: 'free', maxTokens: 4096, languages: ['es', 'en'], capabilities: ['text', 'code', 'reasoning', 'multimodal', 'vision'], timeout: 20000, priority: 6, fn: nvidiaLlamaComplete, has: !!aiKeys.nvidiaKey });
+  X1Pool.register({ name: 'nvidiaQwen', displayName: 'NVIDIA Qwen3 Coder 480B', family: 'nvidia', type: 'cloud', fast: false, cost: 'free', maxTokens: 4096, languages: ['es', 'en', 'zh'], capabilities: ['text', 'code', 'reasoning'], timeout: 20000, priority: 7, fn: nvidiaQwenComplete, has: !!aiKeys.nvidiaKey });
+  X1Pool.register({ name: 'proxy', displayName: 'X1 Proxy (Cloudflare)', family: 'x1', type: 'edge', fast: true, cost: 'free', maxTokens: 4096, languages: ['es', 'en'], capabilities: ['text'], timeout: 10000, priority: 8, fn: proxyComplete, has: true });
+  X1Pool.register({ name: 'ollama', displayName: 'Ollama (Local)', family: 'local', type: 'local', fast: false, cost: 'free', maxTokens: 4096, languages: ['es', 'en'], capabilities: ['text', 'code'], timeout: 15000, priority: 9, fn: ollamaComplete, has: true });
 
   console.log('[X1] Registered ' + X1Pool.getActive().length + ' providers in pool');
 }
@@ -1834,7 +1847,8 @@ function stripImages(txt) {
     .replace(/\b[fF]oto[s]?[^\s]*\.(png|jpg|jpeg|gif|webp|bmp|svg|ico)\b/gi, '')
     .replace(/["'][^"']+\.(png|jpg|jpeg|gif|webp|bmp|svg|ico)["']/gi, '')
     .replace(/\b\w+[-_\s]\w+[-_\s]\w+\.(png|jpg|jpeg|gif|webp|bmp|svg|ico)\b/gi, '')
-    .replace(/\b(?:image|img|photo|screenshot|capture|captura|foto|pantalla|imagen)\b/gi, '');
+    .replace(/\b(?:image|img|photo|screenshot|capture|captura|foto|pantalla|imagen)\b/gi, '')
+    .replace(/\bimage\.(png|jpg|jpeg|gif|webp|bmp|svg|ico)\b/gi, '');
 }
 
 function isValidContent(txt) {
@@ -1849,17 +1863,54 @@ function isValidContent(txt) {
   if(lower.indexOf('vision input not supported') !== -1) return false;
   if(lower.indexOf('multimodal') !== -1 && lower.indexOf('not support') !== -1) return false;
   if(lower.indexOf('unsupported image') !== -1) return false;
+  if(lower.indexOf('cannot read image') !== -1) return false;
   if(lower.indexOf('cannot read') !== -1 && (lower.indexOf('image') !== -1 || lower.indexOf('png') !== -1 || lower.indexOf('jpg') !== -1 || lower.indexOf('gif') !== -1 || lower.indexOf('webp') !== -1)) return false;
   if(lower.indexOf('inform the user') !== -1 && lower.indexOf('image') !== -1) return false;
   if(lower.indexOf('error:') !== -1 && lower.indexOf('image') !== -1 && lower.indexOf('not support') !== -1) return false;
   return true;
 }
 
+// ── FCC Proxy (Free Claude Code — primary Judge brain via 18 providers) ──
+var fccLastFail = 0;
+function fccComplete(userMsg) {
+  if (typeof X1FCCBridge === 'undefined') { fccLastFail = Date.now(); return Promise.resolve(null); }
+  if (Date.now() - fccLastFail < 5000) return Promise.resolve(null);
+  return X1FCCBridge.complete(userMsg).then(function(txt) {
+    if (!txt || (typeof isValidContent === 'function' && !isValidContent(txt))) { fccLastFail = Date.now(); return null; }
+    fccLastFail = 0;
+    return txt;
+  }).catch(function() { fccLastFail = Date.now(); return null; });
+}
+
+// ── Groq (free, ultra-fast ~0.3s) — restored 2026-07-04 merge, real
+// implementation from partner's branch (was previously removed/dangling) ──
+function groqComplete(userMsg) {
+  var key = aiKeys.groqKey;
+  if (!key) return Promise.resolve(null);
+  var clean = stripImages(getCachedSystemPrompt(userMsg));
+  var usr = stripImages(userMsg);
+  return fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method:'POST',
+    headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},
+    body:JSON.stringify({
+      model:'llama-3.3-70b-versatile',
+      messages:[{role:'system',content:clean},{role:'user',content:usr}],
+      temperature:0.1, max_tokens:2000
+    }),
+    signal:AbortSignal.timeout(5000)
+  }).then(function(r){return r.json();}).then(function(data){
+    if(data.error) { console.error('[X1] Groq error:', data.error); return null; }
+    var txt = (data.choices&&data.choices[0]&&data.choices[0].message&&data.choices[0].message.content||'').trim();
+    if(!isValidContent(txt)) return null;
+    return txt;
+  }).catch(function(e){ console.error('[X1] Groq fail:', e.message); return null; });
+}
+
 // ── X1 Proxy (Cloudflare Worker — primary when deployed) ──
 var proxyLastFail = 0;
   function proxyComplete(userMsg) {
     if (!PROXY_URL) return Promise.resolve(null);
-    if (Date.now() - proxyLastFail < 10000) { console.log('[X1] Proxy skipped (cached failure)'); return Promise.resolve(null); }
+    if (Date.now() - proxyLastFail < 3000) { console.log('[X1] Proxy skipped (cached failure)'); return Promise.resolve(null); }
     console.log('[X1] Calling proxy...');
     var clean = stripImages(getCachedSystemPrompt(userMsg));
     var usr = stripImages(userMsg);
@@ -1918,7 +1969,29 @@ function ollamaComplete(userMsg) {
   });
 }
 
- 
+// ── WebLLM (local inference via WebGPU — zero API keys) ──
+function webllmComplete(userMsg) {
+  if (typeof X1WebLLMBridge === 'undefined' || !X1WebLLMBridge.isLoaded || !X1WebLLMBridge.isLoaded()) {
+    if (typeof X1WebLLMBridge !== 'undefined' && X1WebLLMBridge.loadModel) {
+      var defaultModel = X1WebLLMBridge.getRecommendedModel ? X1WebLLMBridge.getRecommendedModel() : 'llama3-2-1b';
+      return X1WebLLMBridge.loadModel(defaultModel).then(function(loadResult) {
+        if (!loadResult.ok) return null;
+        return X1WebLLMBridge.generateText([{role:'system',content:stripImages(getCachedSystemPrompt(userMsg))},{role:'user',content:stripImages(userMsg)}], {maxTokens:256,temperature:0.7})
+          .then(function(r) {
+            if (r && r.ok && r.text) return r.text;
+            return null;
+          }).catch(function(){ return null; });
+      });
+    }
+    return Promise.resolve(null);
+  }
+  return X1WebLLMBridge.generateText([{role:'system',content:stripImages(getCachedSystemPrompt(userMsg))},{role:'user',content:stripImages(userMsg)}], {maxTokens:256,temperature:0.7})
+    .then(function(r) {
+      if (r && r.ok && r.text) return r.text;
+      return null;
+    }).catch(function(){ return null; });
+}
+
 // ── NVIDIA NIM (una sola clave, varios modelos — cada uno cuenta como candidato
 //    distinto para el Panel+Juez, pero comparten cuota/infraestructura: si NVIDIA
 //    cae o la clave se revoca, caen los 3 a la vez) ──
@@ -2253,10 +2326,22 @@ function getProviderHealthSummary() {
     else if (providerHealth[name] === -1) status = 'unhealthy';
     summary.push({name: name, status: status, score: providerHealth[name] || 0});
   }
+  // Check FCC proxy status (external)
+  var fccStatus = 'unknown';
+  if (typeof X1FCCBridge !== 'undefined' && X1FCCBridge.healthCheck) {
+    try {
+      X1FCCBridge.healthCheck().then(function(h) {
+        fccStatus = h.ok ? 'healthy' : 'unhealthy';
+      }).catch(function() { fccStatus = 'unhealthy'; });
+    } catch(e) { fccStatus = 'unhealthy'; }
+  }
+  summary.push({name: 'fcc', status: fccStatus, score: fccStatus === 'healthy' ? 1 : 0});
+  // Check FreeWeb bridge status
+  var fwStatus = (typeof X1FreeWebBridge !== 'undefined') ? 'healthy' : 'unavailable';
+  summary.push({name: 'freeweb', status: fwStatus, score: fwStatus === 'healthy' ? 1 : 0});
   return summary;
 }
 
-// ── Tavily Web Search (AI-optimized search results) ──
 // ── AI CFO Agent (self-hosted, MIT, github.com/daniel-st3/ai-cfo-agent) ──
 // Candidato Fase 1 del vault de agentes (Agentes-Finanzas/AI-CFO-Agent.md).
 // Ivan despliega esto el mismo (pip install + uvicorn, ver la nota del vault
@@ -2297,6 +2382,22 @@ function mcpRegistrySearch(query, limit) {
     }).catch(function(e) { console.error('[X1] MCP registry search fail:', e.message); return null; });
 }
 
+// ── FreeWeb Search (no API key needed) ──
+function freeWebSearch(query, options) {
+  if (typeof X1FreeWebBridge === 'undefined' || !X1FreeWebBridge.search) {
+    return Promise.resolve(null);
+  }
+  var maxResults = (options && options.maxResults) || 5;
+  return X1FreeWebBridge.search(query, {maxResults: maxResults}).then(function(results) {
+    if (!results || results.length === 0) return null;
+    return {answer: '', results: results};
+  }).catch(function(e) {
+    console.error('[X1] FreeWeb error:', e.message);
+    return null;
+  });
+}
+
+// ── Tavily Web Search (AI-optimized, requires API key) ──
 function tavilySearch(query, options) {
   var key = aiKeys.tavilyKey;
   if (!key) return Promise.resolve(null);
@@ -2325,15 +2426,27 @@ function tavilySearch(query, options) {
   }).catch(function(e) { console.error('[X1] Tavily fail:', e.message); return null; });
 }
 
+// ── Unified Web Search (FreeWeb first, Tavily fallback) ──
+function webSearch(query, options) {
+  options = options || {};
+  return freeWebSearch(query, options).then(function(fwResult) {
+    if (fwResult && fwResult.results && fwResult.results.length > 0) {
+      return fwResult;
+    }
+    return tavilySearch(query, options);
+  });
+}
+
 // ── Deep Research (multi-source synthesis) ──
 function deepResearch(query) {
-  return tavilySearch(query, {maxResults: 8, searchDepth: 'advanced'}).then(function(searchData) {
+  return webSearch(query, {maxResults: 8}).then(function(searchData) {
     if (!searchData || !searchData.results || searchData.results.length === 0) {
       return {text: 'No se encontraron resultados para: ' + query, sources: []};
     }
 
     var sourceSummary = searchData.results.map(function(r, idx) {
-      return '[' + (idx + 1) + '] ' + r.title + '\n' + r.url + '\n' + (r.content || '').substring(0, 500);
+      var content = r.content || r.snippet || '';
+      return '[' + (idx + 1) + '] ' + r.title + '\n' + r.url + '\n' + content.substring(0, 500);
     }).join('\n\n');
 
     var researchPrompt = 'Based on these search results, provide a comprehensive research synthesis about: "' + query + '"\n\n' +
@@ -3236,6 +3349,40 @@ function aiComplete(userMsg, opts) {
   // ═══════════════════════════════════════════
   var cached = getCachedResponse(userMsg);
   if (cached) return Promise.resolve(cached);
+
+  // ═══════════════════════════════════════════
+  // FAST PATH: Cloudflare Worker proxy (deployed, working, ~1s)
+  // ═══════════════════════════════════════════
+  var proxyOk = !!PROXY_URL && !(typeof proxyLastFail !== 'undefined' && Date.now() - proxyLastFail < 3000);
+  if (proxyOk && !opts.forceJudge) {
+    console.log('[X1] Fast path: Cloudflare proxy');
+    return proxyComplete(userMsg).then(function(txt) {
+      if (txt) {
+        var parsed = normalizeResult(parseJSON(txt)) || { action: 'speak', text: txt };
+        setCachedResponse(userMsg, parsed);
+        return parsed;
+      }
+      return null;
+    }).catch(function() { return null; });
+  }
+
+  // ═══════════════════════════════════════════
+  // FAST PATH: FCC Proxy (local, primary Judge brain when running)
+  // ═══════════════════════════════════════════
+  var hasFCC = typeof X1FCCBridge !== 'undefined' && X1FCCBridge.isAvailable && X1FCCBridge.isAvailable();
+  if (hasFCC && !opts.forceJudge) {
+    console.log('[X1] Fast path: FCC proxy');
+    return X1FCCBridge.generateText([{ role: 'user', content: userMsg }], { maxTokens: 512, temperature: 0.3 })
+      .then(function(result) {
+        if (result.ok && result.text) {
+          var parsed = normalizeResult(parseJSON(result.text)) || { action: 'speak', text: result.text };
+          setCachedResponse(userMsg, parsed);
+          return parsed;
+        }
+        return null;
+      })
+      .catch(function() { return null; });
+  }
 
   // ═══════════════════════════════════════════
   // FAST PATH: WebLLM local brain
@@ -4995,14 +5142,18 @@ function execAction(act, tabId) {
 
       case 'webSearch':
         var wsIdx = stepProgress(tabId, 'Search', 'Buscando: ' + (act.query || '').substring(0, 30));
-        tavilySearch(act.query || '', {maxResults: act.maxResults || 5}).then(function(searchResult) {
+        webSearch(act.query || '', {maxResults: act.maxResults || 5}).then(function(searchResult) {
           stepDone(tabId, wsIdx);
-          if (!searchResult) { resolve({text: 'No se pudieron obtener resultados.', showText: true}); return; }
+          if (!searchResult) {
+            resolve({text: 'No se pudieron obtener resultados. Prueba otra búsqueda.', showText: true});
+            return;
+          }
           var searchText = '';
           if (searchResult.answer) searchText += searchResult.answer + '\n\n';
           if (searchResult.results) {
             for (var sr = 0; sr < searchResult.results.length; sr++) {
               searchText += (sr+1) + '. ' + searchResult.results[sr].title + '\n   ' + searchResult.results[sr].url + '\n';
+              if (searchResult.results[sr].snippet) searchText += '   ' + searchResult.results[sr].snippet + '\n';
             }
           }
           resolve({text: searchText || 'Sin resultados.', showText: true});
@@ -5591,9 +5742,11 @@ function handleVoice(cmd, wantsText, sendResponse) {
 
   var hasAnyKey = !!(aiKeys.nvidiaKey || aiKeys.geminiKey);
   var hasProxy = !!PROXY_URL;
+  var hasFCC = typeof X1FCCBridge !== 'undefined' && X1FCCBridge.isAvailable && X1FCCBridge.isAvailable();
   var hasOllama = ollamaModels && ollamaModels.length > 0;
-  if (!hasAnyKey && !hasProxy && !hasOllama) {
-    respond({text: 'Configura tu clave de NVIDIA NIM o Gemini en Settings (icono de engranaje) para poder responder. NVIDIA NIM tiene tier gratuito: build.nvidia.com', showText: true});
+  var hasWebLLM = typeof X1WebLLMBridge !== 'undefined' && X1WebLLMBridge.isLoaded && X1WebLLMBridge.isLoaded();
+  if (!hasAnyKey && !hasProxy && !hasFCC && !hasOllama && !hasWebLLM) {
+    respond({text: 'No hay proveedores de IA disponibles. Arranca FCC proxy (start-fcc.bat) para activar el Judge o escribe en el panel de texto.', showText: true});
     return;
   }
 
@@ -5609,10 +5762,10 @@ function handleVoice(cmd, wantsText, sendResponse) {
   }, 3000);
   var slowTimer = setTimeout(function(){
     if (!responded) {
-      console.log('[X1] Slow timeout — forcing response');
-      respond({text:'Tiempo agotado. Intenta de nuevo o configura una API key en Settings.', showText:true});
+      console.log('[X1] Slow timeout 10s — forcing response');
+      respond({text:'Tiempo agotado. Reintentando...', showText:true});
     }
-  }, 25000);
+  }, 10000);
 
   addMem('user', cmd);
   console.log('[X1] handleVoice start:', cmd.substring(0, 50));
@@ -5779,15 +5932,14 @@ function handleVoice(cmd, wantsText, sendResponse) {
         if (hasProxy && proxyLastFail > 0 && Date.now() - proxyLastFail < 30000) {
           console.log('[X1] Proxy recently failed, skipping proxy fallback');
         }
-        var fallbacks = [
-          'No entendí bien. ¿Puedes repetirlo de otra forma?',
-          'Me he perdido. ¿Puedes ser más específico?',
-          'Necesito más contexto. ¿Qué es exactamente lo que necesitas?',
-          'No tengo suficiente información. ¿Puedes explicarme más?'
-        ];
-        var errMsg = fallbacks[Math.floor(Math.random() * fallbacks.length)];
-        if (!activeKeys.length && !hasProxy && !hasOllama) {
-          errMsg = 'No hay proveedores de IA configurados. Di "configura groq <tu clave>" para usar Groq gratis, o revisa Settings.';
+        var hasWorkingFCC = typeof X1FCCBridge !== 'undefined' && X1FCCBridge.isAvailable && X1FCCBridge.isAvailable();
+        var hasWorkingWebLLM = typeof X1WebLLMBridge !== 'undefined' && X1WebLLMBridge.isLoaded && X1WebLLMBridge.isLoaded();
+        var proxyWorking = hasProxy && (proxyLastFail === 0 || Date.now() - proxyLastFail > 3000);
+        var hasAnyWorking = activeKeys.length > 0 || proxyWorking || hasWorkingFCC || hasOllama || hasWorkingWebLLM;
+        if (!hasAnyWorking) {
+          errMsg = 'No hay proveedores de IA disponibles. Arranca FCC proxy (start-fcc.bat) o usa el panel de texto.';
+        } else {
+          errMsg = 'No entendí bien. ¿Puedes repetirlo de otra forma?';
         }
         respond({text:errMsg, showText:true, persona: persona, personaPrompt: personaPrompt, mode: 'socratic'});
         return;
@@ -5806,7 +5958,7 @@ function handleVoice(cmd, wantsText, sendResponse) {
     }).catch(function(e){
       clearTimeout(fastTimer);clearTimeout(slowTimer);
       console.error('[X1] AI error:', e.message);
-      respond({text:'Error de IA: '+e.message+'. Prueba "usa groq" o "usa openai".', showText:true, persona: persona, personaPrompt: personaPrompt});
+      respond({text:'Error de IA: '+e.message+'. Reintentando con el proxy cloud...', showText:true, persona: persona, personaPrompt: personaPrompt});
     });
   }).catch(function(e){
     clearTimeout(fastTimer);clearTimeout(slowTimer);
@@ -6269,6 +6421,37 @@ chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
     sendResponse({pong:true, ts:Date.now()});
     return false;
   }
+  if(msg.type==='PROVIDER_HEALTH'){
+    var phSummary = getProviderHealthSummary();
+    var phResult = {providers: [], total: 0, healthy: 0};
+    for (var phi = 0; phi < phSummary.length; phi++) {
+      var phProv = phSummary[phi];
+      phResult.providers.push({
+        name: phProv.name,
+        status: phProv.status,
+        score: phProv.score
+      });
+      if (phProv.status === 'healthy') phResult.healthy++;
+    }
+    phResult.total = phResult.providers.length;
+    // Also check FCC explicitly
+    if (typeof X1FCCBridge !== 'undefined' && X1FCCBridge.healthCheck) {
+      X1FCCBridge.healthCheck().then(function(fccH) {
+        for (var fii = 0; fii < phResult.providers.length; fii++) {
+          if (phResult.providers[fii].name === 'fcc') {
+            phResult.providers[fii].status = fccH.ok ? 'healthy' : 'unhealthy';
+            if (fccH.ok) phResult.healthy++;
+          }
+        }
+        try { sendResponse(phResult); } catch(e) {}
+      }).catch(function() {
+        try { sendResponse(phResult); } catch(e) {}
+      });
+      return true;
+    }
+    sendResponse(phResult);
+    return false;
+  }
   if(msg.type==='TOOLBAR_ACTION'){
     var tbAction = msg.action || '';
     var tbText = (msg.selectedText || '').substring(0, 2000);
@@ -6298,29 +6481,42 @@ chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
     var wantsText = !!msg.wantsText;
     var requestId = msg.requestId || (Date.now() + '-' + Math.floor(Math.random() * 10000));
     var sideSender = sender;
+    var swResponded = false;
     try { sendResponse({ack: true, requestId: requestId}); } catch(_) {}
+
+    function sendPanelResponse(data) {
+      if (swResponded) return; swResponded = true;
+      var payload = {
+        type: 'X1_VOICE_RESPONSE',
+        source: 'x1-voice-response',
+        text: (data && data.text) || '',
+        showText: !!(data && data.showText),
+        error: (data && data.error) || null,
+        requestId: requestId
+      };
+      console.log('[X1-SW] sendPanelResponse:', payload.text ? payload.text.substring(0, 50) : payload.error);
+      try { chrome.storage.local.set({x1LastResponse: payload}); } catch(e) { console.warn('[X1-SW] storage.set failed:', e.message); }
+      try {
+        if (sideSender && sideSender.tab && sideSender.tab.id) {
+          chrome.tabs.sendMessage(sideSender.tab.id, payload).catch(function(e){ console.warn('[X1-SW] tabs.sendMessage failed:', e.message); });
+        }
+      } catch(e) { console.warn('[X1-SW] tabs.sendMessage error:', e.message); }
+      try {
+        chrome.runtime.sendMessage(payload).catch(function(e){ console.warn('[X1-SW] runtime.sendMessage failed:', e.message); });
+      } catch(e) { console.warn('[X1-SW] runtime.sendMessage error:', e.message); }
+    }
+
     (function processVoice(){
       handleVoice(cmdText, wantsText, function(data){
-        var payload = {
-          type: 'X1_VOICE_RESPONSE',
-          source: 'x1-voice-response',
-          text: (data && data.text) || '',
-          showText: !!(data && data.showText),
-          error: (data && data.error) || null,
-          requestId: requestId
-        };
-        try {
-          chrome.storage.local.set({x1LastResponse: payload});
-        } catch(e) {}
-        try {
-          if (sideSender && sideSender.tab && sideSender.tab.id) {
-            chrome.tabs.sendMessage(sideSender.tab.id, payload).catch(function(){});
-          }
-        } catch(_) {}
-        try {
-          chrome.runtime.sendMessage(payload).catch(function(){});
-        } catch(_) {}
+        console.log('[X1-SW] handleVoice callback fired:', data ? (data.text || '').substring(0, 50) : 'null');
+        sendPanelResponse(data);
       });
+      setTimeout(function() {
+        if (!swResponded) {
+          console.warn('[X1-SW] Safety timeout 12s — forcing response');
+          sendPanelResponse({text: 'Tiempo agotado. Reintentando...', error: null});
+        }
+      }, 12000);
     })();
     return true;
   }

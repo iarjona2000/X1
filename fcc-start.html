@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>X1 — Start FCC Proxy</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: #0a0a0f;
+      color: #e4e4e7;
+      display: flex;
+      justify-content: center;
+      padding: 60px 24px;
+      min-height: 100vh;
+    }
+    .container { max-width: 640px; width: 100%; }
+    h1 {
+      font-size: 28px;
+      font-weight: 700;
+      color: white;
+      margin-bottom: 8px;
+      letter-spacing: -0.02em;
+    }
+    .sub {
+      color: #a1a1aa;
+      font-size: 15px;
+      margin-bottom: 40px;
+      line-height: 1.6;
+    }
+    .step {
+      background: #18181b;
+      border: 1px solid #27272a;
+      border-radius: 16px;
+      padding: 20px 24px;
+      margin-bottom: 16px;
+      transition: border-color 0.2s;
+    }
+    .step:hover { border-color: #3b82f6; }
+    .step-num {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      background: #3b82f6;
+      color: white;
+      font-size: 13px;
+      font-weight: 700;
+      margin-right: 12px;
+      flex-shrink: 0;
+    }
+    .step-header {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      margin-bottom: 12px;
+    }
+    .step-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: white;
+    }
+    .step-desc {
+      font-size: 13px;
+      color: #a1a1aa;
+      line-height: 1.6;
+    }
+    code {
+      display: block;
+      background: #09090b;
+      border: 1px solid #27272a;
+      border-radius: 10px;
+      padding: 14px 18px;
+      font-family: 'JetBrains Mono', 'Cascadia Code', monospace;
+      font-size: 13px;
+      color: #a1f7a1;
+      margin: 12px 0;
+      white-space: pre-wrap;
+      word-break: break-all;
+      user-select: all;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 28px;
+      background: #3b82f6;
+      color: white;
+      border: none;
+      border-radius: 12px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      transition: background 0.2s, transform 0.1s;
+      margin-top: 24px;
+    }
+    .btn:hover { background: #2563eb; }
+    .btn:active { transform: scale(0.98); }
+    .btn-success {
+      background: #22c55e;
+    }
+    .status-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 14px 20px;
+      background: #18181b;
+      border: 1px solid #27272a;
+      border-radius: 12px;
+      margin-bottom: 32px;
+    }
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #22c55e;
+      animation: pulse 2s infinite;
+    }
+    .status-dot.offline { background: #ef4444; animation: none; }
+    .status-dot.checking { background: #f59e0b; }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(34,197,94,0.4); }
+      50% { opacity: 0.8; box-shadow: 0 0 0 6px rgba(34,197,94,0); }
+    }
+    .footer { margin-top: 48px; padding-top: 24px; border-top: 1px solid #27272a; font-size: 13px; color: #71717a; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Start FCC Proxy</h1>
+    <p class="sub">Free Claude Code — 18 providers, Claude-level AI, zero cost.<br>Run once before using X1 for AI responses.</p>
+
+    <div id="status-container" class="status-bar">
+      <span id="fcc-status-dot" class="status-dot checking"></span>
+      <span id="fcc-status-text">Checking FCC proxy...</span>
+    </div>
+
+    <div class="step">
+      <div class="step-header">
+        <span class="step-num">1</span>
+        <span class="step-title">Open terminal</span>
+      </div>
+      <div class="step-desc">Open PowerShell, Command Prompt, or your preferred terminal.</div>
+    </div>
+
+    <div class="step">
+      <div class="step-header">
+        <span class="step-num">2</span>
+        <span class="step-title">Navigate to X1</span>
+      </div>
+      <div class="step-desc">Go to the X1 extension directory:</div>
+      <code>cd C:\Users\tomas\Desktop\cbos-ext</code>
+    </div>
+
+    <div class="step">
+      <div class="step-header">
+        <span class="step-num">3</span>
+        <span class="step-title">Start the proxy</span>
+      </div>
+      <div class="step-desc">Double-click <code style="display:inline; padding:2px 8px;">start-fcc.bat</code> in the folder, or run:</div>
+      <code>.\start-fcc.bat</code>
+      <div class="step-desc" style="margin-top:8px;">This installs dependencies automatically (uv + Python packages) and starts the server on <strong>localhost:8082</strong>.</div>
+    </div>
+
+    <div class="step">
+      <div class="step-header">
+        <span class="step-num">4</span>
+        <span class="step-title">Verify</span>
+      </div>
+      <div class="step-desc">Once started, return to X1. The FCC indicator should turn green. You're ready.</div>
+    </div>
+
+    <button class="btn" onclick="checkFCC()">Check Connection</button>
+    <a class="btn btn-success" href="https://github.com/Alishahryar1/free-claude-code" target="_blank">GitHub Repo (38.4k stars)</a>
+
+    <div class="footer">
+      X1 — Browser Agent (Voice + Text) • FCC proxy runs locally on port 8082
+    </div>
+  </div>
+
+  <script>
+    function checkFCC() {
+      var dot = document.getElementById('fcc-status-dot');
+      var text = document.getElementById('fcc-status-text');
+      dot.className = 'status-dot checking';
+      text.textContent = 'Checking FCC proxy...';
+
+      fetch('http://localhost:8082/v1/models')
+        .then(function(r) {
+          if (r.ok) {
+            dot.className = 'status-dot';
+            text.textContent = 'FCC proxy is RUNNING on localhost:8082';
+          } else {
+            dot.className = 'status-dot offline';
+            text.textContent = 'FCC proxy responded but with error (HTTP ' + r.status + ')';
+          }
+        })
+        .catch(function() {
+          dot.className = 'status-dot offline';
+          text.textContent = 'FCC proxy is NOT running. Follow steps 1-3 above.';
+        });
+    }
+
+    checkFCC();
+    setInterval(checkFCC, 5000);
+  </script>
+</body>
+</html>

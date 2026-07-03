@@ -6,78 +6,60 @@
   <title>X1</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Inter:wght@300;400;500;600&family=Inter+Tight:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Inter+Tight:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="panel.css">
 </head>
 <body>
   <div id="app">
 
     <header id="header">
-      <div id="header-left">
-        <img id="logo" src="../assets/x1-logo.png" alt="X1" height="22">
-        <span id="status-badge">
-          <span id="status-dot"></span>
-          <span id="status-text">Ready</span>
-        </span>
+      <button type="button" id="btn-menu" class="header-icon-btn" aria-label="Abrir menú">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+      </button>
+      <div id="header-center">
+        <img id="logo" src="../assets/x1-logo-blue.png" alt="X1">
+        <span id="header-title" class="truncate">Nueva conversación</span>
       </div>
-      <div id="header-right">
-        <button class="icon-btn" id="btn-new" title="New conversation">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 5v14M5 12h14"/></svg>
-        </button>
-        <button class="icon-btn" id="btn-settings" title="Settings">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
-        </button>
-      </div>
+      <button type="button" id="btn-new" class="header-icon-btn" aria-label="Nueva conversación">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+      </button>
     </header>
 
-    <nav id="tabs">
-      <button class="tab active" data-tab="chat">Chat</button>
-      <button class="tab" data-tab="tasks">Tasks</button>
-      <button class="tab" data-tab="calendar">Calendar</button>
-      <button class="tab" data-tab="email">Email</button>
-    </nav>
-
     <main id="content">
-
       <section id="tab-chat" class="tab-view active">
         <div id="messages"></div>
       </section>
-
-      <section id="tab-tasks" class="tab-view">
-        <div id="tasks-header">
-          <h2>Tasks</h2>
-          <button id="btn-add-task" class="text-btn">Add task</button>
-        </div>
-        <div id="tasks-list"></div>
-      </section>
-
-      <section id="tab-calendar" class="tab-view">
-        <h2>Upcoming</h2>
-        <div id="calendar-list"></div>
-      </section>
-
-      <section id="tab-email" class="tab-view">
-        <div id="email-header">
-          <h2>Inbox</h2>
-          <span id="email-count"></span>
-        </div>
-        <div id="email-list"></div>
-      </section>
-
     </main>
 
     <footer id="input-area">
-      <div id="input-row">
-        <textarea id="input" placeholder="Message X1..." rows="1"></textarea>
-        <button id="btn-mic" class="input-btn" title="Voice input (Ctrl+Space)">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
-        </button>
-        <button id="btn-send" class="input-btn primary" title="Send">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-        </button>
+      <div id="input-container">
+        <textarea id="input" rows="1" placeholder="Escribe un mensaje a X1..."></textarea>
+        <div id="input-actions">
+          <div id="input-toggles">
+            <button type="button" class="toggle-chip" data-toggle="think" aria-pressed="false">
+              <svg class="chip-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M9 18h6M10 22h4M12 2v4M7 12a5 5 0 0110 0c0 2-2 3-2 5h-6c0-2-2-3-2-5z"/></svg>
+              Pensar
+            </button>
+            <button type="button" class="toggle-chip" data-toggle="search" aria-pressed="false">
+              <svg class="chip-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+              Buscar
+            </button>
+          </div>
+          <div id="input-buttons">
+            <button type="button" id="btn-mic" class="input-icon-btn" aria-label="Entrada de voz">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg>
+            </button>
+            <button type="button" id="btn-send" class="input-icon-btn primary" aria-label="Enviar mensaje" disabled>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+            </button>
+          </div>
+        </div>
       </div>
-      <div id="input-hint">
-        <span>Press Enter to send</span>
+      <p id="input-footer">X1 puede cometer errores. Verifica la información importante.</p>
+      <div id="provider-status">
+        <span class="ps-item clickable" data-provider="fcc" title="Click para iniciar FCC proxy"><span class="ps-dot"></span>FCC</span>
+        <span class="ps-item" data-provider="freeweb"><span class="ps-dot"></span>Web</span>
+        <span class="ps-item" data-provider="webllm"><span class="ps-dot"></span>Local</span>
       </div>
     </footer>
 
