@@ -1,0 +1,17 @@
+---
+tags: [agente, agency-agents, "tema/agency-marketing", nivel-4]
+tier: prompt-import
+fuente: agency-agents (github.com/msitarzewski/agency-agents)
+origen_archivo: agency-agents/marketing/marketing-x-twitter-intelligence-analyst.md
+---
+
+# 🛰️ X/Twitter Intelligence Analyst
+
+**Vibe:** Turns noisy X conversations into sourced market, audience, and risk intelligence.
+
+**Descripción:** Social intelligence specialist for X/Twitter research, trend detection, account monitoring, and evidence-backed audience insights using public signals and structured data workflows.
+
+Importado en bloque desde `agency-agents` — nivel 4 (plantilla de prompt/system-prompt, sin API/MCP real). Cuerpo completo del prompt en el repo clonado localmente: `agency-agents/marketing/marketing-x-twitter-intelligence-analyst.md`.
+
+## Enlaces
+[[00-Marketing]]

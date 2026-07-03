@@ -1,0 +1,219 @@
+{
+  "main": {
+    "id": "e82cefce5aa58822",
+    "type": "split",
+    "children": [
+      {
+        "id": "5fe53739f18536ba",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "b4301b70a97e7d46",
+            "type": "leaf",
+            "state": {
+              "type": "graph",
+              "state": {},
+              "icon": "lucide-git-fork",
+              "title": "Vista gráfica"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "2debaf8173d62fab",
+    "type": "split",
+    "children": [
+      {
+        "id": "8e812a7c747bf207",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "b78dbdf1a992733b",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Explorador de archivos"
+            }
+          },
+          {
+            "id": "f1673c6451853bec",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Buscar"
+            }
+          },
+          {
+            "id": "d27296598a45c5b1",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "Marcadores"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "e14332c5ebafaff7",
+    "type": "split",
+    "children": [
+      {
+        "id": "2d09f0228b3fe19f",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "9105c1fde4538599",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Enlaces entrantes"
+            }
+          },
+          {
+            "id": "4d6f29a07576fa26",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Enlaces salientes"
+            }
+          },
+          {
+            "id": "c6879c232fa4aaad",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "Etiquetas"
+            }
+          },
+          {
+            "id": "401f086dd457fa0f",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "Todas las propiedades"
+            }
+          },
+          {
+            "id": "f2b4c577cd23caef",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "Esquema"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Abrir selector rápido": false,
+      "graph:Abrir vista gráfica": false,
+      "canvas:Crear nuevo lienzo": false,
+      "daily-notes:Abrir la nota de hoy": false,
+      "templates:Insertar plantilla": false,
+      "command-palette:Abrir paleta de comandos": false,
+      "bases:Crear nueva base": false
+    }
+  },
+  "active": "b4301b70a97e7d46",
+  "lastOpenFiles": [
+    "00-Indice.md",
+    "Agentes-Agency-GIS/DroneReality-Mapping-Specialist.md",
+    "00-Indice.md.tmp.12384.c8a341f7bc1f",
+    "00-Indice.md.tmp.12384.b89f77699629",
+    "Agentes-Atencion-Cliente/Executive-Summary-Generator.md",
+    "Agentes-Atencion-Cliente/Analytics-Reporter.md",
+    "Agentes-Marketing/Ad-Creative-Strategist.md",
+    "Agentes-Marketing/Paid-Media-Auditor.md",
+    "Agentes-Marketing/Zhihu-Strategist.md",
+    "Agentes-Marketing/Xiaohongshu-Specialist.md",
+    "Agentes-Marketing/XTwitter-Intelligence-Analyst.md",
+    "Agentes-Marketing/Weibo-Strategist.md",
+    "Agentes-Marketing/WeChat-Official-Account-Manager.md",
+    "Agentes-Marketing/Video-Optimization-Specialist.md",
+    "Agentes-Marketing/Twitter-Engager.md",
+    "Agentes-Marketing/TikTok-Strategist.md",
+    "Agentes-Marketing/Social-Media-Strategist.md",
+    "Agentes-Marketing/Short-Video-Editing-Coach.md",
+    "Agentes-Marketing/SEO-Specialist.md",
+    "Agentes-Marketing/Reddit-Community-Builder.md",
+    "Agentes-Marketing/Private-Domain-Operator.md",
+    "Agentes-Marketing/PR-Communications-Manager.md",
+    "Agentes-Marketing/Podcast-Strategist.md",
+    "Agentes-Marketing/Multi-Platform-Publisher.md",
+    "Agentes-Marketing/Livestream-Commerce-Coach.md",
+    "Agentes-Marketing/LinkedIn-Content-Creator.md",
+    "Agentes-Marketing/Kuaishou-Strategist.md",
+    "Agentes-Marketing/Instagram-Curator.md",
+    "Agentes-Agency-SpatialComputing",
+    "Agentes-Agency-Testing",
+    "Agentes-Agency-Specialized",
+    "Agentes-Agency-Security",
+    "Agentes-Agency-Product",
+    "Agentes-Agency-GIS",
+    "Agentes-Agency-GameDev",
+    "Agentes-Agency-Engineering",
+    "Sin título.canvas"
+  ]
+}
