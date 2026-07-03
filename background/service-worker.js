@@ -6483,43 +6483,17 @@ chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
     console.log('[X1-SW] VOICE_COMMAND_EXEC handler firing');
     var cmdText = msg.command || '';
     var wantsText = !!msg.wantsText;
-    var requestId = msg.requestId || (Date.now() + '-' + Math.floor(Math.random() * 10000));
-    var sideSender = sender;
     var swResponded = false;
 
     function sendResp(data) {
       if (swResponded) return; swResponded = true;
       var text = (data && data.text) || (data && data.error) || '';
-      console.log('[X1-SW] response:', text.substring(0, 50));
-      try {
-        var ack = {text: text, showText: !!(data && data.showText), requestId: requestId};
-        chrome.storage.local.set({x1LastResponse: ack});
-        sendResponse(ack);
-      } catch(e) { console.warn('[X1-SW] sendResponse failed:', e.message); }
+      try { sendResponse({text: text, showText: !!(data && data.showText)}); } catch(e) {}
     }
 
-    function proxyDirect(userMsg) {
-      if (!PROXY_URL) return Promise.resolve(null);
-      var h = {'Content-Type':'application/json', 'X-X1-Auth': aiKeys.proxySecret || PROXY_SHARED_SECRET};
-      return fetch(PROXY_URL + '/v1/chat/completions', {
-        method:'POST', headers: h, signal: AbortSignal.timeout(15000),
-        body: JSON.stringify({messages:[{role:'user', content:userMsg}]})
-      }).then(function(r) {
-        if (!r.ok) return null;
-        return r.json();
-      }).then(function(d) {
-        if (!d || !d.choices || !d.choices[0] || !d.choices[0].message) return null;
-        var txt = (d.choices[0].message.content || '').trim();
-        return txt && isValidContent(txt) ? txt : null;
-      }).catch(function() { return null; });
-    }
-
-    proxyDirect(cmdText).then(function(txt) {
-      if (txt) { sendResp({text: txt, showText: true}); return; }
-      handleVoice(cmdText, wantsText, function(data) { sendResp(data); });
-    });
+    handleVoice(cmdText, wantsText, function(data) { sendResp(data); });
     setTimeout(function() {
-      if (!swResponded) { sendResp({text: 'Procesando...', showText: false}); }
+      if (!swResponded) { sendResp({text: 'Procesando...'}); }
     }, 15000);
     return true;
   }

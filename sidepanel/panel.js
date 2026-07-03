@@ -262,6 +262,24 @@
     if (currentThinking) { currentThinking.remove(); currentThinking = null; }
   }
 
+  var PROXY_URL = 'https://x1-proxy.baosx1.workers.dev';
+  var PROXY_SECRET = '9ff4b7dda5f7defd5f7fb7c32c133428bc87e8efeb8550d3ce1e5838c1d3b850';
+
+  function callProxy(userMsg) {
+    return fetch(PROXY_URL + '/v1/chat/completions', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json', 'X-X1-Auth': PROXY_SECRET},
+      body: JSON.stringify({messages:[{role:'user', content:userMsg}]}),
+      signal: AbortSignal.timeout(15000)
+    }).then(function(r) {
+      if (!r.ok) return null;
+      return r.json();
+    }).then(function(d) {
+      if (!d || !d.choices || !d.choices[0] || !d.choices[0].message) return null;
+      return (d.choices[0].message.content || '').trim();
+    }).catch(function() { return null; });
+  }
+
   function sendMessage() {
     var text = input.value.trim();
     if (!text) return;
@@ -269,68 +287,47 @@
     addMessage('user', text);
     showThinking();
     responded = false;
-    activeRequestId = Date.now() + '-' + Math.floor(Math.random() * 10000);
     if (panelTimeout) { clearTimeout(panelTimeout); panelTimeout = null; }
+
+    callProxy(text).then(function(txt) {
+      if (txt) {
+        clearPanelTimeout();
+        if (!responded) {
+          responded = true; removeThinking();
+          var aiMsg = addMessage('ai', txt, true);
+          streamAiText(aiMsg, txt);
+        }
+        return;
+      }
+      tryFallback(text);
+    });
+
     panelTimeout = setTimeout(function() {
       if (!responded) {
         removeThinking();
-        showThinking('Todavía pensando...');
-        var extendTimer = setTimeout(function() {
-          if (!responded) {
-            responded = true; clearTimeout(panelTimeout); panelTimeout = null;
-            removeThinking();
-            addMessage('ai', 'Parece que estoy tardando más de lo normal. Reintentando...');
-            responded = false;
-            activeRequestId = Date.now() + '-' + Math.floor(Math.random() * 10000);
-            showThinking();
-            doSend();
-          }
-        }, 15000);
-        panelTimeout = extendTimer;
+        addMessage('ai', 'El proxy cloud no responde. Arranca FCC proxy (start-fcc.bat) para usar el Judge local.');
       }
     }, 20000);
+  }
 
-    function doSend() {
-      var requestId = activeRequestId;
-      console.log('[X1-sidepanel] Sending:', text.substring(0, 50), 'requestId:', requestId);
-      startResponseFallback(requestId);
-      chrome.runtime.sendMessage(
-        { type: 'VOICE_COMMAND_EXEC', command: text, raw: text, wantsText: true, requestId: requestId },
-        function(response) {
-          if (chrome.runtime.lastError) {
-            if (!responded) { responded = true; clearTimeout(panelTimeout); removeThinking(); stopResponseFallback(); }
-            return;
-          }
-          if (response && response.text) {
-            clearPanelTimeout();
-            if (!responded) {
-              responded = true; stopResponseFallback(); removeThinking();
-              var aiMsg = addMessage('ai', response.text, true);
-              streamAiText(aiMsg, response.text);
-            }
-          }
-        }
-      );
-    }
-
-    setTimeout(function() { if (!responded) stopResponseFallback(); }, 32000);
-
-    try {
-      if (!chrome.runtime || !chrome.runtime.sendMessage) {
-        responded = true; clearTimeout(panelTimeout); removeThinking();
-        addMessage('ai', 'Extensión desconectada. Recarga la extensión.');
-        return;
-      }
-      chrome.runtime.sendMessage({ type: 'PING' }, function(pong) {
+  function tryFallback(text) {
+    chrome.runtime.sendMessage(
+      { type: 'VOICE_COMMAND_EXEC', command: text, raw: text, wantsText: true },
+      function(response) {
         if (chrome.runtime.lastError) {
           if (!responded) { responded = true; clearTimeout(panelTimeout); removeThinking(); }
           return;
         }
-        doSend();
-      });
-    } catch(e) {
-      if (!responded) { responded = true; clearTimeout(panelTimeout); removeThinking(); }
-    }
+        if (response && response.text) {
+          clearPanelTimeout();
+          if (!responded) {
+            responded = true; removeThinking();
+            var aiMsg = addMessage('ai', response.text, true);
+            streamAiText(aiMsg, response.text);
+          }
+        }
+      }
+    );
   }
 
   input.addEventListener('keydown', function(e) {
