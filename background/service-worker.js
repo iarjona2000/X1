@@ -2649,101 +2649,25 @@ function jsonToCsv(jsonData) {
 }
 
 // ── Page Monitoring System ──
-var pageMonitors = [];
+// Fixed 2026-07-04: addPageMonitor/removePageMonitor/savePageMonitors/
+// loadPageMonitors/checkPageMonitors used to be declared TWICE in this file
+// (here, and again ~L7850 with an incompatible pageMonitors.watched[] shape).
+// Plain JS function-declaration hoisting means the LATER declaration always
+// wins — this first copy (and its `var pageMonitors = []` array shape) never
+// actually ran; deleted as dead code. PAGE_MONITOR_ALARM and
+// ensureMonitorAlarm() are kept here since addPriceAlert() and the shared
+// alarm listener below depend on them regardless of which pageMonitors
+// implementation is active.
 var PAGE_MONITOR_ALARM = 'x1-page-monitor';
-
-function addPageMonitor(config) {
-  var monitor = {
-    id: 'mon_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
-    url: config.url,
-    selector: config.selector || '',
-    description: config.description || '',
-    interval: config.interval || 300,
-    lastContent: null,
-    lastCheck: 0,
-    changes: [],
-    active: true,
-    created: Date.now()
-  };
-  pageMonitors.push(monitor);
-  savePageMonitors();
-  ensureMonitorAlarm();
-  console.log('[X1] Monitor added:', monitor.id, monitor.url);
-  return monitor;
-}
-
-function removePageMonitor(id) {
-  pageMonitors = pageMonitors.filter(function(m) { return m.id !== id; });
-  savePageMonitors();
-}
-
-function savePageMonitors() {
-  chrome.storage.local.set({x1PageMonitors: pageMonitors});
-}
-
-function loadPageMonitors() {
-  chrome.storage.local.get('x1PageMonitors', function(r) {
-    if (r && r.x1PageMonitors) {
-      pageMonitors = r.x1PageMonitors;
-      if (pageMonitors.length > 0) ensureMonitorAlarm();
-    }
-  });
-}
-loadPageMonitors();
 
 function ensureMonitorAlarm() {
   chrome.alarms.get(PAGE_MONITOR_ALARM, function(alarm) {
-    if (!alarm && pageMonitors.some(function(m) { return m.active; })) {
+    if (!alarm) {
       chrome.alarms.create(PAGE_MONITOR_ALARM, {periodInMinutes: 5});
     }
   });
 }
-
-function checkPageMonitors() {
-  var active = pageMonitors.filter(function(m) { return m.active; });
-  if (active.length === 0) return;
-
-  var now = Date.now();
-  active.forEach(function(monitor) {
-    if (now - monitor.lastCheck < (monitor.interval * 1000)) return;
-    monitor.lastCheck = now;
-
-    fetch(monitor.url, {signal: AbortSignal.timeout(10000)})
-      .then(function(r) { return r.text(); })
-      .then(function(html) {
-        var content = html;
-        if (monitor.selector) {
-          var match = html.match(new RegExp('<[^>]*' + monitor.selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '[^>]*>([\\s\\S]*?)<', 'i'));
-          if (match) content = match[1].trim();
-        }
-        content = content.replace(/<[^>]+>/g, '').trim().substring(0, 2000);
-
-        if (monitor.lastContent !== null && content !== monitor.lastContent) {
-          var change = {
-            timestamp: now,
-            before: monitor.lastContent.substring(0, 500),
-            after: content.substring(0, 500)
-          };
-          monitor.changes.push(change);
-          if (monitor.changes.length > 20) monitor.changes = monitor.changes.slice(-20);
-
-          chrome.notifications.create('x1-monitor-' + monitor.id, {
-            type: 'basic',
-            iconUrl: 'assets/x1-logo-square.png',
-            title: 'X1 Monitor: Change Detected',
-            message: (monitor.description || monitor.url) + ' has changed.',
-            priority: 2
-          });
-          console.log('[X1] Monitor change detected:', monitor.id);
-        }
-        monitor.lastContent = content;
-        savePageMonitors();
-      })
-      .catch(function(e) {
-        console.warn('[X1] Monitor check failed for', monitor.id, ':', e.message);
-      });
-  });
-}
+loadPageMonitors();
 
 // ── Price Alert System (extends page monitoring) ──
 var priceAlerts = [];
@@ -6847,7 +6771,7 @@ var aiProviders = {
   gemini: {name: "Gemini", models: ["gemini-2.0-flash", "gemini-1.5-pro"], baseUrl: "https://generativelanguage.googleapis.com/v1beta/models/"},
   anthropic: {name: "Anthropic", models: ["claude-3-5-sonnet-20241022", "claude-3-haiku-20240307"], baseUrl: "https://api.anthropic.com/v1/messages"},
   ollama: {name: "Ollama", models: ["llama3", "mistral", "codellama"], baseUrl: "http://localhost:11434/api/chat"},
-  nvidia: {name: "NVIDIA NIM", models: ["z-ai/glm-5.1", "nvidia/nemotron-3-ultra-550b-a55b", "deepseek-ai/deepseek-v4-pro"], baseUrl: "https://integrate.api.nvidia.com/v1/chat/completions"},
+  nvidia: {name: "NVIDIA NIM", models: ["z-ai/glm-5.1", "nvidia/nemotron-3-ultra-550b-a55b", "openai/gpt-oss-120b", "meta/llama-4-maverick-17b-128e-instruct", "qwen/qwen3-coder-480b-a35b-instruct"], baseUrl: "https://integrate.api.nvidia.com/v1/chat/completions"},
   "nvidia-llama": {name: "NVIDIA NIM — Llama 4 Maverick (vision)", models: ["meta/llama-4-maverick-17b-128e-instruct"], baseUrl: "https://integrate.api.nvidia.com/v1/chat/completions"}
 };
 
@@ -6861,7 +6785,12 @@ function getAvailableProviders() {
 }
 
 function getDefaultProvider() {
-  return aiKeys.aiProvider || "groq";
+  // Fixed 2026-07-04: fell back to "groq", a provider with no corresponding
+  // completion function anywhere in this file (removed in the provider
+  // consolidation). loadAIKeys() already normalizes aiProvider to "auto" for
+  // legacy "groq"/"opencode" values (see loadAIKeys above), so "auto" is the
+  // correct default here too.
+  return aiKeys.aiProvider || "auto";
 }
 
 var x1PluginSystem = {

@@ -1,6 +1,14 @@
 var X1AgentManager = (function() {
 
-  var STORAGE_KEY = 'x1_agents';
+  // Fixed 2026-07-04: was 'x1_agents' — the exact same storage key used by
+  // the x1-core bundle's separate, richer AgentManager class (core/agents/
+  // agent-manager.js, reached via agents-x1.js's C.AgentManager) with an
+  // INCOMPATIBLE schema (plain objects here vs. Agent.toJSON() there).
+  // agents-x1.js auto-seeds into the x1-core one ~2s after every SW start,
+  // so the two systems were silently overwriting each other's agent list.
+  // This system (X1AgentManager) is the much less-used of the two (3 call
+  // sites vs. the x1-core one's central role), so it gets the new key.
+  var STORAGE_KEY = 'x1_agents_simple';
   var METRICS_KEY = 'x1_agent_metrics';
 
   // NOTE (fix 2026-07-04): every function here used to pass `sys` as a second

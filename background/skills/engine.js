@@ -116,11 +116,16 @@ var X1SkillEngine = (function() {
 
     if (action === 'ai') {
       if (typeof aiComplete === 'function') {
-        return aiComplete(
-          resolvedParams.system || 'You are a helpful assistant.',
-          resolvedParams.prompt || '',
-          { maxTokens: resolvedParams.maxTokens || 500, temperature: resolvedParams.temperature || 0.7 }
-        );
+        // Fixed 2026-07-04: aiComplete's real signature is (userMsg, opts) —
+        // opts is an options object (only .forceJudge is ever read), not a
+        // 3rd positional {maxTokens,temperature} arg, and there's no separate
+        // system-prompt slot. This used to send `system` as the actual
+        // message and silently drop the real `prompt` text entirely. Fixed
+        // to match the convention used everywhere else in the codebase:
+        // persona baked into the single message string.
+        var system = resolvedParams.system || 'You are a helpful assistant.';
+        var prompt = resolvedParams.prompt || '';
+        return aiComplete(system + '\n\n' + prompt);
       }
       return Promise.reject(new Error('AI_NOT_AVAILABLE'));
     }
