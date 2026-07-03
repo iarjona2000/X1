@@ -2,7 +2,7 @@
 
 Inventario positivo: solo lo que existe y está construido, sin bugs ni pendientes (eso vive en `docs/ISSUES_NEEDING_YOUR_INPUT.md`). Companion de `docs/SYSTEM_ARCHITECTURE.md`, que tiene el detalle técnico completo (líneas de código, citas file:line) de cada pieza mencionada aquí.
 
-**Aviso de estado (2026-07-04):** este documento refleja el audit hecho sobre `origin/main` en el commit `7f79dd0`. Justo después descubrí que tu socio hizo un force-push que reescribe `origin/main` desde `c7367fc` con 10 commits propios no vistos aquí (incluye `feat: integrate Free Claude Code (FCC) as primary Judge brain` y `fix: make Cloudflare Worker proxy the primary AI provider` — ambos posiblemente relevantes para la sección de Orquestación de abajo). Hace falta reconciliar las dos ramas y revisar este documento otra vez con lo suyo incluido.
+**Actualizado 2026-07-04** tras fusionar las dos ramas divergentes (la tuya vía mí, y la de tu socio tras su force-push) tal y como quedaron en `origin/main` commit `d1bd864`. Incluye ya el trabajo de tu socio: FCC (Free Claude Code) como nuevo proveedor rápido, el gateway Python vendorizado, y sus fixes de timeout/panel.
 
 Cada elemento lleva una etiqueta de madurez, no es un bug, es solo honestidad sobre el alcance:
 - 🟢 **En vivo** — se ejecuta hoy desde un comando de voz/acción real.
@@ -16,10 +16,12 @@ Cada elemento lleva una etiqueta de madurez, no es un bug, es solo honestidad so
 La capa de "cualquier agente o IA externo se puede añadir".
 
 ### Modelos de IA como agentes intercambiables
-- 🟢 **6 proveedores de modelo activos**: 5 modelos NVIDIA NIM (GLM 5.1, Nemotron-3 Ultra, gpt-oss 120B, Llama 4 Maverick, Qwen3 Coder 480B) + Gemini 2.5 Flash — cascada con fallback, circuit breaker y rate limiting real en el Worker de Cloudflare (`worker/src/lib.js`).
+- 🟢 **6 proveedores de modelo activos** en el catálogo propio: 5 modelos NVIDIA NIM (GLM 5.1, Nemotron-3 Ultra, gpt-oss 120B, Llama 4 Maverick, Qwen3 Coder 480B) + Gemini 2.5 Flash — cascada con fallback, circuit breaker y rate limiting real en el Worker de Cloudflare (`worker/src/lib.js`).
+- 🟢 **FCC — Free Claude Code** (nuevo, fusionado 2026-07-04): un gateway Python completo (`background/integrations/free-claude-code/`, proyecto vendorizado de terceros) que enruta a **18 proveedores más** (OpenRouter, DeepSeek, Groq, Cerebras, Mistral, Kimi, Wafer, Fireworks, LM Studio, llama.cpp, Codestral, Zai, y más) mediante la Anthropic Messages API — X1 lo consulta como un proveedor rápido más de bajo nivel (`fcc-bridge.js`), con detección de disponibilidad y timeout propio.
 - 🟢 **Proxy propio (Cloudflare Worker)** desplegado y en producción (`x1-proxy.baosx1.workers.dev`), con auth por secreto compartido y catálogo de proveedores versionado (`worker/src/providers.config.js`) — añadir un proveedor nuevo es una entrada de configuración.
 - 🟢 **Ollama local** como proveedor offline/privado, con detección automática del modelo instalado.
-- 🟡 **`X1Pool`** (`background/ai/ai-pool.js`) — registro formal de proveedores (register/get/getActive/getByFamily/select) ya con los 6 proveedores activos registrados correctamente.
+- 🟢 **Groq** restaurado con una implementación real (fetch directo a la API, tier gratuito) tras la fusión — antes solo era una referencia rota.
+- 🟡 **`X1Pool`** (`background/ai/ai-pool.js`) — registro formal de proveedores (register/get/getActive/getByFamily/select) con 8 proveedores registrados correctamente (los 6 de antes + FCC + Groq).
 
 ### Sistema de agentes (personas con rol)
 - 🟢 **16 agentes construidos** entre dos catálogos (`X1AgentManager`: research/legal/marketing/finance/support/writer/developer; x1-core `AgentManager` vía `agents-x1.js`: research/email/code/meeting/writing/analyst), cada uno con system prompt propio, disparadores de voz en español, y llamada real a la cascada de IA.
@@ -50,7 +52,8 @@ La capa que decide qué agente/modelo usar y cómo combinar resultados.
 - 🟢 **Encadenamiento de pasos** (`steps`) — una acción compuesta puede ejecutar N sub-acciones en secuencia, pasando resultados de una a la siguiente.
 
 ### Cascada multi-modelo y selección
-- 🟢 **`aiComplete()`** — punto de entrada único usado en 20+ sitios: cache de respuesta, ruta rápida local (WebLLM), clasificación de complejidad, selección de 1-2 proveedores en paralelo con carrera por velocidad y scoring heurístico.
+- 🟢 **`aiComplete()`** — punto de entrada único usado en 20+ sitios: cache de respuesta, ruta rápida por el proxy de Cloudflare, **ruta rápida por FCC si está corriendo en local** (nuevo, fusionado 2026-07-04 — comprobado en el propio código: es un fast-path real dentro de `aiComplete`, no solo un registro sin usar), ruta rápida local (WebLLM), clasificación de complejidad, y solo si nada de eso responde, selección de 1-2 proveedores en paralelo con carrera por velocidad y scoring heurístico.
+- 🟢 **FCC como fast-path prioritario** — cuando el proxy local FCC está disponible (`start-fcc.bat`), `aiComplete()` lo consulta directamente (`X1FCCBridge.generateText`) antes de llegar a la cascada normal. Es una mejora real y en vivo de la calidad/fiabilidad de una respuesta individual — no implementa por sí mismo comparación entre varias respuestas ni juicio (ver abajo, sigue siendo "un proveedor", no "el juez").
 - 🟢 **`ROUTE_MATRIX`** — enrutado por tipo de tarea (conversacional/código/sensible/agente), con una ruta explícitamente privada-only (`sensitive: ['ollama']`, sin fallback a la nube) por decisión de diseño.
 - 🟡 **Sistema de panel + juez con rúbricas** (`RUBRICS`, `judgeRound`, activación selectiva, límite diario, rotación de juez) — arquitectura completa de evaluación por rúbrica técnica, con calibración histórica.
 - 🟡 **`X1Judge`** — análisis de consulta (9 tipos, complejidad, intención, idioma, entidades — esta parte sí está en vivo), matriz de votantes, consenso, y un pipeline completo de juicio con atajo de WebLLM-como-juez.
@@ -109,6 +112,6 @@ La capa de "manipular documentos y sistemas externos".
 
 | Capa | Amplitud | Profundidad real |
 |---|---|---|
-| **Agentes externos** | Muy amplia — 6 modelos, 16+217 personas, MCP real, 22 bridges | Sólida en el mecanismo de incorporación (MCP, plugins, cascada); variable en los bridges individuales |
-| **Orquestación** | Muy amplia — 5 sistemas de juicio/comparación construidos, planificador, presupuesto, equipos | La pieza que realmente corre hoy (`aiComplete`) es la más simple de todas; el resto está construido pero no conectado al camino real |
+| **Agentes externos** | Muy amplia — 6+18 modelos (FCC), 16+217 personas, MCP real, 22 bridges | Sólida en el mecanismo de incorporación (MCP, plugins, cascada, FCC); variable en los bridges individuales |
+| **Orquestación** | Muy amplia — 5 sistemas de juicio/comparación construidos, planificador, presupuesto, equipos, y ahora FCC como fast-path real | FCC mejora la calidad de **una** respuesta individual, en vivo. Pero seguir comparando/juzgando entre varias respuestas — el corazón de "Panel+Juez" — sigue sin correr: los 5 sistemas construidos para eso continúan desconectados del camino real |
 | **Conectores** | Amplia y madura — Google Workspace completo, extracción, CRM, finanzas, imagen, voz | La capa más terminada del proyecto — casi todo lo listado aquí corre en producción hoy |

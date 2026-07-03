@@ -8,14 +8,15 @@ Vault de Obsidian (basta con abrir esta carpeta en Obsidian, no requiere configu
 
 ## División de responsabilidades
 
-- **Socio**: orquestación, razonamiento, Panel+Juez (`x1-bridge.js`, `x1-integration.js`, `core/judge.js`, `core/ensemble.js`). **No tocar esta parte.**
-- **Ivan (yo)**: incorporar los agentes/IAs — este vault y su implementación en X1.
+- **Socio**: orquestación, razonamiento, Panel+Juez, FCC (`x1-bridge.js`, `x1-integration.js`, `core/judge.js`, `core/ensemble.js`, `ai-judge.js`/`ai-voting.js`/`ai-router.js`/`ai-pool.js`, `fcc-bridge.js` y todo `background/integrations/free-claude-code/`). **No tocar nada de esto, de ahora en adelante (instrucción explícita de Ivan, 2026-07-04).**
+- **Ivan (yo)**: exclusivamente ampliar y optimizar este vault. Propuestas de orquestación (no implementación) para el socio en `X1/docs/PROPUESTAS_ORQUESTACION.md`.
 
 ## Mapa de contenidos
 
 - [[01-Mecanismo-de-Integracion]] — cómo se conecta X1 (extensión MV3) a un agente externo
 - [[02-Plan-de-Fases]] — qué se incorpora primero, qué después
 - [[03-Directorios-MCP]] — dónde buscar más agentes en el futuro
+- [[06-Plan-de-Expansion-Masiva]] — plan de ampliación masiva por temas, búsqueda en GitHub, listón de calidad
 
 ### Por categoría (agentes candidatos, con enlaces reales investigados)
 
@@ -32,7 +33,7 @@ Vault de Obsidian (basta con abrir esta carpeta en Obsidian, no requiere configu
 
 ### Importación en bloque de `agency-agents` (nivel 4 — plantilla de prompt, ver [[01-Mecanismo-de-Integracion]])
 
-217 personas (las 16 divisiones reales del catálogo, según `agency-agents/divisions.json` — excluye `strategy/`, `integrations/` y `examples/`, que no son agentes) de [github.com/msitarzewski/agency-agents](https://github.com/msitarzewski/agency-agents) (clonado en `C:\Users\Ivan\agency-agents`), importadas 2026-07-04 vía `X1-Agents-Vault/scripts/import-agency-agents.js`. Las divisiones con equivalente temático directo (finance, marketing+paid-media, sales, support, project-management) se plegaron dentro de los clusters de arriba (sección "agency-agents" al final de cada hub); el resto forma clusters nuevos, propios:
+217 personas (las 16 divisiones reales del catálogo, según `agency-agents/divisions.json` — excluye `strategy/`, `integrations/` y `examples/`, que no son agentes) de [github.com/msitarzewski/agency-agents](https://github.com/msitarzewski/agency-agents) (clonado en `C:\Users\Ivan\agency-agents`), importadas 2026-07-04 vía `vault/scripts/import-agency-agents.js`. Las divisiones con equivalente temático directo (finance, marketing+paid-media, sales, support, project-management) se plegaron dentro de los clusters de arriba (sección "agency-agents" al final de cada hub); el resto forma clusters nuevos, propios:
 
 - [[Agentes-Agency-Academic/00-Academic|Academic]]
 - [[Agentes-Agency-Design/00-Design|Design]]
