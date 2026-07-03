@@ -58,18 +58,19 @@ try {
     'prompts/assembler.js',
     'x1-core/bundle/x1-core.js',
     'x1-bridge.js',
-    // protocol.js/registry.js/continue-bridge.js load here, BEFORE
-    // x1-integration.js/x1-api.js/agents-x1.js: those three unconditionally
-    // reference `window`, which doesn't exist in an MV3 service worker —
-    // they throw and abort the rest of the importScripts() call, so anything
-    // listed after them silently never loads. Not fixed here on purpose:
-    // x1-integration.js monkey-patches aiComplete/execAction/parseCommand and
-    // exposes x1CompareResponses/x1EvaluateResponse/x1RecordVote, which reads
-    // as judge/panel-adjacent — activating it is a behavior decision, not a
-    // mechanical bug fix, so it's left exactly as inert as it already was.
+    // protocol.js/registry.js load here, BEFORE x1-integration.js/x1-api.js/
+    // agents-x1.js: those three unconditionally reference `window`, which
+    // doesn't exist in an MV3 service worker — they throw and abort the rest
+    // of the importScripts() call, so anything listed after them silently
+    // never loads. Not fixed here on purpose: x1-integration.js monkey-patches
+    // aiComplete/execAction/parseCommand and exposes x1CompareResponses/
+    // x1EvaluateResponse/x1RecordVote, which reads as judge/panel-adjacent —
+    // activating it is a behavior decision, not a mechanical bug fix, so it's
+    // left exactly as inert as it already was.
+    // (ai/continue-bridge.js removed 2026-07-03 — redundant provider bridge,
+    // Ivan's decision: only NVIDIA NIM + Gemini.)
     'protocol.js',
     'integrations/registry.js',
-    'ai/continue-bridge.js',
     'x1-integration.js',
     'x1-api.js',
     'agents-x1.js'
@@ -85,7 +86,6 @@ try {
     typeof X1Bridge !== 'undefined' && X1Bridge.loaded ? 'x1-core' : 'FAIL',
     typeof x1DetectSector === 'function' ? 'x1-integration' : 'FAIL',
     typeof X1Integrations !== 'undefined' ? 'integrations-registry' : 'FAIL',
-    typeof X1ContinueBridge !== 'undefined' ? 'continue-bridge' : 'FAIL',
     typeof X1Protocol !== 'undefined' ? 'protocol' : 'FAIL');
 } catch(e) {
   console.error('[X1] Module import failed:', e && e.message);
@@ -220,12 +220,14 @@ function parseCommand(cmd) {
   }
 
   // ── CHANGE AI PROVIDER ──
-  var mUseAI = l.match(/^(?:usa|utiliza|cambia\s*a)\s+(groq|gemini|ollama|cerebras|mistral|openrouter|nvidia|nemotron|deepseek|auto)$/i);
+  var mUseAI = l.match(/^(?:usa|utiliza|cambia\s*a)\s+(gemini|ollama|nvidia|glm|nemotron|gptoss|llama|qwen|auto)$/i);
   if (mUseAI) {
     var prov = mUseAI[1].toLowerCase();
-    if (prov === 'nvidia') prov = 'nvidiaGlm';
+    if (prov === 'nvidia' || prov === 'glm') prov = 'nvidiaGlm';
     else if (prov === 'nemotron') prov = 'nvidiaNemotron';
-    else if (prov === 'deepseek') prov = 'nvidiaDeepseek';
+    else if (prov === 'gptoss') prov = 'nvidiaGptOss';
+    else if (prov === 'llama') prov = 'nvidiaLlama';
+    else if (prov === 'qwen') prov = 'nvidiaQwen';
     chrome.storage.local.set({aiProvider: prov});
     aiKeys.aiProvider = prov;
     return {action:'speak', text:'Ahora uso '+prov+'.'};
@@ -261,6 +263,16 @@ function parseCommand(cmd) {
   // ── PRICE ALERT ──
   var mPrice = l.match(/^(?:alerta de precio|price alert|av[ií]same cuando)\s+(.+?)\s+(?:baje de|costs? less than|under)\s+(\d+(?:[.,]\d+)?)/i);
   if (mPrice) return {action:'addPriceAlert', productName:mPrice[1].trim(), url:'', targetPrice:parseFloat(mPrice[2].replace(',','.'))};
+
+  // ── AI CFO AGENT (self-hosted, Fase 1 vault) ──
+  var mCfoAgent = l.match(/^analiza\s+finanzas\s+con\s+cfo\s+agent\s*:\s*([\s\S]+)$/i);
+  if (mCfoAgent) return {action:'cfoAgentAnalyze', csv: mCfoAgent[1].trim()};
+
+  // ── MCP REGISTRY SEARCH / ADD SERVER ──
+  var mMcpSearch = l.match(/^(?:busca|buscar)\s+servidores?\s+mcp\s+(?:de\s+|para\s+)?(.+)$/i);
+  if (mMcpSearch) return {action:'mcpRegistrySearch', query: mMcpSearch[1].trim()};
+  var mMcpAdd = l.match(/^a[ñn]ade\s+servidor\s+mcp\s+(\S+)\s+(https?:\/\/\S+)$/i);
+  if (mMcpAdd) return {action:'mcpAddServer', name: mMcpAdd[1].trim(), url: mMcpAdd[2].trim()};
 
   // ── AUTOMATION RULE (natural language → parsed via AI) ──
   var mAutomation = l.match(/^(?:automatiza|crea (?:una )?automatizaci[oó]n|nueva regla|programa que)\s*:?\s*(.+)$/i);
@@ -315,7 +327,7 @@ function parseCommand(cmd) {
   // ── CHECK CURRENT AI PROVIDER ──
   if (/^(?:qu[eé]\s+)?(?:ia|ai|inteligencia)\s+(?:usas|tienes|est[aá]s\s+usando)$/i.test(l)) {
     var provName = aiKeys.aiProvider || 'auto';
-    return {action:'speak', text:'Actualmente uso ' + provName + '. Puedes cambiarme con: usa groq/gemini/ollama/cerebras/mistral/openrouter/nvidia.'};
+    return {action:'speak', text:'Actualmente uso ' + provName + '. Puedes cambiarme con: usa glm/nemotron/gptoss/llama/qwen/gemini/ollama.'};
   }
 
   // ── GOOGLE AUTH ──
@@ -1343,7 +1355,7 @@ function loadAIKeys() {
       'cerebrasKey','sambanovaKey','mistralKey','deepseekKey','togetherKey',
       'cloudflareAccountId','cloudflareKey','tavilyKey','elevenlabsKey',
       'openaiKey','finnhubKey','alphaVantageKey','firecrawlKey',
-      'pipedriveKey','hubspotKey','invoiceGeneratorKey','n8nWebhookUrl','libretranslateUrl',
+      'pipedriveKey','hubspotKey','invoiceGeneratorKey','n8nWebhookUrl','libretranslateUrl','cfoAgentUrl',
       'proxySecret',
       'aiProvider'
     ], function(r) {
@@ -1372,7 +1384,7 @@ function loadGoogleUser() {
 loadGoogleUser();
 
 chrome.storage.onChanged.addListener(function(changes) {
-  if (changes.groqKey || changes.opencodeKey || changes.nvidiaKey || changes.geminiKey || changes.openrouterKey || changes.cerebrasKey || changes.sambanovaKey || changes.mistralKey || changes.deepseekKey || changes.togetherKey || changes.cloudflareAccountId || changes.cloudflareKey || changes.tavilyKey || changes.openaiKey || changes.finnhubKey || changes.alphaVantageKey || changes.firecrawlKey || changes.pipedriveKey || changes.hubspotKey || changes.invoiceGeneratorKey || changes.n8nWebhookUrl || changes.libretranslateUrl || changes.proxySecret || changes.aiProvider) loadAIKeys();
+  if (changes.groqKey || changes.opencodeKey || changes.nvidiaKey || changes.geminiKey || changes.openrouterKey || changes.cerebrasKey || changes.sambanovaKey || changes.mistralKey || changes.deepseekKey || changes.togetherKey || changes.cloudflareAccountId || changes.cloudflareKey || changes.tavilyKey || changes.openaiKey || changes.finnhubKey || changes.alphaVantageKey || changes.firecrawlKey || changes.pipedriveKey || changes.hubspotKey || changes.invoiceGeneratorKey || changes.n8nWebhookUrl || changes.libretranslateUrl || changes.cfoAgentUrl || changes.proxySecret || changes.aiProvider) loadAIKeys();
   if (changes.google_user) loadGoogleUser();
 });
 
@@ -1734,28 +1746,6 @@ function isValidContent(txt) {
 }
 
 // ── Groq (free, ultra-fast ~0.3s) ──
-function groqComplete(userMsg) {
-  var key = aiKeys.groqKey;
-  if (!key) return Promise.resolve(null);
-  var clean = stripImages(buildSystemPrompt(null,userMsg));
-  var usr = stripImages(userMsg);
-  return fetch('https://api.groq.com/openai/v1/chat/completions', {
-    method:'POST',
-    headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},
-    body:JSON.stringify({
-      model:'llama-3.3-70b-versatile',
-      messages:[{role:'system',content:clean},{role:'user',content:usr}],
-      temperature:0.1, max_tokens:2000
-    }),
-    signal:AbortSignal.timeout(15000)
-  }).then(function(r){return r.json();}).then(function(data){
-    if(data.error) { console.error('[X1] Groq error:', data.error); return null; }
-    var txt = (data.choices&&data.choices[0]&&data.choices[0].message&&data.choices[0].message.content||'').trim();
-    if(!isValidContent(txt)) return null;
-    return txt;
-  }).catch(function(e){ console.error('[X1] Groq fail:', e.message); return null; });
-}
-
 // ── X1 Proxy (Cloudflare Worker — primary when deployed) ──
 var proxyLastFail = 0;
   function proxyComplete(userMsg) {
@@ -1844,9 +1834,13 @@ function nvidiaCompleteWithModel(userMsg, model) {
     return txt;
   }).catch(function(e){ console.error('[X1] NVIDIA (' + model + ') fail:', e.message); return null; });
 }
-function nvidiaGlmComplete(userMsg) { return nvidiaCompleteWithModel(userMsg, 'z-ai/glm-5.1'); }
-function nvidiaNemotronComplete(userMsg) { return nvidiaCompleteWithModel(userMsg, 'nvidia/nemotron-3-ultra-550b-a55b'); }
-function nvidiaDeepseekComplete(userMsg) { return nvidiaCompleteWithModel(userMsg, 'deepseek-ai/deepseek-v4-pro'); }
+// 6 familias de modelo distintas en total (5 vía NIM + Gemini aparte), estructura
+// tipo Claude (rapido/equilibrado/potente) pedida por Ivan 2026-07-03:
+function nvidiaGlmComplete(userMsg) { return nvidiaCompleteWithModel(userMsg, 'z-ai/glm-5.1'); } // rapido/conversacional
+function nvidiaNemotronComplete(userMsg) { return nvidiaCompleteWithModel(userMsg, 'nvidia/nemotron-3-ultra-550b-a55b'); } // agentic/flujos largos
+function nvidiaGptOssComplete(userMsg) { return nvidiaCompleteWithModel(userMsg, 'openai/gpt-oss-120b'); } // razonamiento/tool-use
+function nvidiaLlamaComplete(userMsg) { return nvidiaCompleteWithModel(userMsg, 'meta/llama-4-maverick-17b-128e-instruct'); } // multimodal nativo
+function nvidiaQwenComplete(userMsg) { return nvidiaCompleteWithModel(userMsg, 'qwen/qwen3-coder-480b-a35b-instruct'); } // codigo/agentic coding
 
 // ── Gemini Flash (Google AI Studio — 1M+ tokens context, multimodal) ──
 var geminiLastFail = 0;
@@ -1933,118 +1927,6 @@ function geminiVision(base64Image, prompt) {
     }
     return txt.trim() || null;
   }).catch(function(e) { console.error('[X1] Gemini Vision fail:', e.message); return null; });
-}
-
-// ── OpenRouter (29+ free models, single API key gateway) ──
-var openrouterLastFail = 0;
-function openrouterComplete(userMsg, options) {
-  var key = aiKeys.openrouterKey;
-  if (!key) return Promise.resolve(null);
-  if (Date.now() - openrouterLastFail < 30000) return Promise.resolve(null);
-  var model = (options && options.model) || 'meta-llama/llama-4-scout:free';
-  var sys = stripImages(buildSystemPrompt(null, userMsg));
-  var usr = stripImages(userMsg);
-  return fetch('https://openrouter.ai/api/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer ' + key,
-      'HTTP-Referer': 'chrome-extension://x1-ai-agent',
-      'X-Title': 'X1 AI Agent'
-    },
-    body: JSON.stringify({
-      model: model,
-      messages: [{role: 'system', content: sys}, {role: 'user', content: usr}],
-      temperature: (options && options.temperature != null) ? options.temperature : 0.1,
-      max_tokens: (options && options.maxTokens) || 2000
-    }),
-    signal: AbortSignal.timeout(20000)
-  }).then(function(r) { return r.json(); }).then(function(data) {
-    if (data.error) {
-      console.error('[X1] OpenRouter error:', data.error);
-      if (data.error.code === 429) openrouterLastFail = Date.now();
-      return null;
-    }
-    var txt = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content || '').trim();
-    if (!isValidContent(txt)) return null;
-    console.log('[X1] OpenRouter OK (' + model + ')');
-    return txt;
-  }).catch(function(e) {
-    console.error('[X1] OpenRouter fail:', e.message);
-    openrouterLastFail = Date.now();
-    return null;
-  });
-}
-
-// ── Cerebras (Wafer Scale Engine — ultra-fast inference, Groq alternative) ──
-var cerebrasLastFail = 0;
-function cerebrasComplete(userMsg) {
-  var key = aiKeys.cerebrasKey;
-  if (!key) return Promise.resolve(null);
-  if (Date.now() - cerebrasLastFail < 30000) return Promise.resolve(null);
-  var sys = stripImages(buildSystemPrompt(null, userMsg));
-  var usr = stripImages(userMsg);
-  return fetch('https://api.cerebras.ai/v1/chat/completions', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key},
-    body: JSON.stringify({
-      model: 'llama-3.3-70b',
-      messages: [{role: 'system', content: sys}, {role: 'user', content: usr}],
-      temperature: 0.1,
-      max_tokens: 2000
-    }),
-    signal: AbortSignal.timeout(15000)
-  }).then(function(r) { return r.json(); }).then(function(data) {
-    if (data.error) {
-      console.error('[X1] Cerebras error:', data.error);
-      if (data.error.code === 429) cerebrasLastFail = Date.now();
-      return null;
-    }
-    var txt = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content || '').trim();
-    if (!isValidContent(txt)) return null;
-    console.log('[X1] Cerebras OK');
-    return txt;
-  }).catch(function(e) {
-    console.error('[X1] Cerebras fail:', e.message);
-    cerebrasLastFail = Date.now();
-    return null;
-  });
-}
-
-// ── Mistral (European privacy, strong at code + structured output) ──
-var mistralLastFail = 0;
-function mistralComplete(userMsg, options) {
-  var key = aiKeys.mistralKey;
-  if (!key) return Promise.resolve(null);
-  if (Date.now() - mistralLastFail < 30000) return Promise.resolve(null);
-  var model = (options && options.model) || 'mistral-small-latest';
-  var sys = stripImages(buildSystemPrompt(null, userMsg));
-  var usr = stripImages(userMsg);
-  return fetch('https://api.mistral.ai/v1/chat/completions', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key},
-    body: JSON.stringify({
-      model: model,
-      messages: [{role: 'system', content: sys}, {role: 'user', content: usr}],
-      temperature: (options && options.temperature != null) ? options.temperature : 0.1,
-      max_tokens: (options && options.maxTokens) || 2000
-    }),
-    signal: AbortSignal.timeout(15000)
-  }).then(function(r) { return r.json(); }).then(function(data) {
-    if (data.error) {
-      console.error('[X1] Mistral error:', data.error);
-      if (data.error.code === 429) mistralLastFail = Date.now();
-      return null;
-    }
-    var txt = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content || '').trim();
-    if (!isValidContent(txt)) return null;
-    console.log('[X1] Mistral OK (' + model + ')');
-    return txt;
-  }).catch(function(e) {
-    console.error('[X1] Mistral fail:', e.message);
-    mistralLastFail = Date.now();
-    return null;
-  });
 }
 
 // ═══════════════════════════════════════════
@@ -2195,30 +2077,31 @@ function recordProviderOK(provider) {
 }
 
 // ── Routing Decision Matrix ──
+// 6 familias de modelo en total: 5 vía NVIDIA NIM (una sola clave) + Gemini aparte
+// (Google AI Studio, no está en NIM). Ollama solo para 'sensitive' (modo privado,
+// sin llamada externa — decisión explícita de Ivan, no es un "respaldo" más).
 var ROUTE_MATRIX = {
-  conversational: ['groq','cerebras','gemini','nvidiaGlm','openrouter','proxy','ollama'],
-  reasoning:      ['groq','nvidiaGlm','nvidiaNemotron','nvidiaDeepseek','gemini','openrouter','proxy','ollama'],
-  long_context:   ['gemini','groq','openrouter','proxy','ollama'],
-  multimodal:     ['gemini','openrouter','proxy'],
-  code:           ['groq','mistral','nvidiaDeepseek','openrouter','proxy','ollama'],
-  creative:       ['groq','gemini','openrouter','proxy','ollama'],
-  agentic:        ['groq','gemini','nvidiaGlm','openrouter','proxy','ollama'],
-  sensitive:      ['mistral','proxy','ollama'],
-  translation:    ['gemini','groq','openrouter','proxy','ollama']
+  conversational: ['nvidiaGlm','gemini','proxy'],
+  reasoning:      ['nvidiaGptOss','nvidiaNemotron','gemini','proxy'],
+  long_context:   ['gemini','nvidiaNemotron','proxy'],
+  multimodal:     ['gemini','nvidiaLlama','proxy'],
+  code:           ['nvidiaQwen','nvidiaGptOss','proxy'],
+  creative:       ['nvidiaGlm','gemini','proxy'],
+  agentic:        ['nvidiaNemotron','nvidiaGptOss','gemini','proxy'],
+  sensitive:      ['ollama'],
+  translation:    ['gemini','nvidiaGlm','proxy']
 };
 
 function getRoutedChain(taskType) {
   var route = ROUTE_MATRIX[taskType] || ROUTE_MATRIX.conversational;
   var providerMap = {
-    groq:            {name:'groq', fn:groqComplete, has:!!aiKeys.groqKey, fast:true},
     nvidiaGlm:       {name:'nvidiaGlm', fn:nvidiaGlmComplete, has:!!aiKeys.nvidiaKey, fast:true},
     nvidiaNemotron:  {name:'nvidiaNemotron', fn:nvidiaNemotronComplete, has:!!aiKeys.nvidiaKey, fast:true},
-    nvidiaDeepseek:  {name:'nvidiaDeepseek', fn:nvidiaDeepseekComplete, has:!!aiKeys.nvidiaKey, fast:false},
+    nvidiaGptOss:    {name:'nvidiaGptOss', fn:nvidiaGptOssComplete, has:!!aiKeys.nvidiaKey, fast:false},
+    nvidiaLlama:     {name:'nvidiaLlama', fn:nvidiaLlamaComplete, has:!!aiKeys.nvidiaKey, fast:true},
+    nvidiaQwen:      {name:'nvidiaQwen', fn:nvidiaQwenComplete, has:!!aiKeys.nvidiaKey, fast:false},
     ollama:          {name:'ollama', fn:ollamaComplete, has:true, fast:false},
     gemini:          {name:'gemini', fn:geminiComplete, has:!!aiKeys.geminiKey, fast:true},
-    openrouter:      {name:'openrouter', fn:openrouterComplete, has:!!aiKeys.openrouterKey, fast:false},
-    cerebras:        {name:'cerebras', fn:cerebrasComplete, has:!!aiKeys.cerebrasKey, fast:true},
-    mistral:         {name:'mistral', fn:mistralComplete, has:!!aiKeys.mistralKey, fast:true},
     proxy:           {name:'proxy', fn:proxyComplete, has:true, fast:true}
   };
 
@@ -2233,11 +2116,15 @@ function getRoutedChain(taskType) {
   var usedNames = {};
   for (var j = 0; j < chain.length; j++) usedNames[chain[j].name] = true;
 
-  var allProviders = Object.keys(providerMap);
-  for (var k = 0; k < allProviders.length; k++) {
-    var prov = providerMap[allProviders[k]];
-    if (prov.has && !usedNames[prov.name] && !isRateLimited(prov.name) && !isCircuitOpen(prov.name)) {
-      chain.push(prov);
+  // Sensitive route deliberately does NOT fall through to other providers —
+  // adding remaining-providers here would leak a "private" query externally.
+  if (taskType !== TASK_TYPES.SENSITIVE) {
+    var allProviders = Object.keys(providerMap);
+    for (var k = 0; k < allProviders.length; k++) {
+      var prov = providerMap[allProviders[k]];
+      if (prov.has && !usedNames[prov.name] && !isRateLimited(prov.name) && !isCircuitOpen(prov.name)) {
+        chain.push(prov);
+      }
     }
   }
 
@@ -2246,7 +2133,7 @@ function getRoutedChain(taskType) {
 
 // ── Provider health summary ──
 function getProviderHealthSummary() {
-  var providers = ['groq','nvidiaGlm','nvidiaNemotron','nvidiaDeepseek','ollama','gemini','openrouter','cerebras','mistral','proxy'];
+  var providers = ['nvidiaGlm','nvidiaNemotron','nvidiaGptOss','nvidiaLlama','nvidiaQwen','ollama','gemini','proxy'];
   var summary = [];
   for (var i = 0; i < providers.length; i++) {
     var name = providers[i];
@@ -2261,6 +2148,46 @@ function getProviderHealthSummary() {
 }
 
 // ── Tavily Web Search (AI-optimized search results) ──
+// ── AI CFO Agent (self-hosted, MIT, github.com/daniel-st3/ai-cfo-agent) ──
+// Candidato Fase 1 del vault de agentes (Agentes-Finanzas/AI-CFO-Agent.md).
+// Ivan despliega esto el mismo (pip install + uvicorn, ver la nota del vault
+// para el comando exacto) — X1 solo llama a la URL que el ya tenga corriendo.
+function cfoAgentAnalyze(csvText) {
+  var base = aiKeys.cfoAgentUrl;
+  if (!base) return Promise.resolve(null);
+  var blob = new Blob([csvText], {type: 'text/csv'});
+  var form = new FormData();
+  form.append('file', blob, 'transactions.csv');
+  return fetch(base.replace(/\/$/, '') + '/analyze', {
+    method: 'POST', body: form, signal: AbortSignal.timeout(30000)
+  }).then(function(r) { return r.json(); })
+    .catch(function(e) { console.error('[X1] AI CFO Agent fail:', e.message); return null; });
+}
+
+// ── MCP Registry Search (descubrimiento de agentes/servidores publicos) ──
+// API publica de solo lectura, sin clave — solo GET, no ejecuta nada de
+// terceros. Complementa a X1MCPClient: esto ENCUENTRA servidores, addServer()
+// los REGISTRA una vez el usuario decide cual quiere usar.
+function mcpRegistrySearch(query, limit) {
+  var url = 'https://registry.modelcontextprotocol.io/v0/servers?search=' + encodeURIComponent(query) + '&limit=' + (limit || 5);
+  return fetch(url, {signal: AbortSignal.timeout(10000)})
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var servers = (data && data.servers) || [];
+      return servers.map(function(entry) {
+        var s = entry.server || {};
+        var remote = (s.remotes && s.remotes[0]) || null;
+        return {
+          name: s.name || '',
+          description: s.description || '',
+          version: s.version || '',
+          remoteUrl: remote ? remote.url : null,
+          repository: s.repository ? s.repository.url : null
+        };
+      });
+    }).catch(function(e) { console.error('[X1] MCP registry search fail:', e.message); return null; });
+}
+
 function tavilySearch(query, options) {
   var key = aiKeys.tavilyKey;
   if (!key) return Promise.resolve(null);
@@ -2377,7 +2304,7 @@ function translateText(text, targetLang, sourceLang) {
     '. Only return the translation, nothing else:\n\n' + text;
   return geminiComplete(prompt, {model: 'gemini-2.0-flash', temperature: 0.1}).then(function(result) {
     if (result) return result;
-    return groqComplete(prompt).then(function(r2) {
+    return nvidiaGlmComplete(prompt).then(function(r2) {
       if (r2) return r2;
       return libretranslateComplete(text, targetLang, sourceLang);
     });
@@ -3011,19 +2938,17 @@ function detectWritingStyle(msg) {
 // ── Group Chat (multi-model comparison) ──
 function groupChat(userMsg, models) {
   if (!models || models.length === 0) {
-    models = ['groq', 'gemini', 'ollama'];
+    models = ['nvidiaGlm', 'gemini', 'ollama'];
   }
 
   var providerFns = {
-    groq: groqComplete,
     gemini: geminiComplete,
     ollama: ollamaComplete,
     nvidiaGlm: nvidiaGlmComplete,
     nvidiaNemotron: nvidiaNemotronComplete,
-    nvidiaDeepseek: nvidiaDeepseekComplete,
-    openrouter: openrouterComplete,
-    cerebras: cerebrasComplete,
-    mistral: mistralComplete
+    nvidiaGptOss: nvidiaGptOssComplete,
+    nvidiaLlama: nvidiaLlamaComplete,
+    nvidiaQwen: nvidiaQwenComplete
   };
 
   var promises = models.map(function(model) {
@@ -3101,25 +3026,27 @@ var RUBRICS = {
 
 // Judges candidatos por tipo de tarea. pickJudgeProvider() descarta cualquiera
 // que ya haya respondido como candidato en esa misma llamada (decisión #5).
+// Cada lista evita los candidatos habituales de ese sector en ROUTE_MATRIX,
+// para que pickJudgeProvider() casi nunca tenga que descartar por solape.
 var JUDGE_ROTATION = {
-  conversational: ['mistral', 'openrouter', 'nvidiaNemotron'],
-  reasoning: ['nvidiaNemotron', 'nvidiaDeepseek', 'mistral', 'openrouter'],
-  long_context: ['nvidiaNemotron', 'mistral'],
-  code: ['nvidiaDeepseek', 'openrouter'],
-  agentic: ['mistral', 'openrouter', 'nvidiaNemotron'],
-  multimodal: ['nvidiaNemotron', 'mistral'],
-  translation: ['nvidiaNemotron', 'mistral']
+  conversational: ['nvidiaNemotron', 'nvidiaGptOss'],
+  reasoning: ['nvidiaGlm', 'nvidiaQwen'],
+  long_context: ['nvidiaGlm', 'nvidiaGptOss'],
+  code: ['nvidiaNemotron', 'gemini'],
+  agentic: ['nvidiaGlm', 'nvidiaQwen'],
+  multimodal: ['nvidiaNemotron', 'nvidiaGptOss'],
+  translation: ['nvidiaNemotron', 'nvidiaQwen']
 };
 
 var JUDGE_PROVIDER_FN = {
-  groq: groqComplete, nvidiaGlm: nvidiaGlmComplete, nvidiaNemotron: nvidiaNemotronComplete,
-  nvidiaDeepseek: nvidiaDeepseekComplete, gemini: geminiComplete,
-  cerebras: cerebrasComplete, mistral: mistralComplete, openrouter: openrouterComplete
+  nvidiaGlm: nvidiaGlmComplete, nvidiaNemotron: nvidiaNemotronComplete,
+  nvidiaGptOss: nvidiaGptOssComplete, nvidiaLlama: nvidiaLlamaComplete,
+  nvidiaQwen: nvidiaQwenComplete, gemini: geminiComplete
 };
 
 var JUDGE_KEY_FIELD = {
-  groq: 'groqKey', nvidiaGlm: 'nvidiaKey', nvidiaNemotron: 'nvidiaKey', nvidiaDeepseek: 'nvidiaKey',
-  gemini: 'geminiKey', cerebras: 'cerebrasKey', mistral: 'mistralKey', openrouter: 'openrouterKey'
+  nvidiaGlm: 'nvidiaKey', nvidiaNemotron: 'nvidiaKey', nvidiaGptOss: 'nvidiaKey',
+  nvidiaLlama: 'nvidiaKey', nvidiaQwen: 'nvidiaKey', gemini: 'geminiKey'
 };
 
 function isHighRiskTask(userMsg, taskType) {
@@ -3286,14 +3213,12 @@ function aiComplete(userMsg, opts) {
 
   function getAllProviders() {
     return [
-      {name:'groq', fn:groqComplete, has:!!aiKeys.groqKey, fast:true},
       {name:'nvidiaGlm', fn:nvidiaGlmComplete, has:!!aiKeys.nvidiaKey, fast:true},
       {name:'nvidiaNemotron', fn:nvidiaNemotronComplete, has:!!aiKeys.nvidiaKey, fast:true},
-      {name:'nvidiaDeepseek', fn:nvidiaDeepseekComplete, has:!!aiKeys.nvidiaKey, fast:false},
+      {name:'nvidiaGptOss', fn:nvidiaGptOssComplete, has:!!aiKeys.nvidiaKey, fast:false},
+      {name:'nvidiaLlama', fn:nvidiaLlamaComplete, has:!!aiKeys.nvidiaKey, fast:true},
+      {name:'nvidiaQwen', fn:nvidiaQwenComplete, has:!!aiKeys.nvidiaKey, fast:false},
       {name:'gemini', fn:geminiComplete, has:!!aiKeys.geminiKey, fast:true},
-      {name:'cerebras', fn:cerebrasComplete, has:!!aiKeys.cerebrasKey, fast:true},
-      {name:'mistral', fn:mistralComplete, has:!!aiKeys.mistralKey, fast:true},
-      {name:'openrouter', fn:openrouterComplete, has:!!aiKeys.openrouterKey, fast:false},
       {name:'proxy', fn:proxyComplete, has:true, fast:true},
       {name:'ollama', fn:ollamaComplete, has:true, fast:false}
     ];
@@ -3312,7 +3237,7 @@ function aiComplete(userMsg, opts) {
   }
 
   function ensureKeysLoaded() {
-    if (aiKeys && aiKeys.groqKey) return Promise.resolve(aiKeys);
+    if (aiKeys && aiKeys.nvidiaKey) return Promise.resolve(aiKeys);
     return loadAIKeys();
   }
 
@@ -4850,6 +4775,45 @@ function execAction(act, tabId) {
         }).catch(function(e) { stepError(tabId, mcIdx); resolve({text: 'Error MCP: ' + e.message, showText: true}); });
         break;
 
+      case 'cfoAgentAnalyze':
+        var cfoIdx = stepProgress(tabId, 'CFO Agent', 'Analizando finanzas...');
+        if (!aiKeys.cfoAgentUrl) { stepError(tabId, cfoIdx); resolve({text: 'Configura la URL de tu AI CFO Agent en Settings primero.', showText: true}); break; }
+        cfoAgentAnalyze(act.csv || '').then(function(result) {
+          stepDone(tabId, cfoIdx);
+          if (!result) { resolve({text: 'No se pudo contactar con el AI CFO Agent — comprueba que este corriendo.', showText: true}); return; }
+          resolve({text: typeof result === 'string' ? result : JSON.stringify(result, null, 2), showText: true});
+        }).catch(function(e) {
+          stepError(tabId, cfoIdx);
+          resolve({text: 'Error en AI CFO Agent: ' + e.message, showText: true});
+        });
+        break;
+
+      case 'mcpRegistrySearch':
+        var mrsIdx = stepProgress(tabId, 'MCP', 'Buscando servidores MCP: ' + (act.query || ''));
+        mcpRegistrySearch(act.query || '', 5).then(function(results) {
+          stepDone(tabId, mrsIdx);
+          if (!results || results.length === 0) { resolve({text: 'No se encontraron servidores MCP para "' + act.query + '".', showText: true}); return; }
+          var rText = 'Servidores MCP encontrados:\n';
+          results.forEach(function(s, i) {
+            rText += (i+1) + '. ' + s.name + ' — ' + s.description + (s.remoteUrl ? ' (remoto: ' + s.remoteUrl + ')' : ' (repo: ' + (s.repository || 'sin url') + ')') + '\n';
+          });
+          rText += '\nPara añadir uno: "añade servidor mcp <nombre> <url>"';
+          resolve({text: rText, showText: true});
+        }).catch(function(e) {
+          stepError(tabId, mrsIdx);
+          resolve({text: 'Error buscando en el registro MCP: ' + e.message, showText: true});
+        });
+        break;
+
+      case 'mcpAddServer':
+        if (typeof X1MCPClient === 'undefined') { resolve({text: 'Cliente MCP no disponible.', showText: true}); break; }
+        X1MCPClient.addServer({name: act.name || '', url: act.url || '', transport: act.transport || 'http'}).then(function() {
+          resolve({text: 'Servidor MCP "' + act.name + '" añadido.', showText: true});
+        }).catch(function(e) {
+          resolve({text: 'Error añadiendo servidor MCP: ' + e.message, showText: true});
+        });
+        break;
+
       case 'mcpListServers':
         if (typeof X1MCPClient === 'undefined') { resolve({text: 'Cliente MCP no disponible.', showText: true}); break; }
         X1MCPClient.getServers().then(function(servers) {
@@ -5374,7 +5338,7 @@ function runAgentLoop(tabId, goal, url, resolve) {
             ]}),signal:AbortSignal.timeout(15000)}).then(function(r){return r.json();}).then(function(d){var t=(d.choices&&d.choices[0]&&d.choices[0].message&&d.choices[0].message.content||'').trim();if(!isValidContent(t)) throw new Error('bad');return t;});
           }
           var fallbacks = [];
-          if(aiKeys.groqKey) fallbacks.push(function(){return callOpenAICompat('https://api.groq.com/openai/v1/chat/completions',aiKeys.groqKey,'llama-3.3-70b-versatile');});
+          if(aiKeys.nvidiaKey) fallbacks.push(function(){return callOpenAICompat('https://integrate.api.nvidia.com/v1/chat/completions',aiKeys.nvidiaKey,'z-ai/glm-5.1');});
           function tryFallback(i) { if(i>=fallbacks.length) return Promise.resolve(null); return fallbacks[i]().catch(function(){return tryFallback(i+1);}); }
           return tryProxy().catch(function(){return tryFallback(0);});
         }
@@ -5533,11 +5497,11 @@ function handleVoice(cmd, wantsText, sendResponse) {
     }
   }
 
-  var hasAnyKey = !!(aiKeys.groqKey || aiKeys.nvidiaKey || aiKeys.geminiKey || aiKeys.openrouterKey || aiKeys.cerebrasKey || aiKeys.mistralKey);
+  var hasAnyKey = !!(aiKeys.nvidiaKey || aiKeys.geminiKey);
   var hasProxy = !!PROXY_URL;
   var hasOllama = ollamaModels && ollamaModels.length > 0;
   if (!hasAnyKey && !hasProxy && !hasOllama) {
-    respond({text: 'Configura tu API key en Settings (icono de engranaje) para poder responder. Groq es gratuita: groq.com', showText: true});
+    respond({text: 'Configura tu clave de NVIDIA NIM o Gemini en Settings (icono de engranaje) para poder responder. NVIDIA NIM tiene tier gratuito: build.nvidia.com', showText: true});
     return;
   }
 

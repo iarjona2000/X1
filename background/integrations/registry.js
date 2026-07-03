@@ -144,18 +144,9 @@
   self.X1Integrations = IntegrationsRegistry;
 
   // Configuración por defecto de integraciones conocidas
-  IntegrationsRegistry.register({
-    name: 'continue',
-    version: '0.0.0',
-    license: 'Apache-2.0',
-    path: 'background/integrations/continue/',
-    description: 'Motor LLM multi-provider (Continue.dev core)',
-    healthCheck: function(cfg) {
-      return Promise.resolve({ok: true, message: 'Continue core loaded'});
-    },
-    dependencies: []
-  });
-
+  // ('continue' — bridge de Continue.dev — eliminado 2026-07-03, decision de
+  // Ivan: solo NVIDIA NIM + Gemini. 'kilo' se deja tal cual aunque referenciaba
+  // 'continue' como dependencia; no se hizo cumplir en tiempo de ejecucion.)
   IntegrationsRegistry.register({
     name: 'kilo',
     version: '0.0.0',
@@ -165,7 +156,7 @@
     healthCheck: function(cfg) {
       return Promise.resolve({ok: true, message: 'Kilo agent loaded'});
     },
-    dependencies: ['continue']
+    dependencies: []
   });
 
   IntegrationsRegistry.register({

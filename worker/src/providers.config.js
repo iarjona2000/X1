@@ -86,8 +86,8 @@ export const PROVIDERS = [
     tier: 'fast',
     cost: 1,
     authStyle: 'bearer',
-    active: false,
-    notes: 'Google Gemini 2.0 Flash via OpenAI-compat endpoint. Desactivado temporalmente.'
+    active: true,
+    notes: 'Segundo proveedor confirmado (2026-07-03, decision de Ivan: solo NVIDIA NIM + Gemini). Requiere GEMINI_KEY como wrangler secret para activarse de verdad — la entrada estaba desactivada, el codigo esta listo pero falta el secreto.'
   },
   {
     name: 'mistral',
@@ -171,19 +171,43 @@ export const PROVIDERS = [
     cost: 0,
     authStyle: 'bearer',
     active: true,
-    notes: 'Misma clave que nvidia-glm (NVIDIA_KEY). Fallback si el modelo GLM 5.1 falla o se retira del catálogo NIM.'
+    notes: 'Misma clave que nvidia-glm (NVIDIA_KEY). Fallback si el modelo GLM 5.1 falla o se retira del catálogo NIM. Los 5 modelos NVIDIA comparten cuota/infraestructura — no son independientes entre sí ante una caída de NVIDIA o revocación de clave.'
   },
   {
-    name: 'nvidia-deepseek',
-    label: 'NVIDIA NIM — DeepSeek V4 Pro',
+    name: 'nvidia-gptoss',
+    label: 'NVIDIA NIM — gpt-oss 120B',
     envKey: 'NVIDIA_KEY',
     url: 'https://integrate.api.nvidia.com/v1/chat/completions',
-    model: 'deepseek-ai/deepseek-v4-pro',
+    model: 'openai/gpt-oss-120b',
     tier: 'slow',
     cost: 0,
     authStyle: 'bearer',
     active: true,
-    notes: 'Misma clave que nvidia-glm (NVIDIA_KEY). Tercer fallback — los 3 comparten cuota/infraestructura NVIDIA, no son independientes entre sí ante una caída de NVIDIA o revocación de clave.'
+    notes: 'Misma clave que nvidia-glm (NVIDIA_KEY). Razonamiento/tool-use — reemplaza a nvidia-deepseek (2026-07-03, decision de Ivan: 6 familias de modelo max, gpt-oss/llama/qwen en vez de deepseek directo).'
+  },
+  {
+    name: 'nvidia-llama',
+    label: 'NVIDIA NIM — Llama 4 Maverick',
+    envKey: 'NVIDIA_KEY',
+    url: 'https://integrate.api.nvidia.com/v1/chat/completions',
+    model: 'meta/llama-4-maverick-17b-128e-instruct',
+    tier: 'fast',
+    cost: 0,
+    authStyle: 'bearer',
+    active: true,
+    notes: 'Misma clave que nvidia-glm (NVIDIA_KEY). Multimodal nativo — modelo mas usado del catalogo NIM.'
+  },
+  {
+    name: 'nvidia-qwen',
+    label: 'NVIDIA NIM — Qwen3 Coder 480B',
+    envKey: 'NVIDIA_KEY',
+    url: 'https://integrate.api.nvidia.com/v1/chat/completions',
+    model: 'qwen/qwen3-coder-480b-a35b-instruct',
+    tier: 'slow',
+    cost: 0,
+    authStyle: 'bearer',
+    active: true,
+    notes: 'Misma clave que nvidia-glm (NVIDIA_KEY). Especializado en agentic coding.'
   },
   {
     name: 'cloudflare',

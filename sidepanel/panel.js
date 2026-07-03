@@ -419,15 +419,14 @@
           '<div class="setting-row">' +
             '<span class="setting-label">Provider</span>' +
             '<select class="setting-select" id="setting-provider">' +
-              '<option value="auto">Auto (recommended)</option>' +
-              '<option value="groq">Groq</option>' +
-              '<option value="nvidia">NVIDIA</option>' +
+              '<option value="auto">Auto (recomendado)</option>' +
+              '<option value="nvidiaGlm">NVIDIA NIM — GLM 5.1 (rapido)</option>' +
+              '<option value="nvidiaNemotron">NVIDIA NIM — Nemotron 3 Ultra (agentic)</option>' +
+              '<option value="nvidiaGptOss">NVIDIA NIM — gpt-oss 120B (razonamiento)</option>' +
+              '<option value="nvidiaLlama">NVIDIA NIM — Llama 4 Maverick (multimodal)</option>' +
+              '<option value="nvidiaQwen">NVIDIA NIM — Qwen3 Coder (codigo)</option>' +
               '<option value="gemini">Gemini</option>' +
-              '<option value="openrouter">OpenRouter</option>' +
-              '<option value="cerebras">Cerebras</option>' +
-              '<option value="mistral">Mistral</option>' +
-              '<option value="deepseek">DeepSeek</option>' +
-              '<option value="ollama">Ollama (local)</option>' +
+              '<option value="ollama">Ollama (local, privado)</option>' +
             '</select>' +
           '</div>' +
         '</div>' +
@@ -471,6 +470,13 @@
           '<div class="setting-row">' +
             '<span class="setting-label">Invoice-Generator</span>' +
             '<input class="setting-input" type="password" data-key="invoiceGeneratorKey" placeholder="opcional">' +
+          '</div>' +
+        '</div>' +
+        '<div class="settings-section">' +
+          '<h3>Agentes externos (vault, Fase 1)</h3>' +
+          '<div class="setting-row">' +
+            '<span class="setting-label">AI CFO Agent — URL</span>' +
+            '<input class="setting-input" type="text" data-key="cfoAgentUrl" placeholder="http://localhost:8000 (tu propio servidor)">' +
           '</div>' +
         '</div>' +
         '<div class="settings-section">' +
@@ -522,7 +528,7 @@
 
     document.getElementById('app').appendChild(overlay);
 
-    chrome.storage.local.get(['aiProvider', 'groqKey', 'geminiKey', 'openrouterKey', 'nvidiaKey', 'firecrawlKey', 'pipedriveKey', 'hubspotKey', 'finnhubKey', 'invoiceGeneratorKey', 'cloudflareAccountId', 'cloudflareKey', 'openaiKey', 'n8nWebhookUrl', 'libretranslateUrl', 'proxySecret'], function(r) {
+    chrome.storage.local.get(['aiProvider', 'groqKey', 'geminiKey', 'openrouterKey', 'nvidiaKey', 'firecrawlKey', 'pipedriveKey', 'hubspotKey', 'finnhubKey', 'invoiceGeneratorKey', 'cloudflareAccountId', 'cloudflareKey', 'openaiKey', 'n8nWebhookUrl', 'libretranslateUrl', 'cfoAgentUrl', 'proxySecret'], function(r) {
       if (r.aiProvider) {
         var sel = overlay.querySelector('#setting-provider');
         if (sel) sel.value = r.aiProvider;
