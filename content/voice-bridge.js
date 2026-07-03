@@ -11,6 +11,17 @@
     console.error.apply(console, args);
   };
 
+  // ─── Protocol bridge (X1Protocol cargado como content script antes de este) ───
+  // Si X1Protocol está disponible, traduce los tipos legacy X1_* a los nuevos.
+  // Si no lo está, devuelve el tipo legacy tal cual (compat).
+  function legacyAlias(type) {
+    if (typeof X1Protocol !== 'undefined' && typeof X1Protocol.resolveLegacyType === 'function') {
+      var mapped = X1Protocol.resolveLegacyType(type);
+      return mapped || type;
+    }
+    return type;
+  }
+
   // ─── Pending API requests ───
   var pendingRequests = {};
   var REQUEST_TIMEOUT = 35000;
@@ -121,7 +132,7 @@
   function sendVoice(cmd, raw, wantsText, attempt) {
     attempt = attempt || 0;
     chrome.runtime.sendMessage({
-      type: 'VOICE_COMMAND_EXEC',
+      type: legacyAlias('VOICE_COMMAND_EXEC'),
       command: cmd,
       raw: raw,
       wantsText: wantsText
