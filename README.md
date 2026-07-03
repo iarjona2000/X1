@@ -1,6 +1,6 @@
-# X1 — Voice-First Browser Agent
+# X1 — Browser Agent (Voice + Text)
 
-**X1 reemplaza tu teclado por la voz.** Habla y X1 ve lo que tú ves en el navegador, entiende el contexto y ejecuta tareas multi-paso de forma autónoma: navegar, hacer clic, escribir, buscar en la web, extraer datos, rellenar formularios, gestionar email/calendario, y loopear hasta completar la tarea.
+**X1 ve lo que tú ves en el navegador.** Habla o escribe, y X1 entiende el contexto, navega, hace clic, busca en la web, extrae datos, rellena formularios, gestiona email/calendario, y ejecuta tareas multi-paso de forma autónoma — todo desde el sidepanel o por voz.
 
 **Zero API keys needed.** X1 funciona íntegramente con repositorios open-source clonados e integrados directamente en el proyecto.
 
@@ -9,14 +9,14 @@
 ## Cómo funciona
 
 ```
-Tú hablas → voice-listener.js captura audio
+Tú hablas/escribes → voice-listener.js o sidepanel panel.js capturan input
   → voice-bridge.js relay al Service Worker
     → FCC proxy (free-claude-code, 38.4k ⭐) da IA nivel Claude via 18 providers
     → FreeWeb (4 buscadores, sin API key) para búsqueda web
     → WebLLM (MLC) como fallback local vía WebGPU
   → execAction() ejecuta: clic, escribir, scroll, navegar, leer, email...
   → stepProgress() actualiza la barra de proceso en tiempo real
-← X1 responde por voz + texto en el sidepanel
+← X1 responde por voz + texto en sidepanel
 ```
 
 ## Stack (0 APIs externas, solo GitHub repos)
@@ -123,7 +123,7 @@ Layer 0: Sistema ─────────── SW, manifest, bridges
 
 X1 no es una API wrapper. Es un **middleman de IA** que copia e implementa los mejores repos open-source de GitHub, los integra en una extensión de Chrome, y los orquesta con un sistema Judge central. Sin costes de API, sin rate limits, sin dependencias externas.
 
-**Pitch**: *"X1 reemplaza tu teclado por la voz. Habla y X1 ve tu navegador, entiende el contexto, y ejecuta tareas multi-paso — usando IA nivel Claude sin pagar un céntimo."*
+**Pitch**: *"X1 ve lo que ves en el navegador. Habla o escribe, y X1 navega, busca, extrae, rellena formularios, gestiona email — usando IA nivel Claude sin pagar un céntimo."*
 
 ---
 
