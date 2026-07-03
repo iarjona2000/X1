@@ -272,6 +272,51 @@
 
   // ── Action handlers ──
 
+  // ── Mapping: x1-api handler name → X1Protocol.REQ.* type ──
+  // Si una handler no tiene mapeo, se salta la validación (no rompe nada
+  // existente). Sólo las que tienen schema en protocol.js se validan.
+  var handlerToReq = {
+    agentList:       'AGENT_LIST',
+    agentCreate:     'AGENT_CREATE',
+    agentUpdate:     'AGENT_UPDATE',
+    agentDelete:     'AGENT_DELETE',
+    agentRun:        'AGENT_RUN',
+    agentSeed:       'AGENT_SEED',
+    memoryRecall:    'MEMORY_RECALL',
+    memoryRemember:  'MEMORY_REMEMBER',
+    memoryStats:     'MEMORY_STATS',
+    memoryForgetAll: 'MEMORY_FORGET_ALL',
+    factCheck:       'FACT_CHECK',
+    compare:         'COMPARE',
+    vote:            'VOTE',
+    budgetStatus:    'BUDGET_STATUS',
+    projectCreate:   'PROJECT_CREATE',
+    projectList:     'PROJECT_LIST',
+    projectReport:   'PROJECT_REPORT',
+    projectUpdateTask: 'PROJECT_UPDATE_TASK',
+    workspaceStatus: 'WORKSPACE_STATUS',
+    workspaceInbox:  'WORKSPACE_INBOX',
+    planTask:        'PLAN_TASK',
+    teamCreate:      'TEAM_CREATE',
+    teamList:        'TEAM_LIST',
+    teamRun:         'TEAM_RUN',
+    health:          'HEALTH',
+    configGet:       'CONFIG_GET',
+    configSave:      'CONFIG_SAVE',
+    historyGet:      'HISTORY_GET'
+  };
+
+  // Lookup de constante real (si el protocolo está cargado).
+  // Fallback al string literal si X1Protocol aún no existe.
+  function resolveReqType(handlerName) {
+    var key = handlerToReq[handlerName];
+    if (!key) return null;
+    if (typeof X1Protocol !== 'undefined' && X1Protocol.REQ && X1Protocol.REQ[key]) {
+      return X1Protocol.REQ[key];
+    }
+    return key;
+  }
+
   var handlers = {};
 
   // ── Agent actions ──
@@ -785,6 +830,26 @@
     if (!handler) {
       sendResponse({ ok: false, error: 'Unknown X1 API action: ' + action });
       return false;
+    }
+
+    // Validate against X1Protocol if available. Handlers without mapping skip
+    // validation (no breaking change). On validation failure, return a
+    // structured error so the UI can react.
+    var reqType = resolveReqType(action);
+    if (reqType && typeof X1Protocol !== 'undefined' && typeof X1Protocol.validateRequest === 'function') {
+      var validationError = X1Protocol.validateRequest(reqType, payload);
+      if (validationError) {
+        log.error('Validation failed for X1_API.' + action + ':', validationError);
+        sendResponse({
+          ok: false,
+          error: {
+            message: validationError,
+            code: X1Protocol.ERR_CODE ? X1Protocol.ERR_CODE.VALIDATION : 'VALIDATION',
+            context: { action: action, type: reqType }
+          }
+        });
+        return false;
+      }
     }
 
     payload.tabId = sender && sender.tab ? sender.tab.id : payload.tabId;
