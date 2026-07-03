@@ -137,7 +137,7 @@ var X1PluginEngine = (function() {
     if (!manifest || !manifest.id || !manifest.name || !manifest.version) return false;
     if (!manifest.trigger || !Array.isArray(manifest.trigger) || manifest.trigger.length === 0) return false;
     if (!manifest.steps || !Array.isArray(manifest.steps) || manifest.steps.length === 0) return false;
-    var validTypes = ['search', 'synthesize', 'navigate', 'extract', 'write', 'notify', 'calculate'];
+    var validTypes = ['search', 'synthesize', 'navigate', 'extract', 'write', 'notify', 'calculate', 'webhook'];
     for (var i = 0; i < manifest.steps.length; i++) {
       if (validTypes.indexOf(manifest.steps[i].type) === -1) return false;
     }
@@ -251,9 +251,18 @@ var X1PluginEngine = (function() {
           }
         }
         var fullPrompt = synthesizePrompt + '\n\nData:\n' + dataToSynthesize + '\n\nUser request: ' + userMsg;
-        var aiFunc = (typeof groqComplete === 'function') ? groqComplete : ((typeof geminiComplete === 'function') ? geminiComplete : null);
+        // Fixed 2026-07-04: this used to hardcode groqComplete||geminiComplete —
+        // groqComplete no longer exists (removed in the provider consolidation),
+        // so every plugin synthesis silently fell through to a single bare
+        // geminiComplete() call with no persona, no cache, no NVIDIA cascade, no
+        // Panel+Judge. Routing through aiComplete() (the real entry point used at
+        // 20+ other call sites in service-worker.js) gives every plugin the full
+        // brain instead of a dead-end single model call.
+        var aiFunc = (typeof aiComplete === 'function') ? function(prompt, persona) { return aiComplete(persona ? persona + '\n\n' + prompt : prompt); } : null;
         if (aiFunc) {
-          return aiFunc(fullPrompt, 'You are a research analyst. Provide clear, actionable analysis.').then(function(response) {
+          // plugin.persona lets a manifest carry its own identity (e.g. a specialist
+          // persona plugin) instead of the generic research-analyst framing below.
+          return aiFunc(fullPrompt, plugin.persona || 'You are a research analyst. Provide clear, actionable analysis.').then(function(response) {
             results.stepResults.push({ type: 'synthesize', data: response });
             results.synthesis = response;
             return runStep(stepIndex + 1);
@@ -290,9 +299,9 @@ var X1PluginEngine = (function() {
               if (injectionResults && injectionResults[0]) {
                 pageContent = injectionResults[0].result || '';
               }
-              var aiFunc2 = (typeof groqComplete === 'function') ? groqComplete : ((typeof geminiComplete === 'function') ? geminiComplete : null);
+              var aiFunc2 = (typeof aiComplete === 'function') ? function(prompt, persona) { return aiComplete(persona ? persona + '\n\n' + prompt : prompt); } : null;
               if (aiFunc2 && pageContent) {
-                aiFunc2(extractPrompt + '\n\nPage content:\n' + pageContent, 'You are a data extraction assistant. Extract structured data as requested.').then(function(extracted) {
+                aiFunc2(extractPrompt + '\n\nPage content:\n' + pageContent, plugin.persona || 'You are a data extraction assistant. Extract structured data as requested.').then(function(extracted) {
                   results.stepResults.push({ type: 'extract', data: extracted });
                   results.extracted = extracted;
                   resolve(runStep(stepIndex + 1));

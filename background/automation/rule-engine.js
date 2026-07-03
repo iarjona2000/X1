@@ -204,7 +204,10 @@ var X1AutomationEngine = (function() {
   }
 
   function parseNaturalLanguageRule(text) {
-    var aiFunc = (typeof groqComplete === 'function') ? groqComplete : ((typeof geminiComplete === 'function') ? geminiComplete : null);
+    // Fixed 2026-07-04, same bug/fix as plugins/engine.js: groqComplete no longer
+    // exists, so this always fell through to a bare geminiComplete(). Route through
+    // aiComplete() (the real cascade/Panel+Judge entry point) instead.
+    var aiFunc = (typeof aiComplete === 'function') ? function(prompt, persona) { return aiComplete(persona ? persona + '\n\n' + prompt : prompt); } : null;
     if (!aiFunc) return Promise.reject(new Error('No AI function available'));
 
     var prompt = 'Parse this natural language automation rule into JSON.\n' +
