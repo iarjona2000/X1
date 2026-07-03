@@ -1866,7 +1866,9 @@ var proxyLastFail = 0;
     if (!PROXY_URL) return Promise.resolve(null);
     if (Date.now() - proxyLastFail < 3000) { console.log('[X1] Proxy skipped (cached failure)'); return Promise.resolve(null); }
     console.log('[X1] Calling proxy...');
-    var clean = stripImages(getCachedSystemPrompt(userMsg));
+    var sysPrompt = getCachedSystemPrompt(userMsg);
+    if (sysPrompt && sysPrompt.length > 4000) sysPrompt = sysPrompt.substring(0, 4000);
+    var clean = stripImages(sysPrompt);
     var usr = stripImages(userMsg);
     var proxyHeaders = {'Content-Type':'application/json', 'X-X1-Auth': aiKeys.proxySecret || PROXY_SHARED_SECRET};
     return fetch(PROXY_URL + '/v1/chat/completions', {
@@ -1875,13 +1877,15 @@ var proxyLastFail = 0;
       body:JSON.stringify({
         messages:[{role:'system',content:clean},{role:'user',content:usr}]
       }),
-      signal:AbortSignal.timeout(5000)
-    }).then(function(r){return r.json();}).then(function(data){
-      if(data.error) { console.error('[X1] Proxy error:', data.error); proxyLastFail = Date.now(); return null; }
+      signal:AbortSignal.timeout(25000)
+    }).then(function(r){
+      if (!r.ok) return r.json().then(function(d) { return Promise.reject(new Error(d.error || d.detail || 'HTTP ' + r.status)); });
+      return r.json();
+    }).then(function(data){
       proxyLastFail = 0;
       var txt = (data.choices&&data.choices[0]&&data.choices[0].message&&data.choices[0].message.content||'').trim();
-      if(!isValidContent(txt)) { proxyLastFail = Date.now(); return null; }
-      console.log('[X1] Proxy response:', txt.substring(0,200));
+      if(!isValidContent(txt)) { console.warn('[X1] Proxy content filtered:', txt.substring(0,100)); proxyLastFail = Date.now(); return null; }
+      console.log('[X1] Proxy OK (' + txt.length + ' chars)');
       return txt;
     }).catch(function(e){ console.error('[X1] Proxy fail:', e.message); proxyLastFail = Date.now(); return null; });
   }
