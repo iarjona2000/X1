@@ -4839,24 +4839,17 @@ function execAction(act, tabId) {
         }).catch(function(e) { stepError(tabId, giIdx); resolve({text: 'Error generando imagen: ' + e.message, showText: true}); });
         break;
 
-      case 'deepResearch':
-        var drIdx = stepProgress(tabId, 'Research', 'Investigando: ' + (act.query || '').substring(0, 40));
-        if (typeof X1DeepResearch === 'undefined') { stepError(tabId, drIdx); resolve({text: 'Modulo de research no disponible.', showText: true}); break; }
-        X1DeepResearch.research(act.query || act.text || '', {tabId: tabId, depth: act.depth || 'standard', maxSteps: act.maxSteps || 8}).then(function(report) {
-          stepDone(tabId, drIdx);
-          var rText = 'Research: ' + report.query + '\n(' + report.sources.length + ' fuentes, ' + Math.round(report.duration / 1000) + 's)\n\n' + (report.synthesis || 'Sin sintesis.');
-          resolve({text: rText, showText: true});
-        }).catch(function(e) { stepError(tabId, drIdx); resolve({text: 'Error investigando: ' + e.message, showText: true}); });
-        break;
-
-      case 'runSkill':
-        var skIdx = stepProgress(tabId, 'Skills', 'Ejecutando skill: ' + (act.name || ''));
-        if (typeof X1SkillEngine === 'undefined') { stepError(tabId, skIdx); resolve({text: 'Modulo de skills no disponible.', showText: true}); break; }
-        X1SkillEngine.runSkill(act.name || '', act.params || {}, tabId).then(function(result) {
-          stepDone(tabId, skIdx);
-          resolve({text: 'Skill "' + result.skill + '" completado en ' + Math.round(result.duration / 1000) + 's.', showText: true});
-        }).catch(function(e) { stepError(tabId, skIdx); resolve({text: 'Error en skill: ' + e.message, showText: true}); });
-        break;
+      // Fixed 2026-07-04: this switch used to have a SECOND 'deepResearch' and
+      // a SECOND 'runSkill' case right here (using the X1DeepResearch/
+      // X1SkillEngine modules) — duplicate case labels in a switch are legal
+      // JS, but the first match always wins, so these were 100% unreachable
+      // dead code (the earlier case 'deepResearch'/'runSkill' above, using the
+      // local deepResearch() helper and the legacy x1Skills array, always ran
+      // instead). Removed the dead duplicates. Note for later: the module-
+      // based versions that got deleted here were arguably more complete
+      // (X1SkillEngine in particular) — worth deciding which implementation
+      // should be canonical rather than leaving one permanently shadowed; see
+      // docs/ISSUES_NEEDING_YOUR_INPUT.md.
 
       case 'registerSkill':
         if (typeof X1SkillEngine === 'undefined') { resolve({text: 'Modulo de skills no disponible.', showText: true}); break; }

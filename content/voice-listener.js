@@ -835,40 +835,20 @@
     updateGlow('thinking');
     showThinkBubble();
     processing = true;
-    var startTime = Date.now();
     var timeoutMs = 15000;
-    chrome.runtime.sendMessage({
-      type: 'VOICE_COMMAND_EXEC',
-      command: cmd,
-      raw: cmd,
-      wantsText: true
-    }).then(function(resp) {
-      processing = false;
-      removeThinkBubble();
-      var elapsed = Date.now() - startTime;
-      if (resp && resp.text) {
-        var cleanText = resp.text;
-        if (!cleanText) cleanText = 'Hecho. ¿Algo más?';
-        humanSpeak(cleanText);
-        addMessage('assistant', cleanText);
-        if (resp.showText) addBubble(cleanText, 'assistant');
-      } else if (resp && resp.error) {
-        addError('Error: ' + resp.error.replace(/^ERROR:\s*/i, ''));
-      } else {
-        addError('Sin respuesta. Intenta de nuevo.');
-      }
-      setStatus('listo');
-      updateGlow('idle');
-      if (restartTimer) clearTimeout(restartTimer);
-      restartTimer = setTimeout(function() { if (!isActive && !processing) startVoice(); }, 1500);
-    }).catch(function(e) {
-      processing = false;
-      removeThinkBubble();
-      setStatus('error');
-      updateGlow('idle');
-      addError('Error de conexión.');
-      setTimeout(function() { setStatus('listo'); }, 2500);
-    });
+    // Fixed 2026-07-04: this used to call chrome.runtime.sendMessage() directly,
+    // but this script runs with "world":"MAIN" (manifest.json), i.e. inside the
+    // actual page's JS context, where the chrome.runtime extension API is not
+    // reliably available — every command typed/spoken into the on-page panel
+    // threw and silently degraded to the 15s timeout below. content/voice-
+    // bridge.js (an isolated-world content script loaded on the same pages,
+    // manifest.json's content_scripts) already exists specifically to relay
+    // MAIN-world messages via window.postMessage, and this file already has a
+    // working listener for its response (see the 'x1-voice-response' branch in
+    // the window 'message' listener below) — this was just never connected to
+    // that bridge on the send side. Routed through it now, matching the
+    // contract voice-bridge.js already implements.
+    window.postMessage({ source: 'x1-voice', type: 'command', command: cmd, raw: cmd, wantsText: true }, '*');
     setTimeout(function() {
       if (processing) {
         processing = false;
@@ -961,6 +941,14 @@
       showStepProgress(e.data.app, e.data.description, e.data.status);
     }
     if (e.data.source === 'x1-voice-response') {
+      // processing=false added 2026-07-04 alongside routing processCommand's
+      // send through this same bridge — previously only processCommand's own
+      // (now-removed) direct chrome.runtime .then() callback reset this flag,
+      // so every command after the first would have silently no-op'd behind
+      // the `if (processing) return;` guard until the 15s timeout force-reset it.
+      processing = false;
+      setStatus('listo');
+      updateGlow('idle');
       humanSpeak(e.data.text || 'Respuesta recibida');
       removeThinkBubble();
       if (e.data.showText) addBubble(e.data.text || 'Respuesta recibida', 'assistant');
