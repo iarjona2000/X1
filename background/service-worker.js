@@ -6510,17 +6510,48 @@ chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
       } catch(e) { console.warn('[X1-SW] runtime.sendMessage error:', e.message); }
     }
 
+    function proxyDirectComplete(userMsg) {
+      if (!PROXY_URL) return Promise.resolve({ok: false, text: '', error: 'no proxy url'});
+      var proxyHeaders = {'Content-Type':'application/json', 'X-X1-Auth': aiKeys.proxySecret || PROXY_SHARED_SECRET};
+      return fetch(PROXY_URL + '/v1/chat/completions', {
+        method:'POST',
+        headers:proxyHeaders,
+        body:JSON.stringify({
+          messages:[{role:'user', content:userMsg}]
+        }),
+        signal:AbortSignal.timeout(15000)
+      }).then(function(r){
+        if (!r.ok) return Promise.reject(new Error('HTTP ' + r.status));
+        return r.json();
+      }).then(function(data){
+        var txt = (data.choices&&data.choices[0]&&data.choices[0].message&&data.choices[0].message.content||'').trim();
+        if (!isValidContent(txt)) return {ok: false, text: '', error: 'invalid content'};
+        return {ok: true, text: txt};
+      }).catch(function(e){
+        console.warn('[X1-SW] proxyDirect failed:', e.message);
+        return {ok: false, text: '', error: e.message};
+      });
+    }
+
     (function processVoice(){
-      handleVoice(cmdText, wantsText, function(data){
-        console.log('[X1-SW] handleVoice callback fired:', data ? (data.text || '').substring(0, 50) : 'null');
-        sendPanelResponse(data);
+      proxyDirectComplete(cmdText).then(function(proxyResult) {
+        if (proxyResult.ok && !swResponded) {
+          sendPanelResponse({text: proxyResult.text, showText: true});
+          return;
+        }
+        handleVoice(cmdText, wantsText, function(data){
+          console.log('[X1-SW] handleVoice callback:', data ? (data.text || '').substring(0, 50) : 'null');
+          sendPanelResponse(data);
+        });
       });
       setTimeout(function() {
         if (!swResponded) {
-          console.warn('[X1-SW] Safety timeout 12s — forcing response');
-          sendPanelResponse({text: 'Tiempo agotado. Reintentando...', error: null});
+          console.warn('[X1-SW] Safety timeout 15s');
+          handleVoice(cmdText, wantsText, function(data){
+            if (!swResponded) sendPanelResponse(data);
+          });
         }
-      }, 12000);
+      }, 15000);
     })();
     return true;
   }
