@@ -274,21 +274,14 @@
     panelTimeout = setTimeout(function() {
       if (!responded) {
         responded = true; clearTimeout(panelTimeout); panelTimeout = null;
-        removeThinking(); stopResponseFallback();
-        webLLMComplete(text).then(function(result) {
-          clearPanelTimeout(); removeThinking();
-          if (result && result.ok && result.text) {
-            var aiMsg = addMessage('ai', result.text, true);
-            streamAiText(aiMsg, result.text);
-          } else {
-            addMessage('ai', 'Arranca FCC proxy (start-fcc.bat) o configura una API key en Settings.');
-          }
-        }).catch(function(e) {
-          clearPanelTimeout(); removeThinking();
-          addMessage('ai', 'No se pudo cargar el cerebro local. ' + e.message);
-        });
+        removeThinking();
+        addMessage('ai', 'Parece que estoy tardando más de lo normal. Reintentando...');
+        responded = false;
+        activeRequestId = Date.now() + '-' + Math.floor(Math.random() * 10000);
+        showThinking();
+        doSend();
       }
-    }, 8000);
+    }, 12000);
 
     function doSend() {
       var requestId = activeRequestId;
@@ -393,20 +386,20 @@
       attempts++;
       if (attempts > 30) { stopResponseFallback(); return; }
       try {
-        chrome.storage.local.get('x1_last_response', function(data) {
-          if (data && data.x1_last_response && data.x1_last_response.requestId === requestId) {
+        chrome.storage.local.get('x1LastResponse', function(data) {
+          if (data && data.x1LastResponse && data.x1LastResponse.requestId === requestId) {
             if (!responded) {
               clearPanelTimeout();
               responded = true;
               removeThinking();
-              var resp = data.x1_last_response;
+              var resp = data.x1LastResponse;
               if (resp.text) {
                 var aiMsg = addMessage('ai', resp.text, true);
                 streamAiText(aiMsg, resp.text);
               } else {
                 addMessage('ai', 'Comando ejecutado.');
               }
-              chrome.storage.local.remove('x1_last_response');
+              chrome.storage.local.remove('x1LastResponse');
               stopResponseFallback();
             }
           }

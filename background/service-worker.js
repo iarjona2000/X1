@@ -1864,7 +1864,7 @@ function groqComplete(userMsg) {
 var proxyLastFail = 0;
   function proxyComplete(userMsg) {
     if (!PROXY_URL) return Promise.resolve(null);
-    if (Date.now() - proxyLastFail < 10000) { console.log('[X1] Proxy skipped (cached failure)'); return Promise.resolve(null); }
+    if (Date.now() - proxyLastFail < 3000) { console.log('[X1] Proxy skipped (cached failure)'); return Promise.resolve(null); }
     console.log('[X1] Calling proxy...');
     var clean = stripImages(getCachedSystemPrompt(userMsg));
     var usr = stripImages(userMsg);
@@ -3444,7 +3444,23 @@ function aiComplete(userMsg, opts) {
   if (cached) return Promise.resolve(cached);
 
   // ═══════════════════════════════════════════
-  // FAST PATH: FCC Proxy (primary Judge brain)
+  // FAST PATH: Cloudflare Worker proxy (deployed, working, ~1s)
+  // ═══════════════════════════════════════════
+  var proxyOk = !!PROXY_URL && !(typeof proxyLastFail !== 'undefined' && Date.now() - proxyLastFail < 3000);
+  if (proxyOk && !opts.forceJudge) {
+    console.log('[X1] Fast path: Cloudflare proxy');
+    return proxyComplete(userMsg).then(function(txt) {
+      if (txt) {
+        var parsed = normalizeResult(parseJSON(txt)) || { action: 'speak', text: txt };
+        setCachedResponse(userMsg, parsed);
+        return parsed;
+      }
+      return null;
+    }).catch(function() { return null; });
+  }
+
+  // ═══════════════════════════════════════════
+  // FAST PATH: FCC Proxy (local, primary Judge brain when running)
   // ═══════════════════════════════════════════
   var hasFCC = typeof X1FCCBridge !== 'undefined' && X1FCCBridge.isAvailable && X1FCCBridge.isAvailable();
   if (hasFCC && !opts.forceJudge) {
@@ -5177,7 +5193,7 @@ function execAction(act, tabId) {
         webSearch(act.query || '', {maxResults: act.maxResults || 5}).then(function(searchResult) {
           stepDone(tabId, wsIdx);
           if (!searchResult) {
-            resolve({text: 'No se pudieron obtener resultados. Prueba con webSearch si tienes API key de Tavily, o conecta FCC.', showText: true});
+            resolve({text: 'No se pudieron obtener resultados. Prueba otra búsqueda.', showText: true});
             return;
           }
           var searchText = '';
@@ -5191,7 +5207,7 @@ function execAction(act, tabId) {
           resolve({text: searchText || 'Sin resultados.', showText: true});
         }).catch(function(e) {
           stepError(tabId, wsIdx);
-          resolve({text: 'Error buscando: ' + e.message + '. Activa FCC o configura API key de Tavily en Settings.', showText: true});
+          resolve({text: 'Error buscando: ' + e.message, showText: true});
         });
         break;
 
@@ -5778,7 +5794,7 @@ function handleVoice(cmd, wantsText, sendResponse) {
   var hasOllama = ollamaModels && ollamaModels.length > 0;
   var hasWebLLM = typeof X1WebLLMBridge !== 'undefined' && X1WebLLMBridge.isLoaded && X1WebLLMBridge.isLoaded();
   if (!hasAnyKey && !hasProxy && !hasFCC && !hasOllama && !hasWebLLM) {
-    respond({text: 'No hay proveedores de IA disponibles. Arranca FCC proxy (start-fcc.bat) o configura una API key en Settings.', showText: true});
+    respond({text: 'No hay proveedores de IA disponibles. Arranca FCC proxy (start-fcc.bat) para activar el Judge o escribe en el panel de texto.', showText: true});
     return;
   }
 
@@ -5795,7 +5811,7 @@ function handleVoice(cmd, wantsText, sendResponse) {
   var slowTimer = setTimeout(function(){
     if (!responded) {
       console.log('[X1] Slow timeout 10s — forcing response');
-      respond({text:'Tiempo agotado. Intenta de nuevo o configura una API key en Settings.', showText:true});
+      respond({text:'Tiempo agotado. Reintentando...', showText:true});
     }
   }, 10000);
 
@@ -5964,15 +5980,14 @@ function handleVoice(cmd, wantsText, sendResponse) {
         if (hasProxy && proxyLastFail > 0 && Date.now() - proxyLastFail < 30000) {
           console.log('[X1] Proxy recently failed, skipping proxy fallback');
         }
-        var fallbacks = [
-          'No entendí bien. ¿Puedes repetirlo de otra forma?',
-          'Me he perdido. ¿Puedes ser más específico?',
-          'Necesito más contexto. ¿Qué es exactamente lo que necesitas?',
-          'No tengo suficiente información. ¿Puedes explicarme más?'
-        ];
-        var errMsg = fallbacks[Math.floor(Math.random() * fallbacks.length)];
-        if (!activeKeys.length && !hasProxy && !hasOllama) {
-          errMsg = 'No hay proveedores de IA disponibles. Arranca FCC proxy (start-fcc.bat) o configura una API key en Settings.';
+        var hasWorkingFCC = typeof X1FCCBridge !== 'undefined' && X1FCCBridge.isAvailable && X1FCCBridge.isAvailable();
+        var hasWorkingWebLLM = typeof X1WebLLMBridge !== 'undefined' && X1WebLLMBridge.isLoaded && X1WebLLMBridge.isLoaded();
+        var proxyWorking = hasProxy && (proxyLastFail === 0 || Date.now() - proxyLastFail > 3000);
+        var hasAnyWorking = activeKeys.length > 0 || proxyWorking || hasWorkingFCC || hasOllama || hasWorkingWebLLM;
+        if (!hasAnyWorking) {
+          errMsg = 'No hay proveedores de IA disponibles. Arranca FCC proxy (start-fcc.bat) o usa el panel de texto.';
+        } else {
+          errMsg = 'No entendí bien. ¿Puedes repetirlo de otra forma?';
         }
         respond({text:errMsg, showText:true, persona: persona, personaPrompt: personaPrompt, mode: 'socratic'});
         return;
@@ -5991,7 +6006,7 @@ function handleVoice(cmd, wantsText, sendResponse) {
     }).catch(function(e){
       clearTimeout(fastTimer);clearTimeout(slowTimer);
       console.error('[X1] AI error:', e.message);
-      respond({text:'Error de IA: '+e.message+'. Arranca FCC proxy (start-fcc.bat) o prueba otro proveedor con "usa groq".', showText:true, persona: persona, personaPrompt: personaPrompt});
+      respond({text:'Error de IA: '+e.message+'. Reintentando con el proxy cloud...', showText:true, persona: persona, personaPrompt: personaPrompt});
     });
   }).catch(function(e){
     clearTimeout(fastTimer);clearTimeout(slowTimer);
