@@ -25,39 +25,68 @@
   // CONFIG
   // ═══════════════════════════════════════════
 
-  var FCC_BASE_URL = 'http://localhost:8082';
-  var FCC_DEFAULT_MODEL = 'nvidia_nim/nvidia/nemotron-3-super-120b-a12b';
-  var FCC_TIMEOUT = 15000;
-  var FCC_HEALTH_TIMEOUT = 2000;
-  var FCC_AUTH_KEY = '';
+  var LOCAL_PROXY = 'http://localhost:8082';
+  var CLOUD_PROXY = 'https://x1-proxy.baosx1.workers.dev';
+  var CLOUD_SECRET = '9ff4b7dda5f7defd5f7fb7c32c133428bc87e8efeb8550d3ce1e5838c1d3b850';
+  var DEFAULT_MODEL = 'nvidia/nemotron-3-ultra-550b-a55b';
+  var TIMEOUT = 15000;
+  var HEALTH_TIMEOUT = 2000;
 
   var proxyAvailable = null;
-  var proxyCheckTimer = null;
   var proxyLastFail = 0;
-  var proxyAuthToken = '';
+  var usingLocal = false;
 
   // ═══════════════════════════════════════════
-  // HEALTH & DETECTION
+  // HEALTH — checks local FCC first, then cloud
   // ═══════════════════════════════════════════
+
+  function checkLocal() {
+    return fetch(LOCAL_PROXY + '/v1/messages', {
+      method: 'HEAD',
+      signal: AbortSignal.timeout(HEALTH_TIMEOUT)
+    }).then(function(r) {
+      return r.ok || r.status === 204;
+    }).catch(function() {
+      return false;
+    });
+  }
+
+  function checkCloud() {
+    return fetch(CLOUD_PROXY + '/health', {
+      method: 'GET',
+      signal: AbortSignal.timeout(HEALTH_TIMEOUT)
+    }).then(function(r) {
+      return r.ok;
+    }).catch(function() {
+      return false;
+    });
+  }
 
   function checkProxy() {
     if (proxyAvailable === true) return Promise.resolve(true);
-    if (Date.now() - proxyLastFail < 30000) return Promise.resolve(false);
-    return fetch(FCC_BASE_URL + '/v1/messages', {
-      method: 'HEAD',
-      signal: AbortSignal.timeout(FCC_HEALTH_TIMEOUT)
-    }).then(function(r) {
-      proxyAvailable = r.ok || r.status === 204;
-      if (proxyAvailable) {
+    if (Date.now() - proxyLastFail < 5000) return Promise.resolve(false);
+
+    return checkLocal().then(function(ok) {
+      if (ok) {
+        proxyAvailable = true;
+        usingLocal = true;
         proxyLastFail = 0;
-        log.info('Proxy disponible (' + FCC_BASE_URL + ')');
+        log.info('Judge local (free-claude-code) disponible');
+        return true;
       }
-      return proxyAvailable;
-    }).catch(function(e) {
-      proxyAvailable = false;
-      proxyLastFail = Date.now();
-      log.warn('Proxy no disponible: ' + e.message);
-      return false;
+      return checkCloud().then(function(cloudOk) {
+        if (cloudOk) {
+          proxyAvailable = true;
+          usingLocal = false;
+          proxyLastFail = 0;
+          log.info('Judge cloud (x1-proxy) disponible');
+          return true;
+        }
+        proxyAvailable = false;
+        proxyLastFail = Date.now();
+        log.warn('Ningun Judge disponible');
+        return false;
+      });
     });
   }
 
@@ -67,76 +96,98 @@
   }
 
   // ═══════════════════════════════════════════
-  // COMPLETION (Anthropic Messages API)
+  // COMPLETION
   // ═══════════════════════════════════════════
 
   function generateText(messages, opts) {
     opts = opts || {};
-    var model = opts.model || FCC_DEFAULT_MODEL;
     var maxTokens = opts.maxTokens || 4096;
     var temperature = opts.temperature !== undefined ? opts.temperature : 0.3;
-    var timeout = opts.timeout || FCC_TIMEOUT;
+    var timeout = opts.timeout || TIMEOUT;
 
     return checkProxy().then(function(available) {
-      if (!available) return { ok: false, text: '', error: 'FCC proxy no disponible en ' + FCC_BASE_URL };
-
-      var headers = { 'Content-Type': 'application/json' };
-      if (proxyAuthToken) {
-        headers['x-api-key'] = proxyAuthToken;
+      if (!available) {
+        return { ok: false, text: '', error: 'Judge no disponible' };
       }
 
-      return fetch(FCC_BASE_URL + '/v1/messages', {
-        method: 'POST',
-        headers: headers,
-        body: JSON.stringify({
-          model: model,
-          messages: messages,
-          max_tokens: maxTokens,
-          temperature: temperature,
-          stream: false
-        }),
-        signal: AbortSignal.timeout(timeout)
-      }).then(function(r) {
-        if (!r.ok) {
-          return r.json().then(function(errData) {
-            var detail = (errData && errData.error && errData.error.message) || errData.detail || r.statusText;
-            log.error('Proxy error (' + r.status + '): ' + detail);
-            proxyLastFail = Date.now();
+      if (usingLocal) {
+        return fetch(LOCAL_PROXY + '/v1/messages', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: opts.model || DEFAULT_MODEL,
+            messages: messages,
+            max_tokens: maxTokens,
+            temperature: temperature,
+            stream: false
+          }),
+          signal: AbortSignal.timeout(timeout)
+        }).then(function(r) {
+          if (!r.ok) {
             proxyAvailable = false;
-            return { ok: false, text: '', error: detail };
-          }).catch(function() {
             proxyLastFail = Date.now();
-            proxyAvailable = false;
             return { ok: false, text: '', error: 'HTTP ' + r.status };
-          });
-        }
-        return r.json().then(function(data) {
-          var text = '';
-          if (data && data.content && data.content.length > 0) {
-            for (var i = 0; i < data.content.length; i++) {
-              if (data.content[i].type === 'text') {
-                text += data.content[i].text;
+          }
+          return r.json().then(function(data) {
+            var text = '';
+            if (data && data.content && data.content.length > 0) {
+              for (var i = 0; i < data.content.length; i++) {
+                if (data.content[i].type === 'text') text += data.content[i].text;
               }
             }
-          }
-          if (!text) {
-            text = (data && data.content && data.content[0] && data.content[0].text) || '';
-          }
-          proxyLastFail = 0;
-          log.info('Respuesta recibida (' + (text.length || 0) + ' chars)');
-          return { ok: true, text: text, model: data.model || model, usage: data.usage || null };
-        });
-      }).catch(function(e) {
-        if (e.name === 'AbortError') {
-          log.error('Timeout (' + timeout + 'ms)');
+            if (!text) text = (data && data.content && data.content[0] && data.content[0].text) || '';
+            proxyLastFail = 0;
+            return { ok: true, text: text, model: data.model || opts.model || DEFAULT_MODEL };
+          });
+        }).catch(function(e) {
+          proxyAvailable = false;
           proxyLastFail = Date.now();
-          return { ok: false, text: '', error: 'timeout' };
-        }
-        log.error('Fetch error: ' + e.message);
-        proxyLastFail = Date.now();
+          log.warn('Local proxy error, fallback a cloud: ' + e.message);
+          usingLocal = false;
+          return cloudComplete(messages, opts);
+        });
+      }
+
+      return cloudComplete(messages, opts);
+    });
+  }
+
+  function cloudComplete(messages, opts) {
+    var maxTokens = opts.maxTokens || 4096;
+    var temperature = opts.temperature !== undefined ? opts.temperature : 0.3;
+    var timeout = opts.timeout || TIMEOUT;
+
+    var userMsg = '';
+    for (var i = 0; i < messages.length; i++) {
+      if (messages[i].role === 'user') userMsg += messages[i].content + '\n';
+    }
+
+    return fetch(CLOUD_PROXY + '/v1/chat/completions', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-X1-Auth': CLOUD_SECRET},
+      body: JSON.stringify({
+        messages: [{role: 'user', content: userMsg.trim()}]
+      }),
+      signal: AbortSignal.timeout(timeout)
+    }).then(function(r) {
+      if (!r.ok) {
         proxyAvailable = false;
-        return { ok: false, text: '', error: e.message };
-      });
+        proxyLastFail = Date.now();
+        return { ok: false, text: '', error: 'HTTP ' + r.status };
+      }
+      return r.json();
+    }).then(function(d) {
+      var txt = '';
+      if (d && d.choices && d.choices[0] && d.choices[0].message) {
+        txt = (d.choices[0].message.content || '').trim();
+      }
+      proxyLastFail = 0;
+      proxyAvailable = true;
+      return { ok: !!txt, text: txt, model: (d && d.model) || 'cloud-proxy' };
+    }).catch(function(e) {
+      proxyAvailable = false;
+      proxyLastFail = Date.now();
+      return { ok: false, text: '', error: e.message };
     });
   }
 
@@ -158,13 +209,8 @@
   function x1FccComplete(userMsg) {
     return checkProxy().then(function(available) {
       if (!available) return null;
-      var sys = (typeof getCachedSystemPrompt === 'function') ? getCachedSystemPrompt(userMsg) : '';
       var usr = (typeof stripImages === 'function') ? stripImages(userMsg) : userMsg;
-      if (typeof stripImages === 'function') sys = stripImages(sys);
-      var messages = [];
-      if (sys) messages.push({ role: 'user', content: 'System: ' + sys + '\n\n' + usr });
-      else messages.push({ role: 'user', content: usr });
-      return generateText(messages, { timeout: 10000, temperature: 0.1 }).then(function(result) {
+      return generateText([{ role: 'user', content: usr }], { timeout: 10000, temperature: 0.1 }).then(function(result) {
         if (!result.ok || !result.text) return null;
         var txt = result.text.trim();
         if (typeof isValidContent === 'function' && !isValidContent(txt)) return null;
@@ -178,34 +224,20 @@
   // ═══════════════════════════════════════════
 
   function listModels() {
-    return fetch(FCC_BASE_URL + '/v1/models', {
-      method: 'GET',
-      signal: AbortSignal.timeout(3000)
-    }).then(function(r) { return r.json(); }).then(function(data) {
-      var models = [];
-      if (data && data.data) {
-        for (var i = 0; i < data.data.length; i++) {
-          models.push({
-            id: data.data[i].id,
-            name: data.data[i].display_name || data.data[i].id,
-            provider: data.data[i].provider || 'unknown'
-          });
+    if (usingLocal) {
+      return fetch(LOCAL_PROXY + '/v1/models', {
+        method: 'GET', signal: AbortSignal.timeout(3000)
+      }).then(function(r) { return r.json(); }).then(function(data) {
+        var models = [];
+        if (data && data.data) {
+          for (var i = 0; i < data.data.length; i++) {
+            models.push({ id: data.data[i].id, name: data.data[i].display_name || data.data[i].id, provider: data.data[i].provider || 'unknown' });
+          }
         }
-      }
-      return models;
-    }).catch(function() { return []; });
-  }
-
-  // ═══════════════════════════════════════════
-  // START/STOP HELPERS
-  // ═══════════════════════════════════════════
-
-  function buildStartCommand() {
-    return {
-      command: 'uv',
-      args: ['run', 'uvicorn', 'server:app', '--host', '0.0.0.0', '--port', '8082'],
-      cwd: ''  // Will be filled by the caller
-    };
+        return models;
+      }).catch(function() { return []; });
+    }
+    return Promise.resolve([{ id: DEFAULT_MODEL, name: 'NVIDIA Nemotron 3', provider: 'nvidia' }]);
   }
 
   // ═══════════════════════════════════════════
@@ -213,7 +245,6 @@
   // ═══════════════════════════════════════════
 
   window.X1FCCBridge = {
-    // Core
     checkProxy: checkProxy,
     forceCheck: forceCheck,
     generateText: generateText,
@@ -222,58 +253,47 @@
     complete: x1FccComplete,
     listModels: listModels,
 
-    // Config
-    getBaseUrl: function() { return FCC_BASE_URL; },
-    setBaseUrl: function(url) { FCC_BASE_URL = url; proxyAvailable = null; },
-    getDefaultModel: function() { return FCC_DEFAULT_MODEL; },
-    setDefaultModel: function(m) { FCC_DEFAULT_MODEL = m; },
-    getAuthToken: function() { return proxyAuthToken; },
-    setAuthToken: function(t) { proxyAuthToken = t; },
-
-    // Status
+    getBaseUrl: function() { return usingLocal ? LOCAL_PROXY : CLOUD_PROXY; },
     isAvailable: function() { return proxyAvailable === true; },
+    isLocal: function() { return usingLocal; },
     getLastFail: function() { return proxyLastFail; },
 
-    // Health
     healthCheck: function() {
       return checkProxy().then(function(ok) {
         return {
           ok: ok,
-          name: 'Free Claude Code Proxy',
-          version: '1.0.0',
-          baseUrl: FCC_BASE_URL,
-          model: FCC_DEFAULT_MODEL,
+          name: 'Judge (' + (usingLocal ? 'local FCC' : 'cloud proxy') + ')',
+          baseUrl: usingLocal ? LOCAL_PROXY : CLOUD_PROXY,
+          model: DEFAULT_MODEL,
           available: ok,
-          providerCount: 18,
-          auth: !!proxyAuthToken,
-          capabilities: ['text', 'code', 'reasoning', 'agent', 'tool-use']
+          providerCount: usingLocal ? 18 : 3,
+          capabilities: ['text', 'code', 'reasoning']
         };
       });
     },
 
-    // Launcher config (for Native Messaging or external scripts)
-    getLaunchConfig: buildStartCommand
+    getLaunchConfig: function() {
+      return { command: 'uv', args: ['run', 'uvicorn', 'server:app', '--host', '0.0.0.0', '--port', '8082'], cwd: '' };
+    }
   };
 
-  // Register with integration system
   if (window.X1Integrations) {
     window.X1Integrations.register({
       name: 'free-claude-code',
       version: '1.0.0',
       license: 'MIT',
       path: 'background/integrations/free-claude-code/',
-      description: 'Proxy AI con 18 providers (Claude, Gemini, Groq, etc.) via Anthropic Messages API',
+      description: 'Judge — Free Claude Code con 18 providers',
       healthCheck: function() { return window.X1FCCBridge.healthCheck(); },
       dependencies: ['python3', 'uv', 'fastapi']
     });
   }
 
-  log.info('X1FCCBridge loaded — primary Judge brain via FCC proxy');
-  log.info('Proxy endpoint: ' + FCC_BASE_URL + '/v1/messages');
+  log.info('X1FCCBridge loaded — Judge listo (local FCC + cloud proxy)');
 
   // Auto-check on load
   checkProxy().then(function(ok) {
-    log.info(ok ? 'FCC proxy conectado' : 'FCC proxy no encontrado — ejecuta: fcc-server');
+    log.info(ok ? 'Judge conectado (' + (usingLocal ? 'local' : 'cloud') + ')' : 'Judge no disponible');
   });
 
 })();

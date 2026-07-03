@@ -3355,37 +3355,20 @@ function aiComplete(userMsg, opts) {
   if (cached) return Promise.resolve(cached);
 
   // ═══════════════════════════════════════════
-  // FAST PATH: Cloudflare Worker proxy (deployed, working, ~1s)
+  // FAST PATH: Judge (FCC bridge — local proxy or cloud fallback)
   // ═══════════════════════════════════════════
-  var proxyOk = !!PROXY_URL && !(typeof proxyLastFail !== 'undefined' && Date.now() - proxyLastFail < 3000);
-  if (proxyOk && !opts.forceJudge) {
-    console.log('[X1] Fast path: Cloudflare proxy');
-    return proxyComplete(userMsg).then(function(txt) {
-      if (txt) {
-        var parsed = normalizeResult(parseJSON(txt)) || { action: 'speak', text: txt };
+  if (!opts.forceJudge && typeof X1FCCBridge !== 'undefined') {
+    return X1FCCBridge.checkProxy().then(function(ok) {
+      if (!ok) return null;
+      return X1FCCBridge.generateText([{ role: 'user', content: userMsg }], { maxTokens: 512, temperature: 0.3 });
+    }).then(function(result) {
+      if (result && result.ok && result.text) {
+        var parsed = normalizeResult(parseJSON(result.text)) || { action: 'speak', text: result.text };
         setCachedResponse(userMsg, parsed);
         return parsed;
       }
       return null;
     }).catch(function() { return null; });
-  }
-
-  // ═══════════════════════════════════════════
-  // FAST PATH: FCC Proxy (local, primary Judge brain when running)
-  // ═══════════════════════════════════════════
-  var hasFCC = typeof X1FCCBridge !== 'undefined' && X1FCCBridge.isAvailable && X1FCCBridge.isAvailable();
-  if (hasFCC && !opts.forceJudge) {
-    console.log('[X1] Fast path: FCC proxy');
-    return X1FCCBridge.generateText([{ role: 'user', content: userMsg }], { maxTokens: 512, temperature: 0.3 })
-      .then(function(result) {
-        if (result.ok && result.text) {
-          var parsed = normalizeResult(parseJSON(result.text)) || { action: 'speak', text: result.text };
-          setCachedResponse(userMsg, parsed);
-          return parsed;
-        }
-        return null;
-      })
-      .catch(function() { return null; });
   }
 
   // ═══════════════════════════════════════════
@@ -6483,45 +6466,18 @@ chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
     console.log('[X1-SW] VOICE_COMMAND_EXEC handler firing');
     var cmdText = msg.command || '';
     var wantsText = !!msg.wantsText;
-    var requestId = msg.requestId || (Date.now() + '-' + Math.floor(Math.random() * 10000));
-    var sideSender = sender;
     var swResponded = false;
-    try { sendResponse({ack: true, requestId: requestId}); } catch(_) {}
 
-    function sendPanelResponse(data) {
+    function sendResp(data) {
       if (swResponded) return; swResponded = true;
-      var payload = {
-        type: 'X1_VOICE_RESPONSE',
-        source: 'x1-voice-response',
-        text: (data && data.text) || '',
-        showText: !!(data && data.showText),
-        error: (data && data.error) || null,
-        requestId: requestId
-      };
-      console.log('[X1-SW] sendPanelResponse:', payload.text ? payload.text.substring(0, 50) : payload.error);
-      try { chrome.storage.local.set({x1LastResponse: payload}); } catch(e) { console.warn('[X1-SW] storage.set failed:', e.message); }
-      try {
-        if (sideSender && sideSender.tab && sideSender.tab.id) {
-          chrome.tabs.sendMessage(sideSender.tab.id, payload).catch(function(e){ console.warn('[X1-SW] tabs.sendMessage failed:', e.message); });
-        }
-      } catch(e) { console.warn('[X1-SW] tabs.sendMessage error:', e.message); }
-      try {
-        chrome.runtime.sendMessage(payload).catch(function(e){ console.warn('[X1-SW] runtime.sendMessage failed:', e.message); });
-      } catch(e) { console.warn('[X1-SW] runtime.sendMessage error:', e.message); }
+      var text = (data && data.text) || (data && data.error) || '';
+      try { sendResponse({text: text, showText: !!(data && data.showText)}); } catch(e) {}
     }
 
-    (function processVoice(){
-      handleVoice(cmdText, wantsText, function(data){
-        console.log('[X1-SW] handleVoice callback fired:', data ? (data.text || '').substring(0, 50) : 'null');
-        sendPanelResponse(data);
-      });
-      setTimeout(function() {
-        if (!swResponded) {
-          console.warn('[X1-SW] Safety timeout 12s — forcing response');
-          sendPanelResponse({text: 'Tiempo agotado. Reintentando...', error: null});
-        }
-      }, 12000);
-    })();
+    handleVoice(cmdText, wantsText, function(data) { sendResp(data); });
+    setTimeout(function() {
+      if (!swResponded) { sendResp({text: 'Procesando...'}); }
+    }, 15000);
     return true;
   }
   if(msg.type==='X1_MEETING_END'){
