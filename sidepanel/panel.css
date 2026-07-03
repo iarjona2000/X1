@@ -672,6 +672,40 @@ html, body {
   letter-spacing: 0.02em;
 }
 
+#provider-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 6px 4px 2px;
+  border-top: 1px solid var(--border);
+  margin-top: 6px;
+}
+
+.ps-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-sans);
+  font-size: 9px;
+  font-weight: 500;
+  color: var(--muted-foreground);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.ps-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--muted-foreground);
+  transition: background 0.3s ease;
+}
+
+.ps-dot.online { background: #22c55e; }
+.ps-dot.offline { background: var(--destructive); }
+.ps-dot.checking { background: #f59e0b; animation: pulse-dot 0.8s ease-in-out infinite; }
+
 ::-webkit-scrollbar {
   width: 5px;
 }

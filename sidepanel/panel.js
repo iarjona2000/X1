@@ -100,6 +100,7 @@
   initVoice();
   loadTabs();
   checkConnection();
+  checkProviderHealth();
 
   tabs.forEach(function(tab) {
     tab.addEventListener('click', function() {
@@ -140,6 +141,30 @@
       statusDot.style.background = 'var(--destructive)';
       statusText.textContent = 'Offline';
     }
+  }
+
+  function checkProviderHealth() {
+    if (!chrome.runtime || !chrome.runtime.sendMessage) return;
+    var psItems = document.querySelectorAll('.ps-item');
+    psItems.forEach(function(item) {
+      var dot = item.querySelector('.ps-dot');
+      if (dot) { dot.className = 'ps-dot checking'; }
+    });
+    chrome.runtime.sendMessage({ type: 'PROVIDER_HEALTH' }, function(health) {
+      if (chrome.runtime.lastError || !health || !health.providers) return;
+      health.providers.forEach(function(p) {
+        var item = document.querySelector('.ps-item[data-provider="' + p.name + '"]');
+        if (item) {
+          var dot = item.querySelector('.ps-dot');
+          if (dot) {
+            if (p.status === 'healthy') dot.className = 'ps-dot online';
+            else if (p.status === 'unhealthy' || p.status === 'unavailable') dot.className = 'ps-dot offline';
+            else dot.className = 'ps-dot checking';
+          }
+        }
+      });
+    });
+    setTimeout(checkProviderHealth, 30000);
   }
 
   function showWelcome() {
@@ -322,7 +347,7 @@
         panelTimeout = null;
         removeThinking();
         stopResponseFallback();
-        addMessage('ai', 'Cargando cerebro local (WebLLM)...');
+        addMessage('ai', 'Activando cerebro local (WebLLM)...');
         webLLMComplete(text).then(function(result) {
           clearPanelTimeout();
           removeThinking();
@@ -330,7 +355,7 @@
             var aiMsg = addMessage('ai', result.text, true);
             streamAiText(aiMsg, result.text);
           } else {
-            addMessage('ai', 'Configura tu API key en Settings. Groq es gratuita: groq.com');
+            addMessage('ai', 'Configura tu API key en Settings (icono de engranaje). Groq es gratuita: groq.com');
           }
         }).catch(function(e) {
           clearPanelTimeout();
@@ -338,7 +363,7 @@
           addMessage('ai', 'No se pudo cargar el cerebro local. ' + e.message);
         });
       }
-    }, 3500);
+    }, 4000);
 
     function doSend() {
       var requestId = activeRequestId;

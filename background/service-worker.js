@@ -359,8 +359,8 @@ function parseCommand(cmd) {
   // ── PROVIDER HEALTH ──
   if (/^(?:estado providers?|provider health|salud (?:de )?providers?|status ai)$/i.test(l)) return {action:'providerHealth'};
 
-  // ── WEB SEARCH (Tavily) ──
-  var mWebSearch = l.match(/^(?:busca en (?:la )?web|web search|buscar en internet)\s+(.+)$/i);
+  // ── WEB SEARCH (FreeWeb + Tavily fallback) ──
+  var mWebSearch = l.match(/^(?:busca en (?:la )?web|web search|buscar en internet|investiga\s+(?:sobre\s+)?|busca informaci[oó]n\s+(?:sobre\s+)?|b[uú]scame\s+|googlea\s+)\s*(.+)$/i);
   if (mWebSearch) return {action:'webSearch', query:mWebSearch[1].trim()};
 
   // ── CHECK CURRENT AI PROVIDER ──
@@ -2381,10 +2381,38 @@ function getProviderHealthSummary() {
     else if (providerHealth[name] === -1) status = 'unhealthy';
     summary.push({name: name, status: status, score: providerHealth[name] || 0});
   }
+  // Check FCC proxy status (external)
+  var fccStatus = 'unknown';
+  if (typeof X1FCCBridge !== 'undefined' && X1FCCBridge.healthCheck) {
+    try {
+      X1FCCBridge.healthCheck().then(function(h) {
+        fccStatus = h.ok ? 'healthy' : 'unhealthy';
+      }).catch(function() { fccStatus = 'unhealthy'; });
+    } catch(e) { fccStatus = 'unhealthy'; }
+  }
+  summary.push({name: 'fcc', status: fccStatus, score: fccStatus === 'healthy' ? 1 : 0});
+  // Check FreeWeb bridge status
+  var fwStatus = (typeof X1FreeWebBridge !== 'undefined') ? 'healthy' : 'unavailable';
+  summary.push({name: 'freeweb', status: fwStatus, score: fwStatus === 'healthy' ? 1 : 0});
   return summary;
 }
 
-// ── Tavily Web Search (AI-optimized search results) ──
+// ── FreeWeb Search (no API key needed) ──
+function freeWebSearch(query, options) {
+  if (typeof X1FreeWebBridge === 'undefined' || !X1FreeWebBridge.search) {
+    return Promise.resolve(null);
+  }
+  var maxResults = (options && options.maxResults) || 5;
+  return X1FreeWebBridge.search(query, {maxResults: maxResults}).then(function(results) {
+    if (!results || results.length === 0) return null;
+    return {answer: '', results: results};
+  }).catch(function(e) {
+    console.error('[X1] FreeWeb error:', e.message);
+    return null;
+  });
+}
+
+// ── Tavily Web Search (AI-optimized, requires API key) ──
 function tavilySearch(query, options) {
   var key = aiKeys.tavilyKey;
   if (!key) return Promise.resolve(null);
@@ -2413,15 +2441,27 @@ function tavilySearch(query, options) {
   }).catch(function(e) { console.error('[X1] Tavily fail:', e.message); return null; });
 }
 
+// ── Unified Web Search (FreeWeb first, Tavily fallback) ──
+function webSearch(query, options) {
+  options = options || {};
+  return freeWebSearch(query, options).then(function(fwResult) {
+    if (fwResult && fwResult.results && fwResult.results.length > 0) {
+      return fwResult;
+    }
+    return tavilySearch(query, options);
+  });
+}
+
 // ── Deep Research (multi-source synthesis) ──
 function deepResearch(query) {
-  return tavilySearch(query, {maxResults: 8, searchDepth: 'advanced'}).then(function(searchData) {
+  return webSearch(query, {maxResults: 8}).then(function(searchData) {
     if (!searchData || !searchData.results || searchData.results.length === 0) {
       return {text: 'No se encontraron resultados para: ' + query, sources: []};
     }
 
     var sourceSummary = searchData.results.map(function(r, idx) {
-      return '[' + (idx + 1) + '] ' + r.title + '\n' + r.url + '\n' + (r.content || '').substring(0, 500);
+      var content = r.content || r.snippet || '';
+      return '[' + (idx + 1) + '] ' + r.title + '\n' + r.url + '\n' + content.substring(0, 500);
     }).join('\n\n');
 
     var researchPrompt = 'Based on these search results, provide a comprehensive research synthesis about: "' + query + '"\n\n' +
@@ -5132,20 +5172,24 @@ function execAction(act, tabId) {
 
       case 'webSearch':
         var wsIdx = stepProgress(tabId, 'Search', 'Buscando: ' + (act.query || '').substring(0, 30));
-        tavilySearch(act.query || '', {maxResults: act.maxResults || 5}).then(function(searchResult) {
+        webSearch(act.query || '', {maxResults: act.maxResults || 5}).then(function(searchResult) {
           stepDone(tabId, wsIdx);
-          if (!searchResult) { resolve({text: 'No se pudieron obtener resultados.', showText: true}); return; }
+          if (!searchResult) {
+            resolve({text: 'No se pudieron obtener resultados. Prueba con webSearch si tienes API key de Tavily, o conecta FCC.', showText: true});
+            return;
+          }
           var searchText = '';
           if (searchResult.answer) searchText += searchResult.answer + '\n\n';
           if (searchResult.results) {
             for (var sr = 0; sr < searchResult.results.length; sr++) {
               searchText += (sr+1) + '. ' + searchResult.results[sr].title + '\n   ' + searchResult.results[sr].url + '\n';
+              if (searchResult.results[sr].snippet) searchText += '   ' + searchResult.results[sr].snippet + '\n';
             }
           }
           resolve({text: searchText || 'Sin resultados.', showText: true});
         }).catch(function(e) {
           stepError(tabId, wsIdx);
-          resolve({text: 'Error buscando: ' + e.message, showText: true});
+          resolve({text: 'Error buscando: ' + e.message + '. Activa FCC o configura API key de Tavily en Settings.', showText: true});
         });
         break;
 
@@ -6405,6 +6449,37 @@ chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
   if(msg.type==='PING'){
     console.log('[X1-SW] PING handler firing');
     sendResponse({pong:true, ts:Date.now()});
+    return false;
+  }
+  if(msg.type==='PROVIDER_HEALTH'){
+    var phSummary = getProviderHealthSummary();
+    var phResult = {providers: [], total: 0, healthy: 0};
+    for (var phi = 0; phi < phSummary.length; phi++) {
+      var phProv = phSummary[phi];
+      phResult.providers.push({
+        name: phProv.name,
+        status: phProv.status,
+        score: phProv.score
+      });
+      if (phProv.status === 'healthy') phResult.healthy++;
+    }
+    phResult.total = phResult.providers.length;
+    // Also check FCC explicitly
+    if (typeof X1FCCBridge !== 'undefined' && X1FCCBridge.healthCheck) {
+      X1FCCBridge.healthCheck().then(function(fccH) {
+        for (var fii = 0; fii < phResult.providers.length; fii++) {
+          if (phResult.providers[fii].name === 'fcc') {
+            phResult.providers[fii].status = fccH.ok ? 'healthy' : 'unhealthy';
+            if (fccH.ok) phResult.healthy++;
+          }
+        }
+        try { sendResponse(phResult); } catch(e) {}
+      }).catch(function() {
+        try { sendResponse(phResult); } catch(e) {}
+      });
+      return true;
+    }
+    sendResponse(phResult);
     return false;
   }
   if(msg.type==='TOOLBAR_ACTION'){
