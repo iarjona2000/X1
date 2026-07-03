@@ -248,11 +248,11 @@
     chatView.scrollTop = chatView.scrollHeight;
   }
 
-  function showThinking() {
+  function showThinking(msg) {
     removeThinking();
     var el = document.createElement('div');
     el.className = 'msg msg-thinking';
-    el.innerHTML = '<div class="thinking-dots"><span></span><span></span><span></span></div> Pensando...';
+    el.innerHTML = '<div class="thinking-dots"><span></span><span></span><span></span></div> ' + (msg || 'Pensando...');
     messagesEl.appendChild(el);
     currentThinking = el;
     scrollToBottom();
@@ -273,15 +273,22 @@
     if (panelTimeout) { clearTimeout(panelTimeout); panelTimeout = null; }
     panelTimeout = setTimeout(function() {
       if (!responded) {
-        responded = true; clearTimeout(panelTimeout); panelTimeout = null;
         removeThinking();
-        addMessage('ai', 'Parece que estoy tardando más de lo normal. Reintentando...');
-        responded = false;
-        activeRequestId = Date.now() + '-' + Math.floor(Math.random() * 10000);
-        showThinking();
-        doSend();
+        showThinking('Todavía pensando...');
+        var extendTimer = setTimeout(function() {
+          if (!responded) {
+            responded = true; clearTimeout(panelTimeout); panelTimeout = null;
+            removeThinking();
+            addMessage('ai', 'Parece que estoy tardando más de lo normal. Reintentando...');
+            responded = false;
+            activeRequestId = Date.now() + '-' + Math.floor(Math.random() * 10000);
+            showThinking();
+            doSend();
+          }
+        }, 15000);
+        panelTimeout = extendTimer;
       }
-    }, 12000);
+    }, 20000);
 
     function doSend() {
       var requestId = activeRequestId;
