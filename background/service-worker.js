@@ -44,6 +44,7 @@ try {
     'agents/agent-manager.js',
     'agents/workspace.js',
     'plugins/engine.js',
+    'plugins/agency-plugins.js',
     'automation/rule-engine.js',
     'monitor/page-monitor.js',
     'research/deep-research.js',
@@ -58,15 +59,7 @@ try {
     'prompts/assembler.js',
     'x1-core/bundle/x1-core.js',
     'x1-bridge.js',
-    // protocol.js/registry.js load here, BEFORE x1-integration.js/x1-api.js/
-    // agents-x1.js: those three unconditionally reference `window`, which
-    // doesn't exist in an MV3 service worker — they throw and abort the rest
-    // of the importScripts() call, so anything listed after them silently
-    // never loads. Not fixed here on purpose: x1-integration.js monkey-patches
-    // aiComplete/execAction/parseCommand and exposes x1CompareResponses/
-    // x1EvaluateResponse/x1RecordVote, which reads as judge/panel-adjacent —
-    // activating it is a behavior decision, not a mechanical bug fix, so it's
-    // left exactly as inert as it already was.
+    // protocol.js/registry.js load here.
     // (ai/continue-bridge.js removed 2026-07-03 — redundant provider bridge,
     // Ivan's decision: only NVIDIA NIM + Gemini.)
     'protocol.js',
@@ -107,9 +100,23 @@ try {
     'ai/ffmpeg-bridge.js',
     'ai/playwright-bridge.js',
     'ai/sharp-bridge.js',
-    'x1-integration.js',
+    // x1-api.js and agents-x1.js (2026-07-04 fix): both had the same unguarded
+    // `window.foo = ...` bug as the 26 bridges above — fixed the same mechanical
+    // way (self.foo, plus a `typeof` guard on the one bare `x1Log` reference in
+    // x1-api.js) so they load cleanly and agents-x1.js's 6 preset agents
+    // (research/email/code/meeting/writing/analyst) actually get seeded.
     'x1-api.js',
-    'agents-x1.js'
+    'agents-x1.js',
+    // x1-integration.js moved LAST, deliberately still unfixed: it unconditionally
+    // references `window` (line 18) same as the others did, but is NOT given the
+    // same mechanical fix — it monkey-patches aiComplete/execAction/parseCommand
+    // and exposes x1CompareResponses/x1EvaluateResponse/x1RecordVote, which reads
+    // as judge/panel-adjacent (partner's territory, see X1-Agents-Vault/00-Indice.md
+    // "Socio: orquestacion... Panel+Juez... No tocar esta parte"). Activating it is
+    // a behavior decision, not a bug fix, so it's left exactly as inert as before —
+    // just moved to the end of the list so its crash no longer takes x1-api.js and
+    // agents-x1.js down with it.
+    'x1-integration.js'
   );
   console.log('[X1] Modules loaded:',
     typeof X1IndexedDB !== 'undefined' ? 'indexeddb' : 'FAIL',
@@ -1436,16 +1443,20 @@ loadAIKeys();
 function registerDefaultProviders() {
   if (typeof X1Pool === 'undefined') return;
 
-  X1Pool.register({ name: 'groq', displayName: 'Groq (Llama 3.3)', family: 'meta', type: 'cloud', fast: true, cost: 'free', maxTokens: 8192, languages: ['es', 'en', 'fr', 'de'], capabilities: ['text', 'code', 'reasoning'], timeout: 15000, priority: 1, fn: groqComplete, has: !!aiKeys.groqKey });
-  X1Pool.register({ name: 'gemini', displayName: 'Google Gemini 2.5', family: 'google', type: 'cloud', fast: true, cost: 'free', maxTokens: 8192, languages: ['es', 'en', 'fr', 'de', 'ja', 'ko', 'zh'], capabilities: ['text', 'code', 'reasoning', 'multimodal', 'vision'], timeout: 20000, priority: 2, fn: geminiComplete, has: !!aiKeys.geminiKey });
-  X1Pool.register({ name: 'nvidiaGlm', displayName: 'NVIDIA GLM-5.1', family: 'nvidia', type: 'cloud', fast: true, cost: 'free', maxTokens: 4096, languages: ['es', 'en'], capabilities: ['text', 'reasoning'], timeout: 20000, priority: 3, fn: nvidiaGlmComplete, has: !!aiKeys.nvidiaKey });
-  X1Pool.register({ name: 'nvidiaNemotron', displayName: 'NVIDIA Nemotron-3 Ultra', family: 'nvidia', type: 'cloud', fast: false, cost: 'free', maxTokens: 4096, languages: ['es', 'en'], capabilities: ['text', 'reasoning'], timeout: 20000, priority: 4, fn: nvidiaNemotronComplete, has: !!aiKeys.nvidiaKey });
-  X1Pool.register({ name: 'nvidiaDeepseek', displayName: 'NVIDIA DeepSeek V4', family: 'nvidia', type: 'cloud', fast: false, cost: 'free', maxTokens: 4096, languages: ['es', 'en', 'zh'], capabilities: ['text', 'code', 'reasoning'], timeout: 20000, priority: 5, fn: nvidiaDeepseekComplete, has: !!aiKeys.nvidiaKey });
-  X1Pool.register({ name: 'cerebras', displayName: 'Cerebras Wafer Scale', family: 'cerebras', type: 'cloud', fast: true, cost: 'free', maxTokens: 8192, languages: ['es', 'en'], capabilities: ['text', 'code'], timeout: 15000, priority: 6, fn: cerebrasComplete, has: !!aiKeys.cerebrasKey });
-  X1Pool.register({ name: 'mistral', displayName: 'Mistral Small', family: 'mistral', type: 'cloud', fast: true, cost: 'free', maxTokens: 8192, languages: ['es', 'en', 'fr', 'de'], capabilities: ['text', 'code', 'reasoning'], timeout: 15000, priority: 7, fn: mistralComplete, has: !!aiKeys.mistralKey });
-  X1Pool.register({ name: 'openrouter', displayName: 'OpenRouter (Llama 4 Scout)', family: 'openrouter', type: 'cloud', fast: false, cost: 'free', maxTokens: 8192, languages: ['es', 'en'], capabilities: ['text', 'code', 'reasoning'], timeout: 20000, priority: 8, fn: openrouterComplete, has: !!aiKeys.openrouterKey });
-  X1Pool.register({ name: 'proxy', displayName: 'X1 Proxy (Cloudflare)', family: 'x1', type: 'edge', fast: true, cost: 'free', maxTokens: 4096, languages: ['es', 'en'], capabilities: ['text'], timeout: 10000, priority: 9, fn: proxyComplete, has: true });
-  X1Pool.register({ name: 'ollama', displayName: 'Ollama (Local)', family: 'local', type: 'local', fast: false, cost: 'free', maxTokens: 4096, languages: ['es', 'en'], capabilities: ['text', 'code'], timeout: 15000, priority: 10, fn: ollamaComplete, has: true });
+  // NOTA (fix 2026-07-04): esta funcion registraba 'groq'/'cerebras'/'mistral'/'openrouter' con
+  // fn apuntando a funciones que ya no existen en este archivo (descartadas en la consolidacion de
+  // proveedores) — una referencia sin `typeof` guard, a diferencia de cada otro sitio del codebase
+  // que llama a estas mismas funciones. Eso lanzaba un ReferenceError en la primera linea de esta
+  // funcion, así que X1Pool nunca llegaba a registrar NADA (ni siquiera gemini/nvidia/proxy/ollama).
+  // Sustituidas por los 5 modelos NVIDIA NIM realmente activos + gemini/proxy/ollama.
+  X1Pool.register({ name: 'gemini', displayName: 'Google Gemini 2.5', family: 'google', type: 'cloud', fast: true, cost: 'free', maxTokens: 8192, languages: ['es', 'en', 'fr', 'de', 'ja', 'ko', 'zh'], capabilities: ['text', 'code', 'reasoning', 'multimodal', 'vision'], timeout: 20000, priority: 1, fn: geminiComplete, has: !!aiKeys.geminiKey });
+  X1Pool.register({ name: 'nvidiaGlm', displayName: 'NVIDIA GLM-5.1', family: 'nvidia', type: 'cloud', fast: true, cost: 'free', maxTokens: 4096, languages: ['es', 'en'], capabilities: ['text', 'reasoning'], timeout: 20000, priority: 2, fn: nvidiaGlmComplete, has: !!aiKeys.nvidiaKey });
+  X1Pool.register({ name: 'nvidiaNemotron', displayName: 'NVIDIA Nemotron-3 Ultra', family: 'nvidia', type: 'cloud', fast: false, cost: 'free', maxTokens: 4096, languages: ['es', 'en'], capabilities: ['text', 'reasoning'], timeout: 20000, priority: 3, fn: nvidiaNemotronComplete, has: !!aiKeys.nvidiaKey });
+  X1Pool.register({ name: 'nvidiaGptOss', displayName: 'NVIDIA gpt-oss 120B', family: 'nvidia', type: 'cloud', fast: false, cost: 'free', maxTokens: 4096, languages: ['es', 'en'], capabilities: ['text', 'code', 'reasoning'], timeout: 20000, priority: 4, fn: nvidiaGptOssComplete, has: !!aiKeys.nvidiaKey });
+  X1Pool.register({ name: 'nvidiaLlama', displayName: 'NVIDIA Llama 4 Maverick', family: 'nvidia', type: 'cloud', fast: true, cost: 'free', maxTokens: 4096, languages: ['es', 'en'], capabilities: ['text', 'code', 'reasoning', 'multimodal', 'vision'], timeout: 20000, priority: 5, fn: nvidiaLlamaComplete, has: !!aiKeys.nvidiaKey });
+  X1Pool.register({ name: 'nvidiaQwen', displayName: 'NVIDIA Qwen3 Coder 480B', family: 'nvidia', type: 'cloud', fast: false, cost: 'free', maxTokens: 4096, languages: ['es', 'en', 'zh'], capabilities: ['text', 'code', 'reasoning'], timeout: 20000, priority: 6, fn: nvidiaQwenComplete, has: !!aiKeys.nvidiaKey });
+  X1Pool.register({ name: 'proxy', displayName: 'X1 Proxy (Cloudflare)', family: 'x1', type: 'edge', fast: true, cost: 'free', maxTokens: 4096, languages: ['es', 'en'], capabilities: ['text'], timeout: 10000, priority: 7, fn: proxyComplete, has: true });
+  X1Pool.register({ name: 'ollama', displayName: 'Ollama (Local)', family: 'local', type: 'local', fast: false, cost: 'free', maxTokens: 4096, languages: ['es', 'en'], capabilities: ['text', 'code'], timeout: 15000, priority: 8, fn: ollamaComplete, has: true });
 
   console.log('[X1] Registered ' + X1Pool.getActive().length + ' providers in pool');
 }
@@ -6688,7 +6699,12 @@ function answerAboutRegion(windowId, clientX, clientY, dpr, question) {
           binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
         }
         var base64 = btoa(binary);
-        var providersToTry = ['gemini', 'openai', 'groq'];
+        // Fixed 2026-07-04: 'openai' has no active key/entry in providers.config.js
+        // and 'groq' no longer exists as a function anywhere — both fallbacks were
+        // always dead, so only gemini (if keyed) ever answered. nvidia-llama reuses
+        // the already-active, already-keyed meta/llama-4-maverick-17b-128e-instruct
+        // (annotated "multimodal nativo" in worker/src/providers.config.js).
+        var providersToTry = ['gemini', 'nvidia-llama'];
         function tryNextProvider(index) {
           if (index >= providersToTry.length) { reject(new Error('No pude analizar la imagen con ningun proveedor disponible.')); return; }
           callVisionProvider(providersToTry[index], base64, question).then(resolve).catch(function(e) {
@@ -6714,7 +6730,7 @@ function handleAgentVision(tabId, step) {
         return;
       }
       var base64 = dataUrl.replace(/^data:image\/png;base64,/, "");
-      var providersToTry = ["gemini", "openai", "groq"];
+      var providersToTry = ["gemini", "nvidia-llama"]; // fixed 2026-07-04, see answerAboutRegion for why
       var lastError = null;
       function tryNextProvider(index) {
         if (index >= providersToTry.length) {
@@ -6743,8 +6759,27 @@ function callVisionProvider(provider, base64Image, prompt) {
   return new Promise(function(resolve, reject) {
     var providerConfig = aiProviders[provider];
     if (!providerConfig) { reject(new Error("Provider not found: " + provider)); return; }
-    var apiKey = aiKeys[provider + "Key"];
+    // All 5 NVIDIA NIM models share one key (aiKeys.nvidiaKey), not a per-model
+    // "<provider>Key" field like every other provider here.
+    var apiKey = (provider === "nvidia-llama") ? aiKeys.nvidiaKey : aiKeys[provider + "Key"];
     if (!apiKey && provider !== "ollama") { reject(new Error("No API key for " + provider)); return; }
+
+    if (provider === "nvidia-llama") {
+      var url = providerConfig.baseUrl;
+      var body = {
+        model: providerConfig.models[0],
+        messages: [{role: "user", content: [{type: "text", text: prompt}, {type: "image_url", image_url: {url: "data:image/png;base64," + base64Image}}]}],
+        temperature: 0.1, max_tokens: 2000
+      };
+      fetch(url, {method: "POST", headers: {"Content-Type": "application/json", "Authorization": "Bearer " + apiKey}, body: JSON.stringify(body)})
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (data.error) { reject(new Error(data.error.message || JSON.stringify(data.error))); return; }
+          var text = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content ? data.choices[0].message.content : JSON.stringify(data).substring(0, 500);
+          resolve(text);
+        }).catch(reject);
+      return;
+    }
 
     if (provider === "gemini") {
       var url = providerConfig.baseUrl + providerConfig.models[0] + ":generateContent?key=" + apiKey;
@@ -6812,7 +6847,8 @@ var aiProviders = {
   gemini: {name: "Gemini", models: ["gemini-2.0-flash", "gemini-1.5-pro"], baseUrl: "https://generativelanguage.googleapis.com/v1beta/models/"},
   anthropic: {name: "Anthropic", models: ["claude-3-5-sonnet-20241022", "claude-3-haiku-20240307"], baseUrl: "https://api.anthropic.com/v1/messages"},
   ollama: {name: "Ollama", models: ["llama3", "mistral", "codellama"], baseUrl: "http://localhost:11434/api/chat"},
-  nvidia: {name: "NVIDIA NIM", models: ["z-ai/glm-5.1", "nvidia/nemotron-3-ultra-550b-a55b", "deepseek-ai/deepseek-v4-pro"], baseUrl: "https://integrate.api.nvidia.com/v1/chat/completions"}
+  nvidia: {name: "NVIDIA NIM", models: ["z-ai/glm-5.1", "nvidia/nemotron-3-ultra-550b-a55b", "deepseek-ai/deepseek-v4-pro"], baseUrl: "https://integrate.api.nvidia.com/v1/chat/completions"},
+  "nvidia-llama": {name: "NVIDIA NIM — Llama 4 Maverick (vision)", models: ["meta/llama-4-maverick-17b-128e-instruct"], baseUrl: "https://integrate.api.nvidia.com/v1/chat/completions"}
 };
 
 function getAvailableProviders() {
