@@ -1802,7 +1802,8 @@ function stripImages(txt) {
     .replace(/\b[fF]oto[s]?[^\s]*\.(png|jpg|jpeg|gif|webp|bmp|svg|ico)\b/gi, '')
     .replace(/["'][^"']+\.(png|jpg|jpeg|gif|webp|bmp|svg|ico)["']/gi, '')
     .replace(/\b\w+[-_\s]\w+[-_\s]\w+\.(png|jpg|jpeg|gif|webp|bmp|svg|ico)\b/gi, '')
-    .replace(/\b(?:image|img|photo|screenshot|capture|captura|foto|pantalla|imagen)\b/gi, '');
+    .replace(/\b(?:image|img|photo|screenshot|capture|captura|foto|pantalla|imagen)\b/gi, '')
+    .replace(/\bimage\.(png|jpg|jpeg|gif|webp|bmp|svg|ico)\b/gi, '');
 }
 
 function isValidContent(txt) {
