@@ -16,7 +16,7 @@
   }
 
   var C = X1Bridge.raw();
-  var log = x1Log ? x1Log('API') : { info: function(m){console.log('[X1-API]',m);}, error: function(m){console.error('[X1-API]',m);} };
+  var log = (typeof x1Log === 'function') ? x1Log('API') : { info: function(m){console.log('[X1-API]',m);}, error: function(m){console.error('[X1-API]',m);} };
 
   // ─── Continue.dev Provider Classes (Apache 2.0 - Continue.dev Contributors) ───
 
@@ -155,11 +155,11 @@
   GeminiProvider.prototype = Object.create(OpenAICompatibleProvider.prototype);
   GeminiProvider.prototype.constructor = GeminiProvider;
 
-  // Expose globally for handlers
-  window.BaseLLMProvider = BaseLLMProvider;
-  window.OllamaProvider = OllamaProvider;
-  window.OpenAICompatibleProvider = OpenAICompatibleProvider;
-  window.GeminiProvider = GeminiProvider;
+  // Expose globally for handlers (MV3 service worker has `self`, not `window`)
+  self.BaseLLMProvider = BaseLLMProvider;
+  self.OllamaProvider = OllamaProvider;
+  self.OpenAICompatibleProvider = OpenAICompatibleProvider;
+  self.GeminiProvider = GeminiProvider;
 
   // ── Progress broadcast helper ──
   function broadcastProgress(tabId, app, description, status) {

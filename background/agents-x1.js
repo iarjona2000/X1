@@ -125,21 +125,23 @@
   }
 
   // Expose seed function globally so it can be called from service-worker
-  window.x1SeedAgents = seedAgents;
+  // (MV3 service worker has `self`, not `window` — same fix already applied
+  // to the ~26 sibling ai/*-bridge.js files, see X1-Agents-Vault/05-Notas-de-Fusion.md)
+  self.x1SeedAgents = seedAgents;
 
   // Auto-seed after a short delay (to let SW finish loading)
   setTimeout(seedAgents, 2000);
 
   // ── Also expose the agent definitions for voice commands ──
-  window.x1AgentDefs = AGENT_DEFS;
+  self.x1AgentDefs = AGENT_DEFS;
 
   // ── Register specialized agent commands in parseCommand ──
   // These are additional command patterns that call agents directly.
   setTimeout(function() {
-    if (typeof window.parseCommand !== 'function') return;
+    if (typeof parseCommand !== 'function') return;
 
-    var _orig = window.parseCommand;
-    window.parseCommand = function(cmd) {
+    var _orig = parseCommand;
+    parseCommand = function(cmd) {
       var r = _orig(cmd);
       if (r) return r;
 
@@ -148,42 +150,42 @@
       // "investiga <tema>" → research-agent
       var mResearch = l.match(/^(investiga|research|busca\s+info\s+(sobre\s+|de\s+)?|deep\s+research)\s+(.+)/i);
       if (mResearch) {
-        window.x1SeedAgents();
+        self.x1SeedAgents();
         return { action: 'x1agent', agentName: 'research-agent', goal: mResearch[3] || mResearch[2] || cmd };
       }
 
       // "correo: <instrucción>" → email-agent
       var mEmail = l.match(/^(correo|email|mail)\s*:\s*(.+)/i);
       if (mEmail) {
-        window.x1SeedAgents();
+        self.x1SeedAgents();
         return { action: 'x1agent', agentName: 'email-agent', goal: mEmail[2] };
       }
 
       // "programa <descripción>" → code-agent
       var mCode = l.match(/^(programa|escribe\s+c[oó]digo|code|implementa)\s+(.+)/i);
       if (mCode) {
-        window.x1SeedAgents();
+        self.x1SeedAgents();
         return { action: 'x1agent', agentName: 'code-agent', goal: mCode[2] };
       }
 
       // "prepara reunión <tema>" → meeting-agent
       var mMeeting = l.match(/^(prepara\s+(reuni[oó]n|meeting)|meeting\s+prep)\s*(.+)?/i);
       if (mMeeting) {
-        window.x1SeedAgents();
+        self.x1SeedAgents();
         return { action: 'x1agent', agentName: 'meeting-agent', goal: mMeeting[3] || 'preparar próxima reunión' };
       }
 
       // "escribe <tipo>" → writing-agent
       var mWrite = l.match(/^(escribe\s+(un|una)\s+(documento|informe|art[ií]culo|propuesta|carta|email)|redacta\s+(un|una))\s+(.+)/i);
       if (mWrite) {
-        window.x1SeedAgents();
+        self.x1SeedAgents();
         return { action: 'x1agent', agentName: 'writing-agent', goal: mWrite[0] };
       }
 
       // "analiza <tema>" → analyst-agent
       var mAnalyst = l.match(/^(analiza|analize|analiza\s+datos)\s+(.+)/i);
       if (mAnalyst) {
-        window.x1SeedAgents();
+        self.x1SeedAgents();
         return { action: 'x1agent', agentName: 'analyst-agent', goal: mAnalyst[2] };
       }
 
