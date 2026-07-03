@@ -17,6 +17,14 @@
   var currentThinking = null;
   var messages = [];
   var responded = false;
+  var panelTimeout = null;
+  var activeRequestId = null;
+
+  function clearPanelTimeout() {
+    responded = true;
+    if (panelTimeout) { clearTimeout(panelTimeout); panelTimeout = null; }
+    stopResponseFallback();
+  }
 
   showWelcome();
   initVoice();
@@ -235,7 +243,9 @@
     showThinking();
 
     responded = false;
-    var panelTimeout = setTimeout(function() {
+    activeRequestId = Date.now() + '-' + Math.floor(Math.random() * 10000);
+    if (panelTimeout) { clearTimeout(panelTimeout); panelTimeout = null; }
+    panelTimeout = setTimeout(function() {
       if (!responded) {
         responded = true;
         removeThinking();
@@ -244,7 +254,7 @@
     }, 28000);
 
     function doSend() {
-      var requestId = Date.now() + '-' + Math.floor(Math.random() * 10000);
+      var requestId = activeRequestId;
       console.log('[X1-sidepanel] Sending VOICE_COMMAND_EXEC:', text.substring(0, 50), 'requestId:', requestId);
       startResponseFallback(requestId);
       chrome.runtime.sendMessage(
@@ -693,6 +703,7 @@
 
     if (msg.type === 'X1_VOICE_RESPONSE') {
       console.log('[X1-sidepanel] X1_VOICE_RESPONSE received:', msg.text ? msg.text.substring(0, 50) : msg.error);
+      clearPanelTimeout();
       removeThinking();
       if (msg.text) {
         var aiMsg = addMessage('ai', msg.text, true);
@@ -712,18 +723,19 @@
       try {
         chrome.storage.local.get(['x1LastResponse'], function(r) {
           if (r && r.x1LastResponse && r.x1LastResponse.requestId === requestId) {
-            if (!lastSidepanelResponse || lastSidepanelResponse.requestId !== requestId) {
-              lastSidepanelResponse = r.x1LastResponse;
-              removeThinking();
-              if (lastSidepanelResponse.text) {
-                var aiMsg = addMessage('ai', lastSidepanelResponse.text, true);
-                streamAiText(aiMsg, lastSidepanelResponse.text);
-              } else if (lastSidepanelResponse.error) {
-                addMessage('ai', 'Error: ' + lastSidepanelResponse.error);
+              if (!lastSidepanelResponse || lastSidepanelResponse.requestId !== requestId) {
+                lastSidepanelResponse = r.x1LastResponse;
+                clearPanelTimeout();
+                removeThinking();
+                if (lastSidepanelResponse.text) {
+                  var aiMsg = addMessage('ai', lastSidepanelResponse.text, true);
+                  streamAiText(aiMsg, lastSidepanelResponse.text);
+                } else if (lastSidepanelResponse.error) {
+                  addMessage('ai', 'Error: ' + lastSidepanelResponse.error);
+                }
+                clearInterval(responseFallbackInterval);
+                responseFallbackInterval = null;
               }
-              clearInterval(responseFallbackInterval);
-              responseFallbackInterval = null;
-            }
           }
         });
       } catch(e) {}
