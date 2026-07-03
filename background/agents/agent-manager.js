@@ -3,14 +3,20 @@ var X1AgentManager = (function() {
   var STORAGE_KEY = 'x1_agents';
   var METRICS_KEY = 'x1_agent_metrics';
 
+  // NOTE (fix 2026-07-04): every function here used to pass `sys` as a second
+  // positional arg. That's correct for ollama/proxy (real options objects), but
+  // `aiComplete(userMsg, opts)` treats its 2nd arg as an options object (reads
+  // `opts.forceJudge` etc.), never a system-prompt string — and `geminiComplete`'s
+  // 2nd arg is `{model,maxTokens,temperature}`. Neither ever reads `sys`, so every
+  // BUILT_IN_AGENT's systemPrompt was silently discarded. Fixed by baking `sys`
+  // into the message text instead, matching the convention already used at the
+  // 20+ other `aiComplete(...)` call sites throughout service-worker.js. Also
+  // dropped the dead groq/grok/openai entries (no active provider maps to them).
   var PROVIDER_MAP = {
-    groq: function(msg, sys) { return typeof groqComplete === 'function' ? groqComplete(msg, sys) : Promise.resolve(null); },
-    grok: function(msg, sys) { return typeof grokComplete === 'function' ? grokComplete(msg, sys) : Promise.resolve(null); },
-    openai: function(msg, sys) { return typeof openaiComplete === 'function' ? openaiComplete(msg, sys) : Promise.resolve(null); },
-    gemini: function(msg, sys) { return typeof geminiComplete === 'function' ? geminiComplete(msg, sys) : Promise.resolve(null); },
+    gemini: function(msg, sys) { return typeof geminiComplete === 'function' ? geminiComplete(sys ? sys + '\n\n' + msg : msg) : Promise.resolve(null); },
     ollama: function(msg, sys) { return typeof ollamaComplete === 'function' ? ollamaComplete(msg, sys) : Promise.resolve(null); },
     proxy: function(msg, sys) { return typeof proxyComplete === 'function' ? proxyComplete(msg, sys) : Promise.resolve(null); },
-    auto: function(msg, sys) { return typeof aiComplete === 'function' ? aiComplete(msg, sys) : Promise.resolve(null); }
+    auto: function(msg, sys) { return typeof aiComplete === 'function' ? aiComplete(sys ? sys + '\n\n' + msg : msg) : Promise.resolve(null); }
   };
 
   var BUILT_IN_AGENTS = [
