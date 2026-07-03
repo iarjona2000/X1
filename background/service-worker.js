@@ -271,7 +271,7 @@ function parseCommand(cmd) {
   }
 
   // ── CHANGE AI PROVIDER ──
-  var mUseAI = l.match(/^(?:usa|utiliza|cambia\s*a)\s+(groq|gemini|ollama|cerebras|mistral|openrouter|nvidia|nemotron|deepseek|auto)$/i);
+  var mUseAI = l.match(/^(?:usa|utiliza|cambia\s*a)\s+(fcc|groq|gemini|ollama|cerebras|mistral|openrouter|nvidia|nemotron|deepseek|auto)$/i);
   if (mUseAI) {
     var prov = mUseAI[1].toLowerCase();
     if (prov === 'nvidia') prov = 'nvidiaGlm';
@@ -5772,14 +5772,15 @@ function handleVoice(cmd, wantsText, sendResponse) {
     }
   }
 
-var hasAnyKey = !!(aiKeys.groqKey || aiKeys.nvidiaKey || aiKeys.geminiKey || aiKeys.openrouterKey || aiKeys.cerebrasKey || aiKeys.mistralKey);
-   var hasProxy = !!PROXY_URL;
-   var hasOllama = ollamaModels && ollamaModels.length > 0;
-   var hasWebLLM = typeof X1WebLLMBridge !== 'undefined' && X1WebLLMBridge.isLoaded && X1WebLLMBridge.isLoaded();
-   if (!hasAnyKey && !hasProxy && !hasOllama && !hasWebLLM) {
-     respond({text: 'Configura tu API key en Settings (icono de engranaje) para poder responder. Groq es gratuita: groq.com', showText: true});
-     return;
-   }
+  var hasAnyKey = !!(aiKeys.groqKey || aiKeys.nvidiaKey || aiKeys.geminiKey || aiKeys.openrouterKey || aiKeys.cerebrasKey || aiKeys.mistralKey);
+  var hasProxy = !!PROXY_URL;
+  var hasFCC = typeof X1FCCBridge !== 'undefined' && X1FCCBridge.isAvailable && X1FCCBridge.isAvailable();
+  var hasOllama = ollamaModels && ollamaModels.length > 0;
+  var hasWebLLM = typeof X1WebLLMBridge !== 'undefined' && X1WebLLMBridge.isLoaded && X1WebLLMBridge.isLoaded();
+  if (!hasAnyKey && !hasProxy && !hasFCC && !hasOllama && !hasWebLLM) {
+    respond({text: 'No hay proveedores de IA disponibles. Arranca FCC proxy (start-fcc.bat) o configura una API key en Settings.', showText: true});
+    return;
+  }
 
   var fastTimer = setTimeout(function(){
     if (!responded) {
@@ -5971,7 +5972,7 @@ var hasAnyKey = !!(aiKeys.groqKey || aiKeys.nvidiaKey || aiKeys.geminiKey || aiK
         ];
         var errMsg = fallbacks[Math.floor(Math.random() * fallbacks.length)];
         if (!activeKeys.length && !hasProxy && !hasOllama) {
-          errMsg = 'No hay proveedores de IA configurados. Di "configura groq <tu clave>" para usar Groq gratis, o revisa Settings.';
+          errMsg = 'No hay proveedores de IA disponibles. Arranca FCC proxy (start-fcc.bat) o configura una API key en Settings.';
         }
         respond({text:errMsg, showText:true, persona: persona, personaPrompt: personaPrompt, mode: 'socratic'});
         return;
@@ -5990,7 +5991,7 @@ var hasAnyKey = !!(aiKeys.groqKey || aiKeys.nvidiaKey || aiKeys.geminiKey || aiK
     }).catch(function(e){
       clearTimeout(fastTimer);clearTimeout(slowTimer);
       console.error('[X1] AI error:', e.message);
-      respond({text:'Error de IA: '+e.message+'. Prueba "usa groq" o "usa openai".', showText:true, persona: persona, personaPrompt: personaPrompt});
+      respond({text:'Error de IA: '+e.message+'. Arranca FCC proxy (start-fcc.bat) o prueba otro proveedor con "usa groq".', showText:true, persona: persona, personaPrompt: personaPrompt});
     });
   }).catch(function(e){
     clearTimeout(fastTimer);clearTimeout(slowTimer);
