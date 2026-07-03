@@ -71,6 +71,42 @@ try {
     // Ivan's decision: only NVIDIA NIM + Gemini.)
     'protocol.js',
     'integrations/registry.js',
+    // 26 bridges de tu socio (2026-07-04, commits cddd5ec/c8da7e8/466775b/c4a7cf3).
+    // 3 archivos que su lista original nombraba no existen en el arbol y se
+    // omiten aqui (habrian hecho fallar todo el importScripts): 'ai/continue-bridge.js'
+    // (lo elimine yo el 2026-07-03, decision de Ivan), 'ai/plotly-bridge.js' y
+    // 'ai/mermaid-bridge.js' (nunca llegaron a commitearse). Arregle un bug
+    // mecanico identico en los 26 restantes: todos exportaban `window.X1Nombre = {...}`
+    // sin comprobar que exista `window` (no existe en un service worker MV3) —
+    // cambiado a `self.X1Nombre` en los 26, sin tocar la logica interna de ninguno
+    // (no he revisado ni alterado ai-judge.js/ai-voting.js/ai-router.js/ai-pool.js
+    // mas alla de esa linea — es terreno del socio). Ver X1-Agents-Vault/05-Notas-de-Fusion.md.
+    'ai/kilo-bridge.js',
+    'ai/openwebui-bridge.js',
+    'ai/llamaindex-bridge.js',
+    'ai/piper-bridge.js',
+    'ai/whisper-bridge.js',
+    'ai/huggingface-bridge.js',
+    'ai/chromadb-bridge.js',
+    'ai/leveldb-bridge.js',
+    'ai/sqlite-bridge.js',
+    'ai/d3-bridge.js',
+    'ai/chartjs-bridge.js',
+    'ai/langchain-bridge.js',
+    'ai/tesseract-bridge.js',
+    'ai/transformers-bridge.js',
+    'ai/ai-judge.js',
+    'ai/ai-voting.js',
+    'ai/ai-router.js',
+    'ai/ai-pool.js',
+    'ai/page-agent-bridge.js',
+    'ai/freeweb-bridge.js',
+    'ai/browserai-bridge.js',
+    'ai/n0x-bridge.js',
+    'ai/webllm-bridge.js',
+    'ai/ffmpeg-bridge.js',
+    'ai/playwright-bridge.js',
+    'ai/sharp-bridge.js',
     'x1-integration.js',
     'x1-api.js',
     'agents-x1.js'
@@ -86,6 +122,32 @@ try {
     typeof X1Bridge !== 'undefined' && X1Bridge.loaded ? 'x1-core' : 'FAIL',
     typeof x1DetectSector === 'function' ? 'x1-integration' : 'FAIL',
     typeof X1Integrations !== 'undefined' ? 'integrations-registry' : 'FAIL',
+    typeof X1KiloBridge !== 'undefined' ? 'kilo-bridge' : 'FAIL',
+    typeof X1OpenWebUIBridge !== 'undefined' ? 'openwebui-bridge' : 'FAIL',
+    typeof X1LlamaIndexBridge !== 'undefined' ? 'llamaindex-bridge' : 'FAIL',
+    typeof X1PiperBridge !== 'undefined' ? 'piper-bridge' : 'FAIL',
+    typeof X1WhisperBridge !== 'undefined' ? 'whisper-bridge' : 'FAIL',
+    typeof X1HuggingFaceBridge !== 'undefined' ? 'huggingface-bridge' : 'FAIL',
+    typeof X1ChromaDBBridge !== 'undefined' ? 'chromadb-bridge' : 'FAIL',
+    typeof X1LevelDBBridge !== 'undefined' ? 'leveldb-bridge' : 'FAIL',
+    typeof X1SQLiteBridge !== 'undefined' ? 'sqlite-bridge' : 'FAIL',
+    typeof X1D3Bridge !== 'undefined' ? 'd3-bridge' : 'FAIL',
+    typeof X1ChartJSBridge !== 'undefined' ? 'chartjs-bridge' : 'FAIL',
+    typeof X1LangChainBridge !== 'undefined' ? 'langchain-bridge' : 'FAIL',
+    typeof X1TesseractBridge !== 'undefined' ? 'tesseract-bridge' : 'FAIL',
+    typeof X1TransformersBridge !== 'undefined' ? 'transformers-bridge' : 'FAIL',
+    typeof X1Judge !== 'undefined' ? 'ai-judge' : 'FAIL',
+    typeof X1Voting !== 'undefined' ? 'ai-voting' : 'FAIL',
+    typeof X1Router !== 'undefined' ? 'ai-router' : 'FAIL',
+    typeof X1Pool !== 'undefined' ? 'ai-pool' : 'FAIL',
+    typeof X1PageAgentBridge !== 'undefined' ? 'page-agent-bridge' : 'FAIL',
+    typeof X1FreeWebBridge !== 'undefined' ? 'freeweb-bridge' : 'FAIL',
+    typeof X1BrowserAIBridge !== 'undefined' ? 'browserai-bridge' : 'FAIL',
+    typeof X1N0xBridge !== 'undefined' ? 'n0x-bridge' : 'FAIL',
+    typeof X1WebLLMBridge !== 'undefined' ? 'webllm-bridge' : 'FAIL',
+    typeof X1FFmpegBridge !== 'undefined' ? 'ffmpeg-bridge' : 'FAIL',
+    typeof X1PlaywrightBridge !== 'undefined' ? 'playwright-bridge' : 'FAIL',
+    typeof X1SharpBridge !== 'undefined' ? 'sharp-bridge' : 'FAIL',
     typeof X1Protocol !== 'undefined' ? 'protocol' : 'FAIL');
 } catch(e) {
   console.error('[X1] Module import failed:', e && e.message);
@@ -1369,6 +1431,25 @@ function loadAIKeys() {
   });
 }
 loadAIKeys();
+
+// Register default providers in the pool
+function registerDefaultProviders() {
+  if (typeof X1Pool === 'undefined') return;
+
+  X1Pool.register({ name: 'groq', displayName: 'Groq (Llama 3.3)', family: 'meta', type: 'cloud', fast: true, cost: 'free', maxTokens: 8192, languages: ['es', 'en', 'fr', 'de'], capabilities: ['text', 'code', 'reasoning'], timeout: 15000, priority: 1, fn: groqComplete, has: !!aiKeys.groqKey });
+  X1Pool.register({ name: 'gemini', displayName: 'Google Gemini 2.5', family: 'google', type: 'cloud', fast: true, cost: 'free', maxTokens: 8192, languages: ['es', 'en', 'fr', 'de', 'ja', 'ko', 'zh'], capabilities: ['text', 'code', 'reasoning', 'multimodal', 'vision'], timeout: 20000, priority: 2, fn: geminiComplete, has: !!aiKeys.geminiKey });
+  X1Pool.register({ name: 'nvidiaGlm', displayName: 'NVIDIA GLM-5.1', family: 'nvidia', type: 'cloud', fast: true, cost: 'free', maxTokens: 4096, languages: ['es', 'en'], capabilities: ['text', 'reasoning'], timeout: 20000, priority: 3, fn: nvidiaGlmComplete, has: !!aiKeys.nvidiaKey });
+  X1Pool.register({ name: 'nvidiaNemotron', displayName: 'NVIDIA Nemotron-3 Ultra', family: 'nvidia', type: 'cloud', fast: false, cost: 'free', maxTokens: 4096, languages: ['es', 'en'], capabilities: ['text', 'reasoning'], timeout: 20000, priority: 4, fn: nvidiaNemotronComplete, has: !!aiKeys.nvidiaKey });
+  X1Pool.register({ name: 'nvidiaDeepseek', displayName: 'NVIDIA DeepSeek V4', family: 'nvidia', type: 'cloud', fast: false, cost: 'free', maxTokens: 4096, languages: ['es', 'en', 'zh'], capabilities: ['text', 'code', 'reasoning'], timeout: 20000, priority: 5, fn: nvidiaDeepseekComplete, has: !!aiKeys.nvidiaKey });
+  X1Pool.register({ name: 'cerebras', displayName: 'Cerebras Wafer Scale', family: 'cerebras', type: 'cloud', fast: true, cost: 'free', maxTokens: 8192, languages: ['es', 'en'], capabilities: ['text', 'code'], timeout: 15000, priority: 6, fn: cerebrasComplete, has: !!aiKeys.cerebrasKey });
+  X1Pool.register({ name: 'mistral', displayName: 'Mistral Small', family: 'mistral', type: 'cloud', fast: true, cost: 'free', maxTokens: 8192, languages: ['es', 'en', 'fr', 'de'], capabilities: ['text', 'code', 'reasoning'], timeout: 15000, priority: 7, fn: mistralComplete, has: !!aiKeys.mistralKey });
+  X1Pool.register({ name: 'openrouter', displayName: 'OpenRouter (Llama 4 Scout)', family: 'openrouter', type: 'cloud', fast: false, cost: 'free', maxTokens: 8192, languages: ['es', 'en'], capabilities: ['text', 'code', 'reasoning'], timeout: 20000, priority: 8, fn: openrouterComplete, has: !!aiKeys.openrouterKey });
+  X1Pool.register({ name: 'proxy', displayName: 'X1 Proxy (Cloudflare)', family: 'x1', type: 'edge', fast: true, cost: 'free', maxTokens: 4096, languages: ['es', 'en'], capabilities: ['text'], timeout: 10000, priority: 9, fn: proxyComplete, has: true });
+  X1Pool.register({ name: 'ollama', displayName: 'Ollama (Local)', family: 'local', type: 'local', fast: false, cost: 'free', maxTokens: 4096, languages: ['es', 'en'], capabilities: ['text', 'code'], timeout: 15000, priority: 10, fn: ollamaComplete, has: true });
+
+  console.log('[X1] Registered ' + X1Pool.getActive().length + ' providers in pool');
+}
+registerDefaultProviders();
 
 var googleUser = null;
 function loadGoogleUser() {
@@ -3159,7 +3240,7 @@ function heuristicWinner(valid, results) {
 
 function aiComplete(userMsg, opts) {
   opts = opts || {};
-  var timeoutMs = 22000;
+  var timeoutMs = 25000;
   var timeoutPromise = new Promise(function(resolve) {
     setTimeout(function() {
       console.warn('[X1] aiComplete global timeout after ' + timeoutMs + 'ms');
@@ -3264,8 +3345,17 @@ function aiComplete(userMsg, opts) {
     });
   }
 
+  // ═══════════════════════════════════════════
+  // JUDGE-POWERED FLOW
+  // ═══════════════════════════════════════════
+
   var resultPromise = ensureKeysLoaded().then(function() {
-    var chain = getChain().filter(function(p){return p.has;});
+    // 1. Analyze query
+    var analysis = (typeof X1Judge !== 'undefined') ? X1Judge.analyzeQuery(userMsg) : { type: classifyTask(userMsg), complexity: 'moderate' };
+    console.log('[X1-Judge] Query analysis:', JSON.stringify(analysis));
+
+    // 2. Get providers from pool or fallback
+    var chain = getAllProviders().filter(function(p){return p.has;});
 
     if (chain.length === 0) {
       console.warn('[X1] All providers filtered — resetting circuit breakers');
@@ -3273,56 +3363,83 @@ function aiComplete(userMsg, opts) {
       Object.keys(rateLimits).forEach(function(k) { delete rateLimits[k]; });
       providerHealth = {};
       proxyLastFail = 0;
-      chain = getChain().filter(function(p){return p.has;});
+      chain = getAllProviders().filter(function(p){return p.has;});
     }
 
+    // 3. Select voters using router
     var panelSize = Math.min(3, chain.length);
+    if (analysis.complexity === 'complex') panelSize = Math.min(4, chain.length);
     var panelCandidates = chain.slice(0, panelSize);
     var fallbackChain = chain.slice(panelSize);
 
-    console.log('[X1] Panel candidates:', panelCandidates.map(function(p){return p.name;}).join(', '),
+    console.log('[X1-Judge] Voters:', panelCandidates.map(function(p){return p.name;}).join(', '),
       '| Fallback:', fallbackChain.map(function(p){return p.name;}).join(', '));
 
+    // 4. Collect votes (parallel)
     var panelCalls = panelCandidates.map(function(p) { return callProvider(p); });
 
     return Promise.all(panelCalls).then(function(results) {
       var valid = results.filter(function(r) { return r.parsed && r.score >= 0; });
 
       if (valid.length > 0) {
-        var taskTypeForJudge = classifyTask(userMsg);
-        var wantsJudge = !!opts.forceJudge || isHighRiskTask(userMsg, taskTypeForJudge);
-        var canJudge = valid.length >= 2 && taskTypeForJudge !== TASK_TYPES.SENSITIVE && wantsJudge;
+        // 5. Score and rank votes
+        var ranked = valid;
+        if (typeof X1Voting !== 'undefined') {
+          ranked = X1Voting.RankingEngine.rank(valid, analysis);
+        } else {
+          valid.sort(function(a, b) { return b.score - a.score; });
+        }
+
+        // 6. Detect consensus
+        var consensus = { has: false, strength: 0, type: 'none' };
+        if (typeof X1Voting !== 'undefined') {
+          var scoredVotes = ranked.map(function(v) { return { provider: v.provider, score: { total: v.score / 10 } }; });
+          consensus = X1Voting.ConsensusDetector.detect(scoredVotes);
+        } else {
+          if (ranked.length > 1 && Math.abs(ranked[0].score - ranked[1].score) <= 1) {
+            consensus = { has: true, strength: 0.8, type: 'moderate' };
+          }
+        }
+        console.log('[X1-Judge] Consensus:', consensus.type, '(' + Math.round((consensus.strength || 0) * 100) + '%)');
+
+        // 7. Always use Judge for synthesis if available
+        var wantsJudge = !!opts.forceJudge || isHighRiskTask(userMsg, analysis.type) || consensus.strength < 0.6;
+        var canJudge = valid.length >= 2 && analysis.type !== TASK_TYPES.SENSITIVE && wantsJudge;
 
         if (canJudge) {
           return canUsePanelJudgeToday().then(function(allowed) {
             if (!allowed) {
-              console.log('[X1] Panel+Juez: límite diario alcanzado, uso ganador por heurística');
+              console.log('[X1-Judge] Daily limit reached, using heuristic winner');
               return heuristicWinner(valid, results);
             }
-            return judgeRound(valid, taskTypeForJudge, userMsg).then(function(verdict) {
+            return judgeRound(valid, analysis.type, userMsg).then(function(verdict) {
               if (!verdict) {
-                console.warn('[X1] Panel+Juez: el juez no dio veredicto válido, uso heurística');
+                console.warn('[X1-Judge] Judge gave no valid verdict, using heuristic');
                 return heuristicWinner(valid, results);
               }
               incrementPanelJudgeUsage();
-              recordCalibration(taskTypeForJudge, verdict.winner, null);
-              console.log('[X1] Panel+Juez winner:', verdict.winner.provider, '| Juez:', verdict.judge, '|', verdict.justification);
+              recordCalibration(analysis.type, verdict.winner, null);
+              console.log('[X1-Judge] Winner:', verdict.winner.provider, '| Judge:', verdict.judge, '|', verdict.justification);
               return verdict.winner.parsed;
             });
           });
         }
 
-        return heuristicWinner(valid, results);
+        // 8. Use ranked winner (heuristic)
+        var winner = ranked[0];
+        console.log('[X1-Judge] Heuristic winner:', winner.provider, '(score:', winner.score, ', ' + winner.elapsed + 'ms)');
+        return winner.parsed;
       }
 
-      console.warn('[X1] All panel candidates failed, falling back to cascade...');
+      // 9. All panel failed, cascade fallback
+      console.warn('[X1-Judge] All panel candidates failed, falling back to cascade...');
       function tryNext(providers, i) {
         if (i >= providers.length) return Promise.resolve(null);
         var p = providers[i];
-        console.log('[X1] Cascade fallback trying:', p.name);
+        console.log('[X1-Judge] Cascade fallback trying:', p.name);
         return callProvider(p).then(function(r) {
           if (r.parsed && r.score >= 0) {
-            console.log('[X1] Cascade OK via', r.provider);
+            console.log('[X1-Judge] Cascade OK via', r.provider);
             return r.parsed;
           }
           return tryNext(providers, i + 1);

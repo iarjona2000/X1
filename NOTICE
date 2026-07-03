@@ -1,0 +1,55 @@
+X1 (C-BOS) - Open Source Attributions
+========================================
+
+This project integrates the following open source software:
+
+1. Continue.dev
+   License: Apache-2.0
+   Copyright: Continue.dev Contributors
+   Repository: https://github.com/continuedev/continue
+   Files: background/ai/continue-bridge.js
+   License File: LICENSES/APACHE-2.0.txt
+
+2. Kilo Code
+   License: Apache-2.0
+   Copyright: Kilo-Org Contributors
+   Repository: https://github.com/Kilo-Org/kilocode
+   Files: background/ai/kilo-bridge.js
+   License File: LICENSES/KILO-APACHE-2.0.txt
+
+3. Open WebUI
+   License: MIT
+   Copyright: Open WebUI Contributors
+   Repository: https://github.com/open-webui/open-webui
+   Files: background/ai/openwebui-bridge.js
+   License File: LICENSES/OPENWEBUI-MIT.txt
+
+4. LlamaIndex
+   License: MIT
+   Copyright: LlamaIndex Contributors
+   Repository: https://github.com/run-llama/llama_index
+   Files: background/ai/llamaindex-bridge.js
+   License File: LICENSES/LLAMAINDEX-MIT.txt
+
+5. Piper TTS
+   License: Apache-2.0
+   Copyright: Rhasspy / Hugging Face Contributors
+   Repository: https://github.com/rhasspy/piper
+   HuggingFace: https://huggingface.co/rhasspy
+   Files: background/ai/piper-bridge.js
+   License File: LICENSES/APACHE-2.0.txt
+
+6. Whisper STT
+   License: MIT
+   Copyright: OpenAI / Hugging Face Contributors
+   Repository: https://github.com/openai/whisper
+   HuggingFace: https://huggingface.co/openai
+   Files: background/ai/whisper-bridge.js
+   License File: LICENSES/WHISPER-MIT.txt
+
+7. Hugging Face Integration
+   License: MIT + Apache-2.0
+   Copyright: Hugging Face Contributors
+   Repository: https://huggingface.co
+   Files: background/ai/huggingface-bridge.js
+   License File: LICENSES/MIT.txt + LICENSES/APACHE-2.0.txt
