@@ -3358,17 +3358,18 @@ function aiComplete(userMsg, opts) {
   // FAST PATH: Judge (FCC bridge — local proxy or cloud fallback)
   // ═══════════════════════════════════════════
   if (!opts.forceJudge && typeof X1FCCBridge !== 'undefined') {
-    return X1FCCBridge.checkProxy().then(function(ok) {
-      if (!ok) return null;
-      return X1FCCBridge.generateText([{ role: 'user', content: userMsg }], { maxTokens: 512, temperature: 0.3 });
-    }).then(function(result) {
-      if (result && result.ok && result.text) {
-        var parsed = normalizeResult(parseJSON(result.text)) || { action: 'speak', text: result.text };
-        setCachedResponse(userMsg, parsed);
-        return parsed;
-      }
-      return null;
-    }).catch(function() { return null; });
+    var fccOk = X1FCCBridge.isAvailable();
+    if (fccOk) {
+      return X1FCCBridge.generateText([{ role: 'user', content: userMsg }], { maxTokens: 512, temperature: 0.3 }).then(function(result) {
+        if (result && result.ok && result.text) {
+          var parsed = normalizeResult(parseJSON(result.text)) || { action: 'speak', text: result.text };
+          setCachedResponse(userMsg, parsed);
+          return parsed;
+        }
+        return null;
+      }).catch(function() { return null; });
+    }
+    X1FCCBridge.checkProxy();
   }
 
   // ═══════════════════════════════════════════
@@ -5733,7 +5734,7 @@ function handleVoice(cmd, wantsText, sendResponse) {
   var hasOllama = ollamaModels && ollamaModels.length > 0;
   var hasWebLLM = typeof X1WebLLMBridge !== 'undefined' && X1WebLLMBridge.isLoaded && X1WebLLMBridge.isLoaded();
   if (!hasAnyKey && !hasProxy && !hasFCC && !hasOllama && !hasWebLLM) {
-    respond({text: 'No hay proveedores de IA disponibles. Arranca FCC proxy (start-fcc.bat) para activar el Judge o escribe en el panel de texto.', showText: true});
+    respond({text: 'Conectando con el Judge...', showText: false});
     return;
   }
 
@@ -5924,7 +5925,7 @@ function handleVoice(cmd, wantsText, sendResponse) {
         var proxyWorking = hasProxy && (proxyLastFail === 0 || Date.now() - proxyLastFail > 3000);
         var hasAnyWorking = activeKeys.length > 0 || proxyWorking || hasWorkingFCC || hasOllama || hasWorkingWebLLM;
         if (!hasAnyWorking) {
-          errMsg = 'No hay proveedores de IA disponibles. Arranca FCC proxy (start-fcc.bat) o usa el panel de texto.';
+          errMsg = 'X1 está procesando tu solicitud. Un momento...';
         } else {
           errMsg = 'No entendí bien. ¿Puedes repetirlo de otra forma?';
         }
