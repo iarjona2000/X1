@@ -3355,37 +3355,20 @@ function aiComplete(userMsg, opts) {
   if (cached) return Promise.resolve(cached);
 
   // ═══════════════════════════════════════════
-  // FAST PATH: Cloudflare Worker proxy (deployed, working, ~1s)
+  // FAST PATH: Judge (FCC bridge — local proxy or cloud fallback)
   // ═══════════════════════════════════════════
-  var proxyOk = !!PROXY_URL && !(typeof proxyLastFail !== 'undefined' && Date.now() - proxyLastFail < 3000);
-  if (proxyOk && !opts.forceJudge) {
-    console.log('[X1] Fast path: Cloudflare proxy');
-    return proxyComplete(userMsg).then(function(txt) {
-      if (txt) {
-        var parsed = normalizeResult(parseJSON(txt)) || { action: 'speak', text: txt };
+  if (!opts.forceJudge && typeof X1FCCBridge !== 'undefined') {
+    return X1FCCBridge.checkProxy().then(function(ok) {
+      if (!ok) return null;
+      return X1FCCBridge.generateText([{ role: 'user', content: userMsg }], { maxTokens: 512, temperature: 0.3 });
+    }).then(function(result) {
+      if (result && result.ok && result.text) {
+        var parsed = normalizeResult(parseJSON(result.text)) || { action: 'speak', text: result.text };
         setCachedResponse(userMsg, parsed);
         return parsed;
       }
       return null;
     }).catch(function() { return null; });
-  }
-
-  // ═══════════════════════════════════════════
-  // FAST PATH: FCC Proxy (local, primary Judge brain when running)
-  // ═══════════════════════════════════════════
-  var hasFCC = typeof X1FCCBridge !== 'undefined' && X1FCCBridge.isAvailable && X1FCCBridge.isAvailable();
-  if (hasFCC && !opts.forceJudge) {
-    console.log('[X1] Fast path: FCC proxy');
-    return X1FCCBridge.generateText([{ role: 'user', content: userMsg }], { maxTokens: 512, temperature: 0.3 })
-      .then(function(result) {
-        if (result.ok && result.text) {
-          var parsed = normalizeResult(parseJSON(result.text)) || { action: 'speak', text: result.text };
-          setCachedResponse(userMsg, parsed);
-          return parsed;
-        }
-        return null;
-      })
-      .catch(function() { return null; });
   }
 
   // ═══════════════════════════════════════════

@@ -262,22 +262,30 @@
     if (currentThinking) { currentThinking.remove(); currentThinking = null; }
   }
 
-  var PROXY_URL = 'https://x1-proxy.baosx1.workers.dev';
-  var PROXY_SECRET = '9ff4b7dda5f7defd5f7fb7c32c133428bc87e8efeb8550d3ce1e5838c1d3b850';
+  var LOCAL_JUDGE = 'http://localhost:8082';
+  var CLOUD_JUDGE = 'https://x1-proxy.baosx1.workers.dev';
+  var CLOUD_SECRET = '9ff4b7dda5f7defd5f7fb7c32c133428bc87e8efeb8550d3ce1e5838c1d3b850';
 
-  function callProxy(userMsg) {
-    return fetch(PROXY_URL + '/v1/chat/completions', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json', 'X-X1-Auth': PROXY_SECRET},
-      body: JSON.stringify({messages:[{role:'user', content:userMsg}]}),
-      signal: AbortSignal.timeout(15000)
-    }).then(function(r) {
-      if (!r.ok) return null;
-      return r.json();
-    }).then(function(d) {
-      if (!d || !d.choices || !d.choices[0] || !d.choices[0].message) return null;
-      return (d.choices[0].message.content || '').trim();
-    }).catch(function() { return null; });
+  function callJudge(userMsg, baseUrl, secret) {
+    var isLocal = baseUrl === LOCAL_JUDGE;
+    var url = isLocal ? baseUrl + '/v1/messages' : baseUrl + '/v1/chat/completions';
+    var headers = {'Content-Type': 'application/json'};
+    var body;
+    if (isLocal) {
+      headers['x-api-key'] = '';
+      body = JSON.stringify({model: 'nvidia_nim/nvidia/nemotron-3-super-120b-a12b', messages: [{role:'user', content:userMsg}], max_tokens: 512, stream: false});
+    } else {
+      headers['X-X1-Auth'] = secret;
+      body = JSON.stringify({messages: [{role:'user', content:userMsg}]});
+    }
+    return fetch(url, {method:'POST', headers:headers, body:body, signal:AbortSignal.timeout(3000)})
+      .then(function(r) { return r.ok ? r.json() : Promise.reject(); }).then(function(d) {
+        if (isLocal) {
+          if (d && d.content && d.content[0] && d.content[0].text) return (d.content[0].text).trim();
+          return (d && d.content && d.content[0] && d.content[0].text || '').trim();
+        }
+        return (d && d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content || '').trim();
+      }).catch(function() { return null; });
   }
 
   function sendMessage() {
@@ -289,25 +297,23 @@
     responded = false;
     if (panelTimeout) { clearTimeout(panelTimeout); panelTimeout = null; }
 
-    callProxy(text).then(function(txt) {
-      if (txt) {
-        clearPanelTimeout();
-        if (!responded) {
-          responded = true; removeThinking();
-          var aiMsg = addMessage('ai', txt, true);
-          streamAiText(aiMsg, txt);
-        }
-        return;
-      }
-      tryFallback(text);
+    // Try local FCC first (2s timeout), then cloud (3s), then SW fallback
+    callJudge(text, LOCAL_JUDGE).then(function(txt) {
+      if (txt) { showResponse(txt); return; }
+      return callJudge(text, CLOUD_JUDGE, CLOUD_SECRET).then(function(txt2) {
+        if (txt2) { showResponse(txt2); return; }
+        tryFallback(text);
+      });
     });
 
     panelTimeout = setTimeout(function() {
-      if (!responded) {
-        removeThinking();
-        addMessage('ai', 'El proxy cloud no responde. Arranca FCC proxy (start-fcc.bat) para usar el Judge local.');
-      }
-    }, 20000);
+      if (!responded) { removeThinking(); addMessage('ai', 'El Judge no responde. Arranca FCC proxy (start-fcc.bat).'); }
+    }, 10000);
+  }
+
+  function showResponse(txt) {
+    clearPanelTimeout();
+    if (!responded) { responded = true; removeThinking(); var m = addMessage('ai', txt, true); streamAiText(m, txt); }
   }
 
   function tryFallback(text) {
