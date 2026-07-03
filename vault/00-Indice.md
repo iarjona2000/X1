@@ -30,6 +30,7 @@ Vault de Obsidian (basta con abrir esta carpeta en Obsidian, no requiere configu
 - [[Agentes-Atencion-Cliente/00-Atencion|Atención al cliente]]
 - [[Agentes-Ventas-CRM/00-Ventas|Ventas / CRM (CRO)]] — ya integrado en X1 (Pipedrive/HubSpot)
 - [[Agentes-Estrategia/00-Estrategia|Estrategia]]
+- [[Agentes-Conectores/00-Conectores|Conectores (ecosistema MCP de Claude)]] — 59 conectores, transversal a todos los roles
 
 ### Importación en bloque de `agency-agents` (nivel 4 — plantilla de prompt, ver [[01-Mecanismo-de-Integracion]])
 
