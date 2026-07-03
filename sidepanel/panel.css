@@ -317,66 +317,101 @@ html, body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  padding: 56px 24px 32px;
+  padding: 36px 16px 24px;
   text-align: center;
-  gap: 16px;
+  gap: 12px;
 }
 
-.welcome-logo {
-  width: 120px;
-  height: auto;
-  opacity: 0.08;
-  margin-bottom: 12px;
+.welcome-brand {
+  margin-bottom: 4px;
+}
+
+.welcome-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, var(--primary), #8b5cf6);
+  color: white;
+  font-family: var(--font-heading);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  box-shadow: 0 4px 16px rgba(77, 107, 254, 0.25);
 }
 
 .welcome h1 {
   font-family: var(--font-heading);
-  font-size: 26px;
+  font-size: 22px;
   font-weight: 600;
   color: var(--foreground);
   letter-spacing: -0.02em;
-  margin-top: 4px;
+  margin: 0;
 }
 
-.welcome p {
-  font-family: var(--font-heading);
-  font-size: 15px;
-  color: var(--muted-foreground);
-  max-width: 280px;
-  line-height: 1.65;
-  font-style: italic;
-  letter-spacing: 0.005em;
-}
-
-.suggestions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  justify-content: center;
-  margin-top: 16px;
-  max-width: 320px;
-}
-
-.suggestion {
-  padding: 8px 16px;
-  border: 1px solid var(--border);
-  border-radius: 20px;
-  background: var(--card);
-  color: var(--secondary-foreground);
+.welcome-sub {
   font-family: var(--font-sans);
-  font-size: 12px;
-  font-weight: 500;
-  letter-spacing: 0.01em;
-  cursor: pointer;
-  transition: border-color 0.2s, color 0.2s, background 0.2s;
-  box-shadow: none;
+  font-size: 13px;
+  color: var(--muted-foreground);
+  margin: 0 0 4px;
+  font-weight: 400;
 }
 
-.suggestion:hover {
+.caps-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  width: 100%;
+  max-width: 340px;
+  margin-top: 8px;
+}
+
+.cap-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 14px 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--card);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  -webkit-appearance: none;
+  font-family: inherit;
+}
+
+.cap-card:hover {
   border-color: var(--primary);
+  box-shadow: 0 2px 12px rgba(77, 107, 254, 0.10);
+  transform: translateY(-1px);
+}
+
+.cap-card:active {
+  transform: translateY(0);
+}
+
+.cap-icon {
+  font-size: 20px;
+  line-height: 1;
+  margin-bottom: 2px;
+}
+
+.cap-label {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 600;
   color: var(--foreground);
-  background: var(--muted);
+  letter-spacing: 0.02em;
+}
+
+.cap-desc {
+  font-family: var(--font-sans);
+  font-size: 9px;
+  color: var(--muted-foreground);
+  letter-spacing: 0.02em;
 }
 
 #tasks-header {
@@ -572,6 +607,7 @@ html, body {
   padding: 10px 12px 14px;
   border-top: 1px solid var(--border);
   background: var(--background);
+  box-shadow: 0 -1px 8px rgba(26,26,26,0.03);
 }
 
 #input-row {
@@ -694,6 +730,15 @@ html, body {
   text-transform: uppercase;
 }
 
+.ps-item.clickable {
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.ps-item.clickable:hover {
+  color: var(--foreground);
+}
+
 .ps-dot {
   width: 5px;
   height: 5px;
@@ -707,7 +752,7 @@ html, body {
 .ps-dot.checking { background: #f59e0b; animation: pulse-dot 0.8s ease-in-out infinite; }
 
 ::-webkit-scrollbar {
-  width: 5px;
+  width: 4px;
 }
 
 ::-webkit-scrollbar-track {
@@ -716,11 +761,17 @@ html, body {
 
 ::-webkit-scrollbar-thumb {
   background: var(--border);
-  border-radius: 3px;
+  border-radius: 4px;
+  min-height: 40px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--muted-foreground);
+}
+
+::selection {
+  background: rgba(77, 107, 254, 0.15);
+  color: inherit;
 }
 
 .settings-overlay {

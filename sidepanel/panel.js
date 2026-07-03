@@ -102,6 +102,13 @@
   checkConnection();
   checkProviderHealth();
 
+  var fccStatusItem = document.querySelector('.ps-item.clickable');
+  if (fccStatusItem) {
+    fccStatusItem.addEventListener('click', function() {
+      chrome.tabs.create({url: 'fcc-start.html'});
+    });
+  }
+
   tabs.forEach(function(tab) {
     tab.addEventListener('click', function() {
       var target = this.getAttribute('data-tab');
@@ -172,18 +179,47 @@
     var welcome = document.createElement('div');
     welcome.className = 'welcome';
     welcome.innerHTML =
-      '<img src="../assets/x1-logo.png" alt="X1" class="welcome-logo">' +
-      '<h1>How can I help?</h1>' +
-      '<p>Navigate, search, manage your email and calendar, or simply ask.</p>' +
-      '<div class="suggestions">' +
-        '<button class="suggestion" data-cmd="What meetings do I have today?">Meetings today</button>' +
-        '<button class="suggestion" data-cmd="Summarize my unread emails">Unread emails</button>' +
-        '<button class="suggestion" data-cmd="Search for the latest news">Latest news</button>' +
-        '<button class="suggestion" data-cmd="What can you do?">Your capabilities</button>' +
+      '<div class="welcome-brand">' +
+        '<span class="welcome-icon">X1</span>' +
+      '</div>' +
+      '<h1>What can I do for you?</h1>' +
+      '<p class="welcome-sub">Voice or text. X1 sees your browser and acts.</p>' +
+      '<div class="caps-grid">' +
+        '<button class="cap-card" data-cmd="investiga las ultimas tendencias en inteligencia artificial">' +
+          '<span class="cap-icon">🔍</span>' +
+          '<span class="cap-label">Research</span>' +
+          '<span class="cap-desc">Search &amp; synthesize</span>' +
+        '</button>' +
+        '<button class="cap-card" data-cmd="resume mi bandeja de entrada de gmail">' +
+          '<span class="cap-icon">📧</span>' +
+          '<span class="cap-label">Email</span>' +
+          '<span class="cap-desc">Read &amp; reply</span>' +
+        '</button>' +
+        '<button class="cap-card" data-cmd="crea un documento sobre ideas para Y Combinator">' +
+          '<span class="cap-icon">📝</span>' +
+          '<span class="cap-label">Documents</span>' +
+          '<span class="cap-desc">Create &amp; edit</span>' +
+        '</button>' +
+        '<button class="cap-card" data-cmd="que reuniones tengo hoy">' +
+          '<span class="cap-icon">📅</span>' +
+          '<span class="cap-label">Calendar</span>' +
+          '<span class="cap-desc">Schedule &amp; view</span>' +
+        '</button>' +
+        '<button class="cap-card" data-cmd="navega a ycombinator.com">' +
+          '<span class="cap-icon">🌐</span>' +
+          '<span class="cap-label">Navigate</span>' +
+          '<span class="cap-desc">Browse &amp; click</span>' +
+        '</button>' +
+        '<button class="cap-card" data-cmd="que puedes hacer exactamente">' +
+          '<span class="cap-icon">⚡</span>' +
+          '<span class="cap-label">Quick Demo</span>' +
+          '<span class="cap-desc">See capabilities</span>' +
+        '</button>' +
       '</div>';
+
     messagesEl.appendChild(welcome);
 
-    welcome.querySelectorAll('.suggestion').forEach(function(btn) {
+    welcome.querySelectorAll('.cap-card').forEach(function(btn) {
       btn.addEventListener('click', function() {
         var cmd = this.getAttribute('data-cmd');
         input.value = cmd;
