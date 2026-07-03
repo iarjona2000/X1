@@ -6486,73 +6486,41 @@ chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
     var requestId = msg.requestId || (Date.now() + '-' + Math.floor(Math.random() * 10000));
     var sideSender = sender;
     var swResponded = false;
-    try { sendResponse({ack: true, requestId: requestId}); } catch(_) {}
 
-    function sendPanelResponse(data) {
+    function sendResp(data) {
       if (swResponded) return; swResponded = true;
-      var payload = {
-        type: 'X1_VOICE_RESPONSE',
-        source: 'x1-voice-response',
-        text: (data && data.text) || '',
-        showText: !!(data && data.showText),
-        error: (data && data.error) || null,
-        requestId: requestId
-      };
-      console.log('[X1-SW] sendPanelResponse:', payload.text ? payload.text.substring(0, 50) : payload.error);
-      try { chrome.storage.local.set({x1LastResponse: payload}); } catch(e) { console.warn('[X1-SW] storage.set failed:', e.message); }
+      var text = (data && data.text) || (data && data.error) || '';
+      console.log('[X1-SW] response:', text.substring(0, 50));
       try {
-        if (sideSender && sideSender.tab && sideSender.tab.id) {
-          chrome.tabs.sendMessage(sideSender.tab.id, payload).catch(function(e){ console.warn('[X1-SW] tabs.sendMessage failed:', e.message); });
-        }
-      } catch(e) { console.warn('[X1-SW] tabs.sendMessage error:', e.message); }
-      try {
-        chrome.runtime.sendMessage(payload).catch(function(e){ console.warn('[X1-SW] runtime.sendMessage failed:', e.message); });
-      } catch(e) { console.warn('[X1-SW] runtime.sendMessage error:', e.message); }
+        var ack = {text: text, showText: !!(data && data.showText), requestId: requestId};
+        chrome.storage.local.set({x1LastResponse: ack});
+        sendResponse(ack);
+      } catch(e) { console.warn('[X1-SW] sendResponse failed:', e.message); }
     }
 
-    function proxyDirectComplete(userMsg) {
-      if (!PROXY_URL) return Promise.resolve({ok: false, text: '', error: 'no proxy url'});
-      var proxyHeaders = {'Content-Type':'application/json', 'X-X1-Auth': aiKeys.proxySecret || PROXY_SHARED_SECRET};
+    function proxyDirect(userMsg) {
+      if (!PROXY_URL) return Promise.resolve(null);
+      var h = {'Content-Type':'application/json', 'X-X1-Auth': aiKeys.proxySecret || PROXY_SHARED_SECRET};
       return fetch(PROXY_URL + '/v1/chat/completions', {
-        method:'POST',
-        headers:proxyHeaders,
-        body:JSON.stringify({
-          messages:[{role:'user', content:userMsg}]
-        }),
-        signal:AbortSignal.timeout(15000)
-      }).then(function(r){
-        if (!r.ok) return Promise.reject(new Error('HTTP ' + r.status));
+        method:'POST', headers: h, signal: AbortSignal.timeout(15000),
+        body: JSON.stringify({messages:[{role:'user', content:userMsg}]})
+      }).then(function(r) {
+        if (!r.ok) return null;
         return r.json();
-      }).then(function(data){
-        var txt = (data.choices&&data.choices[0]&&data.choices[0].message&&data.choices[0].message.content||'').trim();
-        if (!isValidContent(txt)) return {ok: false, text: '', error: 'invalid content'};
-        return {ok: true, text: txt};
-      }).catch(function(e){
-        console.warn('[X1-SW] proxyDirect failed:', e.message);
-        return {ok: false, text: '', error: e.message};
-      });
+      }).then(function(d) {
+        if (!d || !d.choices || !d.choices[0] || !d.choices[0].message) return null;
+        var txt = (d.choices[0].message.content || '').trim();
+        return txt && isValidContent(txt) ? txt : null;
+      }).catch(function() { return null; });
     }
 
-    (function processVoice(){
-      proxyDirectComplete(cmdText).then(function(proxyResult) {
-        if (proxyResult.ok && !swResponded) {
-          sendPanelResponse({text: proxyResult.text, showText: true});
-          return;
-        }
-        handleVoice(cmdText, wantsText, function(data){
-          console.log('[X1-SW] handleVoice callback:', data ? (data.text || '').substring(0, 50) : 'null');
-          sendPanelResponse(data);
-        });
-      });
-      setTimeout(function() {
-        if (!swResponded) {
-          console.warn('[X1-SW] Safety timeout 15s');
-          handleVoice(cmdText, wantsText, function(data){
-            if (!swResponded) sendPanelResponse(data);
-          });
-        }
-      }, 15000);
-    })();
+    proxyDirect(cmdText).then(function(txt) {
+      if (txt) { sendResp({text: txt, showText: true}); return; }
+      handleVoice(cmdText, wantsText, function(data) { sendResp(data); });
+    });
+    setTimeout(function() {
+      if (!swResponded) { sendResp({text: 'Procesando...', showText: false}); }
+    }, 15000);
     return true;
   }
   if(msg.type==='X1_MEETING_END'){

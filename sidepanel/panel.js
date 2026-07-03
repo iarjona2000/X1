@@ -301,7 +301,14 @@
             if (!responded) { responded = true; clearTimeout(panelTimeout); removeThinking(); stopResponseFallback(); }
             return;
           }
-          if (response && response.ack) console.log('[X1-sidepanel] ack received');
+          if (response && response.text) {
+            clearPanelTimeout();
+            if (!responded) {
+              responded = true; stopResponseFallback(); removeThinking();
+              var aiMsg = addMessage('ai', response.text, true);
+              streamAiText(aiMsg, response.text);
+            }
+          }
         }
       );
     }
