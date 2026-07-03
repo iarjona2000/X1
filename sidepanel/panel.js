@@ -18,6 +18,76 @@
   var messages = [];
   var responded = false;
   var panelTimeout = null;
+  var webLLMEngine = null;
+  var webLLMLoaded = false;
+
+  // Detect WebGPU support
+  function detectWebGPU() {
+    if (typeof navigator === 'undefined' || !navigator.gpu) {
+      return Promise.resolve({ supported: false });
+    }
+    return navigator.gpu.requestAdapter().then(function(adapter) {
+      if (!adapter) return { supported: false };
+      return adapter.requestDevice().then(function() {
+        return { supported: true, adapter: adapter };
+      }).catch(function() { return { supported: false }; });
+    }).catch(function() { return { supported: false }; });
+  }
+
+  // Load WebLLM model
+  function loadWebLLM() {
+    if (webLLMLoaded && webLLMEngine) return Promise.resolve({ ok: true });
+    if (typeof window.webllm === 'undefined') {
+      return new Promise(function(resolve) {
+        var script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/@mlc-ai/web-llm@latest/lib/index.js';
+        script.onload = function() {
+          window.webllm.CreateMLCEngine('Llama-3.2-1B-Instruct-q4f16_1-MLC').then(function(engine) {
+            webLLMEngine = engine;
+            webLLMLoaded = true;
+            console.log('[X1-sidepanel] WebLLM loaded');
+            resolve({ ok: true });
+          }).catch(function(e) {
+            console.error('[X1-sidepanel] WebLLM load failed:', e);
+            resolve({ ok: false, error: e.message });
+          });
+        };
+        script.onerror = function() {
+          resolve({ ok: false, error: 'Failed to load WebLLM script' });
+        };
+        document.head.appendChild(script);
+      });
+    }
+    return Promise.resolve({ ok: true });
+  }
+
+  function webLLMComplete(userMsg) {
+    if (!webLLMLoaded || !webLLMEngine) {
+      return loadWebLLM().then(function() {
+        if (!webLLMLoaded || !webLLMEngine) {
+          return { ok: false, error: 'WebLLM not available' };
+        }
+        return performWebLLMInference(userMsg);
+      });
+    }
+    return performWebLLMInference(userMsg);
+  }
+
+  function performWebLLMInference(userMsg) {
+    return webLLMEngine.chat.completions.create({
+      messages: [{ role: 'user', content: userMsg }],
+      max_tokens: 256,
+      temperature: 0.7
+    }).then(function(response) {
+      return {
+        ok: true,
+        text: response.choices[0].message.content,
+        model: 'Llama-3.2-1B-WebLLM'
+      };
+    }).catch(function(e) {
+      return { ok: false, error: e.message };
+    });
+  }
   var activeRequestId = null;
 
   function clearPanelTimeout() {
@@ -248,10 +318,27 @@
     panelTimeout = setTimeout(function() {
       if (!responded) {
         responded = true;
+        clearTimeout(panelTimeout);
+        panelTimeout = null;
         removeThinking();
-        addMessage('ai', 'Sin respuesta del servidor. Verifica que tienes una API key configurada en Settings.');
+        stopResponseFallback();
+        addMessage('ai', 'Cargando cerebro local (WebLLM)...');
+        webLLMComplete(text).then(function(result) {
+          clearPanelTimeout();
+          removeThinking();
+          if (result && result.ok && result.text) {
+            var aiMsg = addMessage('ai', result.text, true);
+            streamAiText(aiMsg, result.text);
+          } else {
+            addMessage('ai', 'Configura tu API key en Settings. Groq es gratuita: groq.com');
+          }
+        }).catch(function(e) {
+          clearPanelTimeout();
+          removeThinking();
+          addMessage('ai', 'No se pudo cargar el cerebro local. ' + e.message);
+        });
       }
-    }, 28000);
+    }, 3500);
 
     function doSend() {
       var requestId = activeRequestId;

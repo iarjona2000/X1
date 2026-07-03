@@ -95,6 +95,7 @@ try {
     'ai/browserai-bridge.js',
     'ai/n0x-bridge.js',
     'ai/webllm-bridge.js',
+    'ai/fcc-bridge.js',
     'x1-integration.js',
     'x1-api.js',
     'agents-x1.js'
@@ -1412,6 +1413,8 @@ loadAIKeys();
 function registerDefaultProviders() {
   if (typeof X1Pool === 'undefined') return;
 
+  X1Pool.register({ name: 'fcc', displayName: 'FCC Proxy (Claude via 18 providers)', family: 'fcc', type: 'local', fast: true, cost: 'free', maxTokens: 32768, languages: ['es', 'en', 'fr', 'de', 'ja', 'ko', 'zh'], capabilities: ['text', 'code', 'reasoning', 'agent', 'tool-use', 'multimodal'], timeout: 15000, priority: 0, fn: fccComplete, has: true });
+
   X1Pool.register({ name: 'groq', displayName: 'Groq (Llama 3.3)', family: 'meta', type: 'cloud', fast: true, cost: 'free', maxTokens: 8192, languages: ['es', 'en', 'fr', 'de'], capabilities: ['text', 'code', 'reasoning'], timeout: 15000, priority: 1, fn: groqComplete, has: !!aiKeys.groqKey });
   X1Pool.register({ name: 'gemini', displayName: 'Google Gemini 2.5', family: 'google', type: 'cloud', fast: true, cost: 'free', maxTokens: 8192, languages: ['es', 'en', 'fr', 'de', 'ja', 'ko', 'zh'], capabilities: ['text', 'code', 'reasoning', 'multimodal', 'vision'], timeout: 20000, priority: 2, fn: geminiComplete, has: !!aiKeys.geminiKey });
   X1Pool.register({ name: 'nvidiaGlm', displayName: 'NVIDIA GLM-5.1', family: 'nvidia', type: 'cloud', fast: true, cost: 'free', maxTokens: 4096, languages: ['es', 'en'], capabilities: ['text', 'reasoning'], timeout: 20000, priority: 3, fn: nvidiaGlmComplete, has: !!aiKeys.nvidiaKey });
@@ -1820,6 +1823,18 @@ function isValidContent(txt) {
   return true;
 }
 
+// ── FCC Proxy (Free Claude Code — primary Judge brain via 18 providers) ──
+var fccLastFail = 0;
+function fccComplete(userMsg) {
+  if (typeof X1FCCBridge === 'undefined') { fccLastFail = Date.now(); return Promise.resolve(null); }
+  if (Date.now() - fccLastFail < 5000) return Promise.resolve(null);
+  return X1FCCBridge.complete(userMsg).then(function(txt) {
+    if (!txt || (typeof isValidContent === 'function' && !isValidContent(txt))) { fccLastFail = Date.now(); return null; }
+    fccLastFail = 0;
+    return txt;
+  }).catch(function() { fccLastFail = Date.now(); return null; });
+}
+
 // ── Groq (free, ultra-fast ~0.3s) ──
 function groqComplete(userMsg) {
   var key = aiKeys.groqKey;
@@ -1906,7 +1921,29 @@ function ollamaComplete(userMsg) {
   });
 }
 
- 
+// ── WebLLM (local inference via WebGPU — zero API keys) ──
+function webllmComplete(userMsg) {
+  if (typeof X1WebLLMBridge === 'undefined' || !X1WebLLMBridge.isLoaded || !X1WebLLMBridge.isLoaded()) {
+    if (typeof X1WebLLMBridge !== 'undefined' && X1WebLLMBridge.loadModel) {
+      var defaultModel = X1WebLLMBridge.getRecommendedModel ? X1WebLLMBridge.getRecommendedModel() : 'llama3-2-1b';
+      return X1WebLLMBridge.loadModel(defaultModel).then(function(loadResult) {
+        if (!loadResult.ok) return null;
+        return X1WebLLMBridge.generateText([{role:'system',content:stripImages(getCachedSystemPrompt(userMsg))},{role:'user',content:stripImages(userMsg)}], {maxTokens:256,temperature:0.7})
+          .then(function(r) {
+            if (r && r.ok && r.text) return r.text;
+            return null;
+          }).catch(function(){ return null; });
+      });
+    }
+    return Promise.resolve(null);
+  }
+  return X1WebLLMBridge.generateText([{role:'system',content:stripImages(getCachedSystemPrompt(userMsg))},{role:'user',content:stripImages(userMsg)}], {maxTokens:256,temperature:0.7})
+    .then(function(r) {
+      if (r && r.ok && r.text) return r.text;
+      return null;
+    }).catch(function(){ return null; });
+}
+
 // ── NVIDIA NIM (una sola clave, varios modelos — cada uno cuenta como candidato
 //    distinto para el Panel+Juez, pero comparten cuota/infraestructura: si NVIDIA
 //    cae o la clave se revoca, caen los 3 a la vez) ──
@@ -3363,6 +3400,24 @@ function aiComplete(userMsg, opts) {
   // ═══════════════════════════════════════════
   var cached = getCachedResponse(userMsg);
   if (cached) return Promise.resolve(cached);
+
+  // ═══════════════════════════════════════════
+  // FAST PATH: FCC Proxy (primary Judge brain)
+  // ═══════════════════════════════════════════
+  var hasFCC = typeof X1FCCBridge !== 'undefined' && X1FCCBridge.isAvailable && X1FCCBridge.isAvailable();
+  if (hasFCC && !opts.forceJudge) {
+    console.log('[X1] Fast path: FCC proxy');
+    return X1FCCBridge.generateText([{ role: 'user', content: userMsg }], { maxTokens: 512, temperature: 0.3 })
+      .then(function(result) {
+        if (result.ok && result.text) {
+          var parsed = normalizeResult(parseJSON(result.text)) || { action: 'speak', text: result.text };
+          setCachedResponse(userMsg, parsed);
+          return parsed;
+        }
+        return null;
+      })
+      .catch(function() { return null; });
+  }
 
   // ═══════════════════════════════════════════
   // FAST PATH: WebLLM local brain
@@ -5671,13 +5726,14 @@ function handleVoice(cmd, wantsText, sendResponse) {
     }
   }
 
-  var hasAnyKey = !!(aiKeys.groqKey || aiKeys.nvidiaKey || aiKeys.geminiKey || aiKeys.openrouterKey || aiKeys.cerebrasKey || aiKeys.mistralKey);
-  var hasProxy = !!PROXY_URL;
-  var hasOllama = ollamaModels && ollamaModels.length > 0;
-  if (!hasAnyKey && !hasProxy && !hasOllama) {
-    respond({text: 'Configura tu API key en Settings (icono de engranaje) para poder responder. Groq es gratuita: groq.com', showText: true});
-    return;
-  }
+var hasAnyKey = !!(aiKeys.groqKey || aiKeys.nvidiaKey || aiKeys.geminiKey || aiKeys.openrouterKey || aiKeys.cerebrasKey || aiKeys.mistralKey);
+   var hasProxy = !!PROXY_URL;
+   var hasOllama = ollamaModels && ollamaModels.length > 0;
+   var hasWebLLM = typeof X1WebLLMBridge !== 'undefined' && X1WebLLMBridge.isLoaded && X1WebLLMBridge.isLoaded();
+   if (!hasAnyKey && !hasProxy && !hasOllama && !hasWebLLM) {
+     respond({text: 'Configura tu API key en Settings (icono de engranaje) para poder responder. Groq es gratuita: groq.com', showText: true});
+     return;
+   }
 
   var fastTimer = setTimeout(function(){
     if (!responded) {
@@ -5691,10 +5747,10 @@ function handleVoice(cmd, wantsText, sendResponse) {
   }, 3000);
   var slowTimer = setTimeout(function(){
     if (!responded) {
-      console.log('[X1] Slow timeout — forcing response');
+      console.log('[X1] Slow timeout 10s — forcing response');
       respond({text:'Tiempo agotado. Intenta de nuevo o configura una API key en Settings.', showText:true});
     }
-  }, 25000);
+  }, 10000);
 
   addMem('user', cmd);
   console.log('[X1] handleVoice start:', cmd.substring(0, 50));
@@ -6380,29 +6436,42 @@ chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
     var wantsText = !!msg.wantsText;
     var requestId = msg.requestId || (Date.now() + '-' + Math.floor(Math.random() * 10000));
     var sideSender = sender;
+    var swResponded = false;
     try { sendResponse({ack: true, requestId: requestId}); } catch(_) {}
+
+    function sendPanelResponse(data) {
+      if (swResponded) return; swResponded = true;
+      var payload = {
+        type: 'X1_VOICE_RESPONSE',
+        source: 'x1-voice-response',
+        text: (data && data.text) || '',
+        showText: !!(data && data.showText),
+        error: (data && data.error) || null,
+        requestId: requestId
+      };
+      console.log('[X1-SW] sendPanelResponse:', payload.text ? payload.text.substring(0, 50) : payload.error);
+      try { chrome.storage.local.set({x1LastResponse: payload}); } catch(e) { console.warn('[X1-SW] storage.set failed:', e.message); }
+      try {
+        if (sideSender && sideSender.tab && sideSender.tab.id) {
+          chrome.tabs.sendMessage(sideSender.tab.id, payload).catch(function(e){ console.warn('[X1-SW] tabs.sendMessage failed:', e.message); });
+        }
+      } catch(e) { console.warn('[X1-SW] tabs.sendMessage error:', e.message); }
+      try {
+        chrome.runtime.sendMessage(payload).catch(function(e){ console.warn('[X1-SW] runtime.sendMessage failed:', e.message); });
+      } catch(e) { console.warn('[X1-SW] runtime.sendMessage error:', e.message); }
+    }
+
     (function processVoice(){
       handleVoice(cmdText, wantsText, function(data){
-        var payload = {
-          type: 'X1_VOICE_RESPONSE',
-          source: 'x1-voice-response',
-          text: (data && data.text) || '',
-          showText: !!(data && data.showText),
-          error: (data && data.error) || null,
-          requestId: requestId
-        };
-        try {
-          chrome.storage.local.set({x1LastResponse: payload});
-        } catch(e) {}
-        try {
-          if (sideSender && sideSender.tab && sideSender.tab.id) {
-            chrome.tabs.sendMessage(sideSender.tab.id, payload).catch(function(){});
-          }
-        } catch(_) {}
-        try {
-          chrome.runtime.sendMessage(payload).catch(function(){});
-        } catch(_) {}
+        console.log('[X1-SW] handleVoice callback fired:', data ? (data.text || '').substring(0, 50) : 'null');
+        sendPanelResponse(data);
       });
+      setTimeout(function() {
+        if (!swResponded) {
+          console.warn('[X1-SW] Safety timeout 12s — forcing response');
+          sendPanelResponse({text: 'Tiempo agotado. Reintentando...', error: null});
+        }
+      }, 12000);
     })();
     return true;
   }

@@ -228,6 +228,19 @@
     dependencies: ['piper', 'whisper']
   });
 
+  IntegrationsRegistry.register({
+    name: 'free-claude-code',
+    version: '1.0.0',
+    license: 'MIT',
+    path: 'background/integrations/free-claude-code/',
+    description: 'Proxy Anthropic API con 18 providers (NVIDIA NIM, OpenRouter, Gemini, Groq, DeepSeek, Cerebras, Mistral, etc.) — cerebro principal del Judge',
+    healthCheck: function(cfg) {
+      if (typeof X1FCCBridge !== 'undefined') return X1FCCBridge.healthCheck();
+      return Promise.resolve({ok: false, error: 'X1FCCBridge no cargado'});
+    },
+    dependencies: ['python3', 'uv', 'fastapi']
+  });
+
   console.log('[X1-Registry] Registro inicializado con', Object.keys(IntegrationsRegistry.integrations).length, 'integraciones');
 
 })();

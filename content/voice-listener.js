@@ -184,8 +184,9 @@
     '  line-height: 1.6 !important;',
     '  color: var(--x1-text) !important;',
     '  max-width: 100% !important;',
-    '  word-break: break-word !important;',
-    '  overflow-wrap: break-word !important;',
+    '  min-width: 0 !important;',
+    '  overflow-wrap: normal !important;',
+    '  word-break: normal !important;',
     '  white-space: pre-wrap !important;',
     '  animation: x1-bubble-in 0.35s ease !important;',
     '  pointer-events: auto !important;',
@@ -673,7 +674,7 @@
       if (item.role === 'user') {
         bubble.textContent = item.text;
       } else {
-        bubble.innerHTML = '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4D6BFE" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 12h8M12 8v8"/></svg><span style="font-size:11px;font-weight:600;color:#4D6BFE;">X1</span></div><div style="white-space:pre-wrap;word-break:break-word;">' + escapeHtml(item.text) + '</div>';
+        bubble.innerHTML = '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4D6BFE" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 12h8M12 8v8"/></svg><span style="font-size:11px;font-weight:600;color:#4D6BFE;">X1</span></div><div style="white-space:pre-wrap;">' + escapeHtml(item.text) + '</div>';
       }
       bubblesEl.appendChild(bubble);
       var timeout = Math.max(4000, item.text.length * 60 + 2000);
