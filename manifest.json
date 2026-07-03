@@ -101,7 +101,7 @@
     },
     {
       "matches": ["https://*/*", "http://*/*"],
-      "js": ["content/voice-bridge.js"],
+      "js": ["background/protocol.js", "content/voice-bridge.js"],
       "run_at": "document_idle"
     },
     {

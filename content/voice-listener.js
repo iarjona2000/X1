@@ -180,19 +180,25 @@
     '  border-radius: 12px !important;',
     '  box-shadow: var(--x1-shadow) !important;',
     '  font-family: var(--x1-sans) !important;',
-    '  font-size: 12px !important;',
-    '  line-height: 1.5 !important;',
+    '  font-size: 13px !important;',
+    '  line-height: 1.6 !important;',
     '  color: var(--x1-text) !important;',
     '  max-width: 100% !important;',
+    '  word-break: break-word !important;',
+    '  overflow-wrap: break-word !important;',
+    '  white-space: pre-wrap !important;',
     '  animation: x1-bubble-in 0.35s ease !important;',
     '  pointer-events: auto !important;',
     '}',
     '.x1-bubble.assistant {',
-    '  border-left: 3px solid var(--x1-accent) !important;',
+    '  border-left: 3px solid #4D6BFE !important;',
+    '  background: rgba(255,255,255,0.95) !important;',
     '}',
     '.x1-bubble.user {',
-    '  border-left: 3px solid var(--x1-accent-blue) !important;',
-    '  background: rgba(245,247,250,0.92) !important;',
+    '  border-left: 3px solid #4D6BFE !important;',
+    '  background: #4D6BFE !important;',
+    '  color: #ffffff !important;',
+    '  margin-left: 20% !important;',
     '}',
     '.x1-bubble.thinking {',
     '  border-left: 3px solid var(--x1-accent-purple) !important;',
@@ -645,6 +651,10 @@
     renderBubbles();
   }
 
+  function showBubble(text, role) {
+    addBubble(text, role);
+  }
+
   function renderBubbles() {
     if (!bubblesEl) return;
     var visible = bubblesEl.querySelectorAll('.x1-bubble:not(.removing)');
@@ -660,7 +670,11 @@
       var item = bubbleQueue.shift();
       var bubble = document.createElement('div');
       bubble.className = 'x1-bubble ' + (item.role || 'assistant');
-      bubble.textContent = item.text;
+      if (item.role === 'user') {
+        bubble.textContent = item.text;
+      } else {
+        bubble.innerHTML = '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4D6BFE" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 12h8M12 8v8"/></svg><span style="font-size:11px;font-weight:600;color:#4D6BFE;">X1</span></div><div style="white-space:pre-wrap;word-break:break-word;">' + escapeHtml(item.text) + '</div>';
+      }
       bubblesEl.appendChild(bubble);
       var timeout = Math.max(4000, item.text.length * 60 + 2000);
       timeout = Math.min(timeout, 15000);
@@ -669,6 +683,11 @@
         setTimeout(function() { if (bubble.parentNode) bubble.remove(); }, 300);
       }, timeout);
     }
+  }
+
+  function escapeHtml(str) {
+    if (!str) return '';
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
 
   function showThinkBubble() {

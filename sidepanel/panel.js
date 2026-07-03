@@ -246,6 +246,7 @@
     function doSend() {
       var requestId = Date.now() + '-' + Math.floor(Math.random() * 10000);
       console.log('[X1-sidepanel] Sending VOICE_COMMAND_EXEC:', text.substring(0, 50), 'requestId:', requestId);
+      startResponseFallback(requestId);
       chrome.runtime.sendMessage(
         { type: 'VOICE_COMMAND_EXEC', command: text, raw: text, wantsText: true, requestId: requestId },
         function(response) {
@@ -255,6 +256,7 @@
               responded = true;
               clearTimeout(panelTimeout);
               removeThinking();
+              stopResponseFallback();
               addMessage('ai', 'Service worker no disponible. Recarga la extension desde chrome://extensions.');
             }
             return;
@@ -265,6 +267,12 @@
         }
       );
     }
+
+    setTimeout(function() {
+      if (!responded) {
+        stopResponseFallback();
+      }
+    }, 32000);
 
     try {
       if (!chrome.runtime || !chrome.runtime.sendMessage) {
@@ -690,6 +698,7 @@
     }
 
     if (msg.type === 'X1_VOICE_RESPONSE') {
+      console.log('[X1-sidepanel] X1_VOICE_RESPONSE received:', msg.text ? msg.text.substring(0, 50) : msg.error);
       removeThinking();
       if (msg.text) {
         var aiMsg = addMessage('ai', msg.text, true);
@@ -699,6 +708,40 @@
       }
     }
   });
+
+  var lastSidepanelResponse = null;
+  var responseFallbackInterval = null;
+
+  function startResponseFallback(requestId) {
+    if (responseFallbackInterval) clearInterval(responseFallbackInterval);
+    responseFallbackInterval = setInterval(function() {
+      try {
+        chrome.storage.local.get(['x1LastResponse'], function(r) {
+          if (r && r.x1LastResponse && r.x1LastResponse.requestId === requestId) {
+            if (!lastSidepanelResponse || lastSidepanelResponse.requestId !== requestId) {
+              lastSidepanelResponse = r.x1LastResponse;
+              removeThinking();
+              if (lastSidepanelResponse.text) {
+                var aiMsg = addMessage('ai', lastSidepanelResponse.text, true);
+                streamAiText(aiMsg, lastSidepanelResponse.text);
+              } else if (lastSidepanelResponse.error) {
+                addMessage('ai', 'Error: ' + lastSidepanelResponse.error);
+              }
+              clearInterval(responseFallbackInterval);
+              responseFallbackInterval = null;
+            }
+          }
+        });
+      } catch(e) {}
+    }, 300);
+  }
+
+  function stopResponseFallback() {
+    if (responseFallbackInterval) {
+      clearInterval(responseFallbackInterval);
+      responseFallbackInterval = null;
+    }
+  }
 
   document.addEventListener('keydown', function(e) {
     if (e.ctrlKey && e.code === 'Space') {
