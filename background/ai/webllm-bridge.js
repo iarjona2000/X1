@@ -170,19 +170,37 @@
 
     log.info('Loading model: ' + config.name + ' (' + config.size + ')');
 
-    // In real WebLLM, this calls webllm.CreateMLCEngine()
-    // For X1, we simulate the loading and provide the interface
-    return new Promise(function(resolve) {
-      setTimeout(function() {
-        loadedModel = modelId;
-        engine = {
-          model: modelId,
-          config: config,
-          loaded: Date.now()
+    // Real WebLLM loading via CDN
+    return detectWebGPU().then(function(gpu) {
+      if (!gpu.supported) {
+        log.warn('WebGPU not available — cannot load local model');
+        return { ok: false, error: 'WebGPU not supported: ' + gpu.reason };
+      }
+
+      // Load WebLLM from CDN
+      return new Promise(function(resolve, reject) {
+        var script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/@mlc-ai/web-llm@latest/lib/index.js';
+        script.onload = function() {
+          if (typeof window.webllm !== 'undefined') {
+            window.webllm.CreateMLCEngine(modelId).then(function(eng) {
+              loadedModel = modelId;
+              engine = eng;
+              log.info('Model loaded: ' + config.name);
+              resolve({ ok: true, model: modelId, name: config.name, size: config.size });
+            }).catch(function(e) {
+              log.error('Engine creation failed: ' + e.message);
+              resolve({ ok: false, error: e.message });
+            });
+          } else {
+            resolve({ ok: false, error: 'WebLLM not available after script load' });
+          }
         };
-        log.info('Model loaded: ' + config.name);
-        resolve({ ok: true, model: modelId, name: config.name, size: config.size });
-      }, 2000);
+        script.onerror = function() {
+          resolve({ ok: false, error: 'Failed to load WebLLM script' });
+        };
+        document.head.appendChild(script);
+      });
     });
   }
 
@@ -212,15 +230,29 @@
 
     log.info('Generating with ' + config.name + ' (' + maxTokens + ' tokens)');
 
-    // In real WebLLM, this calls engine.chat.completions.create()
-    // For now, return a structured response indicating the model is ready
+    // Real WebLLM inference
+    if (engine.chat && engine.chat.completions && typeof engine.chat.completions.create === 'function') {
+      return engine.chat.completions.create({
+        messages: messages,
+        max_tokens: maxTokens,
+        temperature: temperature
+      }).then(function(response) {
+        var text = (response.choices && response.choices[0] && response.choices[0].message && response.choices[0].message.content) || '';
+        return { ok: true, text: text, model: loadedModel, modelConfig: config, engine: 'webllm' };
+      }).catch(function(e) {
+        log.error('Inference failed: ' + e.message);
+        return { ok: false, error: e.message };
+      });
+    }
+
+    // Fallback: return prompt for external processing
     return Promise.resolve({
       ok: true,
       text: '',
       model: loadedModel,
       modelConfig: config,
       engine: 'webllm',
-      note: 'WebLLM inference would run here via WebGPU',
+      note: 'WebLLM engine loaded but chat.completions.create not available',
       prompt: prompt.substring(0, 200) + '...',
       options: {
         maxTokens: maxTokens,
@@ -314,7 +346,7 @@
     getCachedModels: getCachedModels,
     clearCache: clearCache,
 
-    isLoaded: function() { return !!loadedModel; },
+    isLoaded: function() { return !!loadedModel && !!engine && !!(engine.chat && engine.chat.completions); },
     getLoadedModel: function() { return loadedModel; },
     getEngine: function() { return engine; },
 
