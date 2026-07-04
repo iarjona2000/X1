@@ -7,14 +7,14 @@ const MAX_MEM = 24;
 const AI = '../assets/ai/';
 
 export const AGENTS = [
-  { id: 'research',   name: 'Research',   ai: 'Groq',    aiIcon: AI + 'groq.svg' },
-  { id: 'writer',     name: 'Writer',     ai: 'Groq',    aiIcon: AI + 'groq.svg' },
-  { id: 'developer',  name: 'Developer',  ai: 'Groq',    aiIcon: AI + 'groq.svg' },
-  { id: 'marketing',  name: 'Marketing',  ai: 'Groq',    aiIcon: AI + 'groq.svg' },
-  { id: 'finance',    name: 'Finance',    ai: 'Groq',    aiIcon: AI + 'groq.svg' },
-  { id: 'legal',      name: 'Legal',      ai: 'Groq',    aiIcon: AI + 'groq.svg' },
-  { id: 'email',      name: 'Email',      ai: 'Groq',    aiIcon: AI + 'groq.svg' },
-  { id: 'meeting',    name: 'Meeting',    ai: 'Groq',    aiIcon: AI + 'groq.svg' }
+  { id: 'research',   name: 'Research',   ai: 'Gemini',  aiIcon: AI + 'googlegemini.svg' },
+  { id: 'writer',     name: 'Writer',     ai: 'Claude',  aiIcon: AI + 'anthropic.svg' },
+  { id: 'developer',  name: 'Developer',  ai: 'GPT-4o',  aiIcon: AI + 'openai.svg' },
+  { id: 'marketing',  name: 'Marketing',  ai: 'Gemini',  aiIcon: AI + 'googlegemini.svg' },
+  { id: 'finance',    name: 'Finance',    ai: 'Claude',  aiIcon: AI + 'anthropic.svg' },
+  { id: 'legal',      name: 'Legal',      ai: 'Mistral', aiIcon: AI + 'mistralai.svg' },
+  { id: 'email',      name: 'Email',      ai: 'Llama',   aiIcon: AI + 'meta.svg' },
+  { id: 'meeting',    name: 'Meeting',    ai: 'Gemini',  aiIcon: AI + 'googlegemini.svg' }
 ];
 
 export function agentById(id) {
