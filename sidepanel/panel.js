@@ -14,6 +14,7 @@
   var messages = [];
   var responded = false;
   var panelTimeout = null;
+  var panelTimeout2 = null;
   var webLLMEngine = null;
   var webLLMLoaded = false;
   var activeRequestId = null;
@@ -70,6 +71,7 @@
   function clearPanelTimeout() {
     responded = true;
     if (panelTimeout) { clearTimeout(panelTimeout); panelTimeout = null; }
+    if (panelTimeout2) { clearTimeout(panelTimeout2); panelTimeout2 = null; }
     stopResponseFallback();
   }
 
@@ -266,6 +268,17 @@
   var CLOUD_JUDGE = 'https://x1-proxy.baosx1.workers.dev';
   var CLOUD_SECRET = '9ff4b7dda5f7defd5f7fb7c32c133428bc87e8efeb8550d3ce1e5838c1d3b850';
 
+  // Warm the cloud proxy on load so first response is fast
+  function warmJudge() {
+    fetch(CLOUD_JUDGE + '/v1/chat/completions', {
+      method:'POST', headers:{'Content-Type':'application/json','X-X1-Auth':CLOUD_SECRET},
+      body:JSON.stringify({messages:[{role:'user',content:'ping'}]}),
+      signal:AbortSignal.timeout(15000)
+    }).catch(function(){});
+    if (window.X1FCCBridge) window.X1FCCBridge.checkProxy();
+  }
+  warmJudge();
+
   function callJudge(userMsg) {
     var p1 = fetch(LOCAL_JUDGE + '/v1/messages', {
       method:'POST', headers:{'Content-Type':'application/json'},
@@ -278,7 +291,7 @@
     var p2 = fetch(CLOUD_JUDGE + '/v1/chat/completions', {
       method:'POST', headers:{'Content-Type':'application/json','X-X1-Auth':CLOUD_SECRET},
       body:JSON.stringify({messages:[{role:'user',content:userMsg}]}),
-      signal:AbortSignal.timeout(3000)
+      signal:AbortSignal.timeout(12000)
     }).then(function(r){return r.ok?r.json():null;}).then(function(d){
       var t=(d&&d.choices&&d.choices[0]&&d.choices[0].message&&d.choices[0].message.content||'').trim();return t||null;
     }).catch(function(){return null;});
@@ -298,14 +311,19 @@
     responded = false;
     if (panelTimeout) clearTimeout(panelTimeout);
 
+    // Try cloud proxy directly + SW fallback IN PARALLEL
     callJudge(text).then(function(txt) {
       if (txt) { clearPanelTimeout(); if (!responded) { responded = true; removeThinking(); var m = addMessage('ai', txt, true); streamAiText(m, txt); } return; }
       tryFallback(text);
     });
 
+    // Stage 1: "pensando" at 6s, Stage 2: "todavia pensando" at 15s
     panelTimeout = setTimeout(function() {
-      if (!responded) { removeThinking(); addMessage('ai', 'X1 está pensando... ¿puedes esperar unos segundos más?'); }
-    }, 8000);
+      if (!responded) { removeThinking(); showThinking('X1 está procesando...'); }
+      panelTimeout2 = setTimeout(function() {
+        if (!responded) { removeThinking(); showThinking('Todavía procesando, esto puede tomar un momento...'); }
+      }, 14000);
+    }, 6000);
   }
 
   function tryFallback(text) {
