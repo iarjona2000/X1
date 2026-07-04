@@ -31,6 +31,8 @@ A escala de miles de candidatos, mandarle la lista entera a un LLM en cada promp
 - **A favor:** respeta y aprovecha una decisión de diseño que Ivan ya tomó a propósito para la bóveda. Dos pasos baratos, sin necesitar un índice vectorial grande desde el primer día.
 - **En contra:** si el clasificador de clúster falla, todo lo de después falla con él. Prompts que cruzan clústeres (Finanzas+Legal) necesitan un caso especial.
 
+**Actualización 2026-07-05:** Ivan reestructuró la bóveda entera alrededor de exactamente esta idea — una jerarquía CEO → orquestador especializado por vertical → agentes (ver `vault/00-Indice.md`), sin departamentos sueltos. "El clúster" de esta propuesta ahora es literalmente "la vertical CEO" (CFO/CMO/CLO/CHRO/CRO/COO/CTO/CPO), y "el clasificador barato" sería el propio orquestador central decidiendo qué CEO-especialista atiende cada prompt, antes de que ese CEO decida entre sus propios agentes. Confirma que esta propuesta ya tiene el terreno preparado del lado de la bóveda — falta solo la pieza de código, que sigue siendo tu decisión.
+
 ## Propuesta 3 — Panel + Juez aplicado a elegir agente, no modelo
 
 **Idea:** reutilizar tal cual el sistema de rúbricas (`RUBRICS`, `judgeRound`, activación selectiva, límite diario) y/o `EnsembleEngine`+`JudgeSystem` — pero para una tarea distinta a la que se diseñaron: en vez de "¿cuál de 6 modelos responde mejor?", "¿cuál de estos 3-5 agentes candidatos (ya reducidos por la Propuesta 1 o 2) encaja mejor con este prompt?". Las rúbricas ya están pensadas por "tipo de tarea técnica", que encaja mejor con "qué especialista necesito" que con "qué modelo genérico responde mejor".

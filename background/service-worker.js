@@ -44,7 +44,10 @@ try {
     'agents/agent-manager.js',
     'agents/workspace.js',
     'plugins/engine.js',
-    'plugins/agency-plugins.js',
+    // plugins/agency-plugins.js removed 2026-07-05 — Ivan's decision: the vault
+    // no longer catalogs agency-agents prompt-only personas (Nivel 4, no
+    // software real detrás), solo agentes reales de GitHub. Los 16 plugins
+    // promovidos desde ahi se retiran junto con las notas que los originaron.
     'automation/rule-engine.js',
     'monitor/page-monitor.js',
     'research/deep-research.js',

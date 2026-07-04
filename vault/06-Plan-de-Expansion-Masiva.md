@@ -19,36 +19,40 @@ No cualquier repo de GitHub — la barra es específicamente **especialización 
 - Ejecuta acciones reales, no solo conversa (una herramienta de análisis de contratos que de verdad extrae cláusulas, no solo "actúa como abogado").
 - Comunidad/mantenimiento real — señales: estrellas, actividad reciente, issues respondidos, no un repo abandonado de una tarde de hackathon.
 
-Los 217 agentes ya importados de `agency-agents` (Nivel 4, prompts puros) son precisamente lo que este listón busca **sustituir** cuando exista algo mejor — no se borran, pero cuando encontremos un candidato de Nivel 1-3 real y superior para el mismo hueco, ese pasa a ser el elegido y el de `agency-agents` queda como alternativa secundaria en la misma nota de clúster, igual que ya se hizo con Finanzas/Legal/Marketing en la Fase 1 original (ver `02-Plan-de-Fases.md`).
+**Actualización 2026-07-05 — cambio de política, no solo de estructura:** los 217 agentes de `agency-agents` (Nivel 4, prompts puros, sin software real detrás) y los 16 plugins de X1 construidos a partir de ellos **se retiraron por completo**, instrucción explícita de Ivan — la bóveda cataloga exclusivamente agentes/herramientas reales verificables en GitHub, nunca personas de prompt como relleno o alternativa secundaria. Cualquier hueco que antes se consideraba "cubierto (parcial) vía agency-agents" vuelve a ser un hueco real hasta que se encuentre un candidato de verdad.
+
+También se reestructuró la bóveda entera de clústeres por departamento a una jerarquía **CEO → orquestador especializado por vertical → agentes** (sin "departamentos" sueltos) — ver `00-Indice.md` para el mapa actual de verticales (CEO/CFO/CMO/CLO/CHRO/CRO/COO/CTO/CPO + Conectores transversal).
 
 ---
 
-## 2. Universo de temas (taxonomía objetivo)
+## 2. Universo de temas (taxonomía objetivo, por vertical CEO)
 
-Cobertura amplia deliberada, no solo lo que ya está. Marco lo que ya tiene cluster (✅) vs. lo que es hueco real hoy:
+Cobertura amplia deliberada, no solo lo que ya está. Marco qué vertical tiene candidatos reales (✅) vs. hueco real hoy (⬜) — "✅" ya no significa "cubierto por agency-agents", significa que hay al menos un agente real investigado:
 
-**Negocio**
-- ✅ Finanzas/Contabilidad, Legal, RRHH, Marketing, Ventas/CRM, Operaciones/PM, Estrategia, Atención al cliente
-- ⬜ Cadena de suministro/procurement, Seguros, Banca/Fintech, Bienes raíces, Retail/E-commerce específico
+**CFO** — ✅ Finanzas/Contabilidad (4 candidatos) · ⬜ Banca/Fintech, Seguros
 
-**Técnico**
-- ✅ Ingeniería de software (general), Seguridad, Testing, GIS, Spatial computing, Game dev
-- ⬜ Datos/ML/MLOps como especialidad propia (más allá del "AI Engineer" genérico ya importado), DevOps/SRE como cluster propio, Ciberseguridad por sub-especialidad (forense, red team, threat intel — ya hay algunas personas pero sin candidatos externos reales investigados)
+**CMO** — ✅ Marketing/SEO (3 candidatos) · ⬜ resto de marketing (contenido, publicidad, redes) sin candidato real todavía
 
-**Ciencia e investigación**
-- ⬜ Biología/bioinformática, Química, Medicina/salud, Ciencia climática/ambiental, Herramientas de investigación académica (más allá de OpenOSINT)
+**CLO** — ✅ Legal (3 candidatos) · ⬜ propiedad intelectual, inmigración/visados como sub-especialidad propia
 
-**Creativo**
-- ✅ Diseño (parcial, vía agency-agents)
-- ⬜ Escritura/edición como vertical propia, Producción de audio/vídeo, Música
+**CHRO** — ✅ RRHH (4 candidatos)
 
-**Vertical/industria**
-- ⬜ Construcción/ingeniería civil, Manufactura, Educación, Inmigración/visados, Propiedad intelectual, Cumplimiento normativo/regulatorio, Privacidad de datos
+**CRO** — ✅ Ventas/CRM (ya integrado en X1, Pipedrive/HubSpot)
 
-**Transversal**
-- ⬜ Traducción/localización, Accesibilidad
+**COO** — ✅ PMO/Operaciones (2), Atención al cliente (2), Cadena de suministro (1, nuevo) · ⬜ Retail/E-commerce específico, Bienes raíces, Manufactura, Construcción/ingeniería civil
 
-Cada hueco (⬜) es candidato a convertirse en un **clúster nuevo**, respetando la regla de aislamiento (`04-Diseno-de-Red.md`) — nunca se mezclan.
+**CEO** — ✅ Estrategia (3), Research/OSINT (4)
+
+**CTO — vacío, hueco total tras retirar agency-agents.** Antes "cubierto (parcial)" por 6 clústeres de personas de prompt (Engineering/Security/Testing/GIS/SpatialComputing/GameDev) — ninguno era un agente real. ⬜ Ingeniería de software, seguridad (por sub-especialidad: forense, red team, threat intel), testing, GIS, MLOps/datos, DevOps/SRE, spatial computing, game dev — todo pendiente de candidatos reales.
+
+**CPO — vacío, hueco total.** Antes "cubierto (parcial)" por 2 clústeres de agency-agents (Product/Design) — ninguno real. ⬜ Gestión de producto, diseño.
+
+**Sin vertical CEO clara (evaluar si necesitan una nueva o encajan en una existente)**
+- ⬜ Ciencia e investigación: bioinformática, química, medicina/salud, ciencia climática — candidatas a vivir bajo CEO (informan estrategia) o como vertical propia si crecen mucho.
+- ⬜ Creativo no cubierto: escritura/edición, audio/vídeo, música — candidatas a CMO o vertical propia.
+- ⬜ Transversal: traducción/localización, accesibilidad, cumplimiento normativo/privacidad de datos — como Conectores, podrían vivir fuera de la jerarquía CEO si de verdad cruzan todas las verticales.
+
+Cada hueco es candidato a poblar una vertical existente o, si de verdad no encaja en ninguna CEO, a justificar una nueva — respetando la regla de aislamiento (`04-Diseno-de-Red.md`) y la instrucción de "nada de departamentos sueltos".
 
 ---
 
@@ -80,12 +84,13 @@ Esto no es orquestación — es metadata de catálogo, terreno nuestro. Si el so
 
 ## 5. Orden de ejecución (por lotes, iterativo)
 
-1. **Lote 1 — rellenar huecos en clústeres ya existentes pero flacos** (Legal: 2 notas, RRHH: 3, Research: 2, Núcleo: 0 candidatos externos reales) — más rápido, más impacto inmediato.
-2. **Lote 2 — verticales de negocio no cubiertas** (cadena de suministro, banca/fintech, seguros, bienes raíces).
-3. **Lote 3 — técnico especializado** (MLOps/datos, DevOps/SRE, ciberseguridad por sub-especialidad).
-4. **Lote 4 — ciencia e investigación** (bioinformática, química, medicina, clima).
-5. **Lote 5 — creativo y transversal** (escritura, audio/vídeo, traducción, accesibilidad, cumplimiento).
-6. **Lotes posteriores — mantenimiento**: revisar candidatos ya elegidos cada cierto tiempo (el ecosistema cambia), y seguir añadiendo verticales que vayan apareciendo.
+1. **Lote 1 (hecho, 2026-07-04) — rellenar huecos flacos**: CLO (+1, Legal-MCP), CHRO (+1, Horilla), CEO/Research (+2, SpiderFoot + OSINT-Agent-Skills).
+2. **Lote 2 (en curso) — verticales de negocio no cubiertas**: Cadena de suministro (hecho, NocoBase, ahora vive bajo COO), CFO/datos de mercado (hecho, OpenBB) — pendiente: banca/fintech, seguros, bienes raíces, retail/e-commerce (todos bajo COO o vertical propia si crecen).
+3. **Lote 2.5 (hecho, 2026-07-05) — Conectores**: 59 conectores MCP del directorio oficial de Claude, clúster transversal nuevo.
+4. **Lote 3 — CTO desde cero**: MLOps/datos, DevOps/SRE, ciberseguridad por sub-especialidad, testing, GIS, spatial computing, game dev — todo el territorio que antes "cubría" agency-agents sin agentes reales, ahora hueco total.
+5. **Lote 4 — CPO desde cero + ciencia e investigación**: gestión de producto, diseño, bioinformática, química, medicina, clima.
+6. **Lote 5 — creativo y transversal restante**: escritura, audio/vídeo, traducción, accesibilidad, cumplimiento normativo.
+7. **Lotes posteriores — mantenimiento**: revisar candidatos ya elegidos cada cierto tiempo (el ecosistema cambia), y seguir añadiendo verticales o clústeres nuevos que vayan apareciendo.
 
 Cada lote se documenta con su propio resumen (candidatos investigados, elegidos, descartados y por qué) siguiendo el mismo patrón que `05-Notas-de-Fusion.md` ya usa para dejar rastro de decisiones.
 
