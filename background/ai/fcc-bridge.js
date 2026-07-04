@@ -35,6 +35,7 @@
   var proxyAvailable = null;
   var proxyLastFail = 0;
   var usingLocal = false;
+  var proxyPromise = null;
 
   // ═══════════════════════════════════════════
   // HEALTH — checks local FCC first, then cloud
@@ -63,15 +64,16 @@
   }
 
   function checkProxy() {
-    if (proxyAvailable === true) return Promise.resolve(true);
-    if (Date.now() - proxyLastFail < 5000) return Promise.resolve(false);
+    if (proxyPromise) return proxyPromise;
+    if (Date.now() - proxyLastFail < 3000) return Promise.resolve(false);
 
-    return checkLocal().then(function(ok) {
+    proxyPromise = checkLocal().then(function(ok) {
       if (ok) {
         proxyAvailable = true;
         usingLocal = true;
         proxyLastFail = 0;
         log.info('Judge local (free-claude-code) disponible');
+        proxyPromise = null;
         return true;
       }
       return checkCloud().then(function(cloudOk) {
@@ -80,14 +82,17 @@
           usingLocal = false;
           proxyLastFail = 0;
           log.info('Judge cloud (x1-proxy) disponible');
+          proxyPromise = null;
           return true;
         }
         proxyAvailable = false;
         proxyLastFail = Date.now();
+        proxyPromise = null;
         log.warn('Ningun Judge disponible');
         return false;
       });
     });
+    return proxyPromise;
   }
 
   function forceCheck() {
@@ -105,50 +110,48 @@
     var temperature = opts.temperature !== undefined ? opts.temperature : 0.3;
     var timeout = opts.timeout || TIMEOUT;
 
-    return checkProxy().then(function(available) {
-      if (!available) {
-        return { ok: false, text: '', error: 'Judge no disponible' };
-      }
-
-      if (usingLocal) {
-        return fetch(LOCAL_PROXY + '/v1/messages', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            model: opts.model || DEFAULT_MODEL,
-            messages: messages,
-            max_tokens: maxTokens,
-            temperature: temperature,
-            stream: false
-          }),
-          signal: AbortSignal.timeout(timeout)
-        }).then(function(r) {
-          if (!r.ok) {
-            proxyAvailable = false;
-            proxyLastFail = Date.now();
-            return { ok: false, text: '', error: 'HTTP ' + r.status };
+    // First check: try local with 2s timeout
+    function tryLocal() {
+      return fetch(LOCAL_PROXY + '/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: opts.model || DEFAULT_MODEL,
+          messages: messages,
+          max_tokens: maxTokens,
+          temperature: temperature,
+          stream: false
+        }),
+        signal: AbortSignal.timeout(2000)
+      }).then(function(r) {
+        if (!r.ok) return null;
+        return r.json();
+      }).then(function(data) {
+        if (!data) return null;
+        var text = '';
+        if (data && data.content && data.content.length > 0) {
+          for (var i = 0; i < data.content.length; i++) {
+            if (data.content[i].type === 'text') text += data.content[i].text;
           }
-          return r.json().then(function(data) {
-            var text = '';
-            if (data && data.content && data.content.length > 0) {
-              for (var i = 0; i < data.content.length; i++) {
-                if (data.content[i].type === 'text') text += data.content[i].text;
-              }
-            }
-            if (!text) text = (data && data.content && data.content[0] && data.content[0].text) || '';
-            proxyLastFail = 0;
-            return { ok: true, text: text, model: data.model || opts.model || DEFAULT_MODEL };
-          });
-        }).catch(function(e) {
-          proxyAvailable = false;
-          proxyLastFail = Date.now();
-          log.warn('Local proxy error, fallback a cloud: ' + e.message);
-          usingLocal = false;
-          return cloudComplete(messages, opts);
-        });
-      }
+        }
+        if (!text) text = (data && data.content && data.content[0] && data.content[0].text) || '';
+        if (text) {
+          proxyAvailable = true; usingLocal = true; proxyLastFail = 0;
+          return { ok: true, text: text, model: data.model || opts.model || DEFAULT_MODEL };
+        }
+        return null;
+      }).catch(function() { return null; });
+    }
 
+    // Fallback: cloud proxy
+    function tryCloud() {
       return cloudComplete(messages, opts);
+    }
+
+    // Try local first (2s), then cloud (timeout)
+    return tryLocal().then(function(result) {
+      if (result) return result;
+      return tryCloud();
     });
   }
 
@@ -291,9 +294,9 @@
 
   log.info('X1FCCBridge loaded — Judge listo (local FCC + cloud proxy)');
 
-  // Auto-check on load
-  checkProxy().then(function(ok) {
-    log.info(ok ? 'Judge conectado (' + (usingLocal ? 'local' : 'cloud') + ')' : 'Judge no disponible');
-  });
+  // Optimistic: assume available → no request blocked
+  proxyAvailable = true;
+  // Background verification: discovers local vs cloud, sets usingLocal
+  checkProxy();
 
 })();
