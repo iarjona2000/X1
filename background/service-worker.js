@@ -1889,6 +1889,7 @@ function isValidContent(txt) {
   if(lower.indexOf('cannot read image') !== -1) return false;
   if(lower.indexOf('cannot read') !== -1 && (lower.indexOf('image') !== -1 || lower.indexOf('png') !== -1 || lower.indexOf('jpg') !== -1 || lower.indexOf('gif') !== -1 || lower.indexOf('webp') !== -1)) return false;
   if(lower.indexOf('inform the user') !== -1 && lower.indexOf('image') !== -1) return false;
+  if(lower.indexOf('inform') !== -1 && lower.indexOf('image') !== -1 && lower.indexOf('not support') !== -1) return false;
   if(lower.indexOf('error:') !== -1 && lower.indexOf('image') !== -1 && lower.indexOf('not support') !== -1) return false;
   return true;
 }
