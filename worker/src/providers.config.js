@@ -26,8 +26,8 @@ export const PROVIDERS = [
     tier: 'fast',
     cost: 1,
     authStyle: 'bearer',
-    active: false,
-    notes: 'Ultra-fast Llama 70B. Desactivado temporalmente — solo GLM 5.1 (nvidia) activo mientras se valida el Panel+Juez.'
+    active: true,
+    notes: 'Ultra-fast Llama 70B. Reactivado para YC demo (2026-07-04).'
   },
   {
     name: 'cerebras',

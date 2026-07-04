@@ -1,7 +1,7 @@
 name = "x1-proxy"
 main = "src/worker.js"
 compatibility_date = "2026-06-01"
-account_id = "64bb1a5452d4edc505546d47e5f99959"
+account_id = "130e823c470feb5c46d25d59a5f9bcd3"
 
 # ═══════════════════════════════════════════
 # Worker config — X1 AI Gateway (v4)
