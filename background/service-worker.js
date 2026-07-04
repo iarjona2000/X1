@@ -540,13 +540,23 @@ function startKeepalive() {
   if (keepaliveTimer) return;
   console.log('[X1] Starting keepalive');
   keepaliveTimer = setInterval(function() {
-    // Chrome API calls reset the SW inactivity timer
     chrome.storage.local.get('keepalive', function() {});
-    // Also fetch a lightweight endpoint to keep network alive
     if (PROXY_URL) {
       fetch(PROXY_URL + '/health', {signal:AbortSignal.timeout(3000)}).catch(function(){});
     }
-  }, 15000); // Every 15s
+  }, 15000);
+}
+
+function warmJudge() {
+  if (!PROXY_URL || !PROXY_SHARED_SECRET) return;
+  fetch(PROXY_URL + '/v1/chat/completions', {
+    method:'POST',
+    headers:{'Content-Type':'application/json','X-X1-Auth':PROXY_SHARED_SECRET},
+    body:JSON.stringify({messages:[{role:'user',content:'ping'}]}),
+    signal:AbortSignal.timeout(10000)
+  }).then(function(r){
+    if (r.ok) console.log('[X1] Judge warm ping OK');
+  }).catch(function(){});
 }
 
 function stopKeepalive() {
@@ -6168,6 +6178,8 @@ try { chrome.alarms.create('x1-deal-check', {periodInMinutes: 1440}); } catch(e)
 // External command reception (B.14) — chrome.alarms floors at 1 minute for
 // regular installs (the spec's "every 30 seconds" isn't reachable in MV3).
 try { chrome.alarms.create('x1-external-commands-poll', {periodInMinutes: 1}); } catch(e) { console.error('[X1] alarm external-commands failed:', e && e.message); }
+// Keep cloud proxy warm (Cloudflare Workers idle timeout ~10min on free plan)
+try { chrome.alarms.create('x1-keep-warm', {periodInMinutes: 4}); } catch(e) { console.error('[X1] alarm keep-warm failed:', e && e.message); }
 
 // Read-only/non-destructive action types only — anything else (send email,
 // delete, purchase-shaped actions) waits for the user to approve manually,
@@ -6211,6 +6223,7 @@ function pollExternalCommands() {
 
 chrome.alarms.onAlarm.addListener(function(alarm) {
   if (alarm.name === 'x1-external-commands-poll') { pollExternalCommands(); return; }
+  if (alarm.name === 'x1-keep-warm') { warmJudge(); return; }
   if (alarm.name === 'x1-meeting-check') {
     // Check for meetings starting in 10-15 minutes
     isLoggedIn().then(function(logged) {
