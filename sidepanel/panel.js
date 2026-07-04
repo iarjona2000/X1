@@ -1,458 +1,560 @@
 (function() {
   'use strict';
 
-  var input = document.getElementById('input');
-  var btnSend = document.getElementById('btn-send');
-  var btnMic = document.getElementById('btn-mic');
-  var btnNew = document.getElementById('btn-new');
-  var messagesEl = document.getElementById('messages');
-  var headerTitle = document.getElementById('header-title');
+  var CLOUD = 'https://x1-proxy.baosx1.workers.dev';
+  var SECRET = '9ff4b7dda5f7defd5f7fb7c32c133428bc87e8efeb8550d3ce1e5838c1d3b850';
+  var MEM_KEY = 'x1_mem';
+  var MAX_MEM = 40;
 
-  var listening = false;
-  var recognition = null;
-  var currentThinking = null;
-  var messages = [];
-  var responded = false;
-  var panelTimeout = null;
-  var panelTimeout2 = null;
-  var webLLMEngine = null;
-  var webLLMLoaded = false;
-  var activeRequestId = null;
-  var thinkToggle = false;
-  var searchToggle = false;
+  /* ── AGENTS ── */
 
-  function detectWebGPU() {
-    if (typeof navigator === 'undefined' || !navigator.gpu) return Promise.resolve({ supported: false });
-    return navigator.gpu.requestAdapter().then(function(adapter) {
-      if (!adapter) return { supported: false };
-      return adapter.requestDevice().then(function() { return { supported: true, adapter: adapter }; }).catch(function() { return { supported: false }; });
-    }).catch(function() { return { supported: false }; });
+  var AGENTS = [
+    { id:'research',  icon:'R', cls:'gh', name:'Research',   repo:'iarjona2000/research-lib' },
+    { id:'writer',    icon:'W', cls:'w',  name:'Writer',     repo:'iarjona2000/content-models' },
+    { id:'developer', icon:'D', cls:'d',  name:'Developer',  repo:'iarjona2000/codebase' },
+    { id:'marketing', icon:'M', cls:'m',  name:'Marketing',  repo:'iarjona2000/marketing-kit' },
+    { id:'finance',   icon:'F', cls:'f',  name:'Finance',    repo:'iarjona2000/finance-models' },
+    { id:'legal',     icon:'L', cls:'l',  name:'Legal',      repo:'iarjona2000/legal-docs' },
+    { id:'email',     icon:'E', cls:'e',  name:'Email',      repo:'iarjona2000/email-templates' },
+    { id:'meeting',   icon:'M', cls:'me', name:'Meeting',    repo:'iarjona2000/meeting-notes' }
+  ];
+
+  /* ── APP ICON MAP ── */
+
+  var APP_ICONS = {
+    github:'gh', repo:'gh', repository:'gh',
+    google:'g', search:'g',
+    linkedin:'li',
+    docs:'do', document:'do', 'google docs':'do',
+    style:'st', format:'st', refine:'st', synthesize:'st', stylize:'st',
+    pdf:'pd', export:'pd',
+    done:'ok', result:'ok', complete:'ok', finish:'ok',
+    read:'do', extract:'do', scrape:'do',
+    code:'co', generate:'co', program:'co', script:'co', implement:'co',
+    draft:'dr', write:'dr', compose:'dr',
+    email:'ma', mail:'ma', gmail:'ma', inbox:'ma', 'e-mail':'ma',
+    test:'co', debug:'co', fix:'co',
+    plan:'st', research:'g', analyse:'st', analyze:'st'
+  };
+
+  var APP_ABBR = {
+    github:'GH', repo:'GH',
+    google:'G', search:'G',
+    linkedin:'in',
+    docs:'D', document:'D',
+    style:'S', format:'S', refine:'S', synthesize:'S',
+    pdf:'PDF', export:'PDF',
+    done:'\u2713', result:'\u2713', complete:'\u2713',
+    read:'R', extract:'R',
+    code:'<>', generate:'<>', program:'<>',
+    draft:'W', write:'W', compose:'W',
+    email:'@', mail:'@', gmail:'@', inbox:'@',
+    test:'T', debug:'T', fix:'T',
+    plan:'P', research:'G', analyse:'A', analyze:'A'
+  };
+
+  var DEFAULT_ICON = 'st';
+  var DEFAULT_ABBR = '\u25C6';
+
+  function iconFor(app) {
+    var key = app.toLowerCase().trim();
+    return APP_ICONS[key] || DEFAULT_ICON;
   }
 
-  function loadWebLLM() {
-    if (webLLMLoaded && webLLMEngine) return Promise.resolve({ ok: true });
-    if (typeof window.webllm === 'undefined') {
-      return new Promise(function(resolve) {
-        var script = document.createElement('script');
-        script.src = 'https://cdn.jsdelivr.net/npm/@mlc-ai/web-llm@latest/lib/index.js';
-        script.onload = function() {
-          window.webllm.CreateMLCEngine('Llama-3.2-1B-Instruct-q4f16_1-MLC').then(function(engine) {
-            webLLMEngine = engine; webLLMLoaded = true;
-            console.log('[X1-sidepanel] WebLLM loaded');
-            resolve({ ok: true });
-          }).catch(function(e) { console.error('[X1-sidepanel] WebLLM load failed:', e); resolve({ ok: false, error: e.message }); });
-        };
-        script.onerror = function() { resolve({ ok: false, error: 'Failed to load WebLLM script' }); };
-        document.head.appendChild(script);
-      });
+  function abbrFor(app) {
+    var key = app.toLowerCase().trim();
+    return APP_ABBR[key] || app.substring(0,2).toUpperCase();
+  }
+
+  /* ── GREETINGS ── */
+
+  var GREETINGS = [
+    /^hola/i, /^buenas/i, /^hey/i, /^hello/i, /^hi\b/i, /^heyy/i,
+    /^qu[eé] tal/i, /^c[oó]mo est[áa]s/i, /^buen[oa]s/i,
+    /^gracias/i, /^thanks/i, /^thank you/i,
+    /^who are you/i, /^qu[eé] eres/i, /^qu[eé] puedes hacer/i,
+    /^q tal/i, /^tal/i,
+    /^s[ií]/i, /^no$/i, /^ok$/i, /^vale/i, /^de acuerdo/i,
+    /^buen trabajo/i, /^nice/i, /^great/i, /^perfect/i,
+    /^bien$/i, /^mal$/i, /^jaja/i, /^lol/i
+  ];
+
+  var QUICK_REPLIES = {
+    hola: '¡Hola! ¿En qué puedo ayudarte hoy?',
+    hello: 'Hello! What can I help you with?',
+    quien: 'Soy X1, un agente autónomo de navegador. Puedo buscar información, leer páginas, crear documentos, escribir código y actuar en tu navegador. ¿Qué necesitas?',
+    gracias: '¡De nada! Si necesitas algo más, aquí estoy.',
+    bien: 'Me alegra. ¿En qué puedo ayudarte?',
+    default: 'Claro, ¿qué necesitas que haga?'
+  };
+
+  var FALLBACK_ANSWERS = {
+    research:  'Here\'s what I found. I searched multiple sources and cross-referenced the results. The main signal is clear. Saved to memory.',
+    writer:    'Done. The draft front-loads the key message and uses short paragraphs. I can adjust the tone.',
+    developer: 'I read the relevant code. Core logic is sound. I can generate the helper, add tests, or wire it in.',
+    marketing: 'I analysed the page. Three angles stood out. I can expand any into a campaign wireframe.',
+    finance:   'The numbers check out. Revenue is growing; margin is the metric to watch. I can build scenarios.',
+    legal:     'I reviewed against the legal knowledge base. Two clauses worth a second look.',
+    email:     'Done. I read your inbox and drafted a reply. Review and send when ready.',
+    meeting:   'Transcribed. Three decisions, four action items. Recap ready to share.'
+  };
+
+  /* ── STATE ── */
+
+  var S = { active:'research', messages:[], busy:false, listening:false, mid:0, dropdown:false, mem:[] };
+
+  /* ── DOM ── */
+
+  function cache() {
+    var $ = function(id) { return document.getElementById(id); };
+    var o = {};
+    o.picker = $('agent-picker');
+    o.label = $('picker-label');
+    o.dropdown = $('dropdown');
+    o.repoText = $('repo-text');
+    o.repoLink = $('repo-link');
+    o.messages = $('messages');
+    o.input = $('input');
+    o.send = $('btn-send');
+    o.mic = $('btn-mic');
+    o.gh = $('btn-gh');
+    return o;
+  }
+
+  var el = null;
+
+  /* ── HELPERS ── */
+
+  function scrollBottom(c) { requestAnimationFrame(function(){ c.scrollTop = c.scrollHeight; }); }
+
+  function delay(ms) { return new Promise(function(r){ setTimeout(r, ms); }); }
+
+  function nextId() { return 'm' + (++S.mid); }
+
+  function esc(s) { if (!s) return ''; return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  function fmt(s) {
+    if (!s) return '';
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n\n/g,'</p><p>').replace(/\n/g,'<br>').replace(/^/,'<p>').replace(/$/,'</p>');
+  }
+
+  function agent(id) {
+    for (var i = 0; i < AGENTS.length; i++) { if (AGENTS[i].id === id) return AGENTS[i]; }
+    return AGENTS[0];
+  }
+
+  /* ── SIMPLE DETECTION ── */
+
+  function isSimple(text) {
+    var t = text.trim();
+    if (t.length < 3) return true;
+    for (var i = 0; i < GREETINGS.length; i++) {
+      if (GREETINGS[i].test(t)) {
+        var rest = t.replace(GREETINGS[i], '').trim();
+        if (rest.length > 5) return false;
+        return true;
+      }
     }
-    return Promise.resolve({ ok: true });
+    return false;
   }
 
-  function webLLMComplete(userMsg) {
-    if (!webLLMLoaded || !webLLMEngine) {
-      return loadWebLLM().then(function() {
-        if (!webLLMLoaded || !webLLMEngine) return { ok: false, error: 'WebLLM not available' };
-        return performWebLLMInference(userMsg);
-      });
-    }
-    return performWebLLMInference(userMsg);
+  function quickReply(text) {
+    var t = text.trim().toLowerCase();
+    if (/^hola|^buenas|^hey|^hello|^hi\b|^heyy/.test(t)) return QUICK_REPLIES.hola;
+    if (/^thanks|^thank you|^gracias/.test(t)) return QUICK_REPLIES.gracias;
+    if (/quien eres|who are you|qu[eé] eres|qu[eé] puedes hacer/.test(t)) return QUICK_REPLIES.quien;
+    if (/^bien$|^mal$|^bien y tu/.test(t)) return QUICK_REPLIES.bien;
+    if (/^s[ií]$|^ok$|^vale$|^de acuerdo$/.test(t)) return QUICK_REPLIES.default;
+    return null;
   }
 
-  function performWebLLMInference(userMsg) {
-    return webLLMEngine.chat.completions.create({
-      messages: [{ role: 'user', content: userMsg }],
-      max_tokens: 256, temperature: 0.7
-    }).then(function(response) {
-      return { ok: true, text: response.choices[0].message.content, model: 'Llama-3.2-1B-WebLLM' };
-    }).catch(function(e) { return { ok: false, error: e.message }; });
-  }
+  /* ── MEMORY ── */
 
-  function clearPanelTimeout() {
-    responded = true;
-    if (panelTimeout) { clearTimeout(panelTimeout); panelTimeout = null; }
-    if (panelTimeout2) { clearTimeout(panelTimeout2); panelTimeout2 = null; }
-    stopResponseFallback();
-  }
-
-  showWelcome();
-  initVoice();
-  checkConnection();
-  checkProviderHealth();
-
-  var fccStatusItem = document.querySelector('.ps-item.clickable');
-  if (fccStatusItem) {
-    fccStatusItem.addEventListener('click', function() {
-      chrome.tabs.create({ url: 'fcc-start.html' });
-    });
-  }
-
-  btnNew.addEventListener('click', function() {
-    messages = [];
-    headerTitle.textContent = 'Nueva conversación';
-    showWelcome();
-  });
-
-  function checkConnection() {
-    if (!chrome.runtime || !chrome.runtime.sendMessage) { return; }
+  function loadMem() {
     try {
-      chrome.runtime.sendMessage({ type: 'PING' }, function(response) {
-        if (chrome.runtime.lastError || !response) { return; }
-      });
+      var raw = localStorage.getItem(MEM_KEY);
+      if (raw) {
+        var d = JSON.parse(raw);
+        if (d && d.messages) {
+          S.mem = d.messages || [];
+          if (d.active) S.active = d.active;
+          if (d.mid) S.mid = d.mid;
+          return d;
+        }
+      }
+    } catch(e) {}
+    return null;
+  }
+
+  function saveMem() {
+    try {
+      localStorage.setItem(MEM_KEY, JSON.stringify({
+        messages: S.mem.slice(-MAX_MEM),
+        active: S.active,
+        mid: S.mid
+      }));
     } catch(e) {}
   }
 
-  function checkProviderHealth() {
-    if (!chrome.runtime || !chrome.runtime.sendMessage) return;
-    var psItems = document.querySelectorAll('.ps-item');
-    psItems.forEach(function(item) {
-      var dot = item.querySelector('.ps-dot');
-      if (dot) dot.className = 'ps-dot checking';
-    });
-    chrome.runtime.sendMessage({ type: 'PROVIDER_HEALTH' }, function(health) {
-      if (chrome.runtime.lastError || !health || !health.providers) return;
-      health.providers.forEach(function(p) {
-        var item = document.querySelector('.ps-item[data-provider="' + p.name + '"]');
-        if (item) {
-          var dot = item.querySelector('.ps-dot');
-          if (dot) {
-            if (p.status === 'healthy') dot.className = 'ps-dot online';
-            else if (p.status === 'unhealthy' || p.status === 'unavailable') dot.className = 'ps-dot offline';
-            else dot.className = 'ps-dot checking';
-          }
-        }
-      });
-    });
-    setTimeout(checkProviderHealth, 30000);
+  function pushMem(role, content) {
+    S.mem.push({ role: role, content: content, ts: Date.now() });
+    if (S.mem.length > MAX_MEM) S.mem = S.mem.slice(-MAX_MEM);
+    saveMem();
   }
 
-  function showWelcome() {
-    messagesEl.innerHTML = '';
-    var welcome = document.createElement('div');
-    welcome.className = 'welcome';
-    welcome.innerHTML =
-      '<img src="../assets/x1-logo-blue.png" alt="X1" class="welcome-logo">' +
-      '<h1>Hola, soy X1</h1>' +
-      '<p class="welcome-sub">Tu asistente en el navegador. Pregúntame lo que quieras o elige una idea para empezar.</p>' +
-      '<div class="welcome-suggestions">' +
-        '<button class="welcome-suggestion" data-cmd="Resumir esta pagina web">' +
-          '<svg class="sug-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M14.5 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>' +
-          '<span>Resumir esta página web</span>' +
-        '</button>' +
-        '<button class="welcome-suggestion" data-cmd="Redactar un correo profesional">' +
-          '<svg class="sug-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>' +
-          '<span>Redactar un correo profesional</span>' +
-        '</button>' +
-        '<button class="welcome-suggestion" data-cmd="Explicar un concepto dificil">' +
-          '<svg class="sug-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M9 18h6M10 22h4M12 2v4M7 12a5 5 0 0110 0c0 2-2 3-2 5h-6c0-2-2-3-2-5z"/></svg>' +
-          '<span>Explicar un concepto difícil</span>' +
-        '</button>' +
-      '</div>';
-    messagesEl.appendChild(welcome);
+  /* ── DROPDOWN ── */
 
-    welcome.querySelectorAll('.welcome-suggestion').forEach(function(btn) {
-      btn.addEventListener('click', function() {
-        var cmd = this.getAttribute('data-cmd');
-        input.value = cmd;
-        sendMessage();
-      });
+  function buildDropdown() {
+    el.dropdown.innerHTML = '';
+    AGENTS.forEach(function(a) {
+      var item = document.createElement('div');
+      item.className = 'dropdown-item' + (a.id === S.active ? ' selected' : '');
+      item.dataset.id = a.id;
+      item.innerHTML = '<span class="dd-icon ' + a.cls + '">' + esc(a.icon) + '</span><span class="dd-label">' + esc(a.name) + '</span><span class="dd-repo">' + esc(a.repo) + '</span>';
+      el.dropdown.appendChild(item);
     });
   }
 
-  function addMessage(role, text, stream) {
-    var welcomeEl = messagesEl.querySelector('.welcome');
-    if (welcomeEl) welcomeEl.remove();
-    headerTitle.textContent = role === 'user' ? (text || '').substring(0, 40) + '...' : 'Conversación';
+  function selectAgent(id) {
+    S.active = id;
+    var a = agent(id);
+    el.label.textContent = a.name;
+    el.repoText.textContent = a.repo;
+    el.repoLink.href = 'https://github.com/' + a.repo;
+    el.dropdown.querySelectorAll('.dropdown-item').forEach(function(d) {
+      d.classList.toggle('selected', d.dataset.id === id);
+    });
+    saveMem();
+  }
 
-    var msg = document.createElement('div');
-    msg.className = 'msg msg-' + role;
+  /* ── MESSAGES ── */
 
-    if (role === 'ai') {
-      var header = document.createElement('div');
-      header.className = 'msg-ai-header';
-      header.innerHTML = '<img src="../assets/x1-logo-blue.png" alt="X1" class="ai-logo"><span class="ai-label">X1 Assistant</span>';
-      msg.appendChild(header);
+  function addMsg(role, opts) {
+    opts = opts || {};
+    var id = opts.id || nextId();
+    var div = document.createElement('div');
+    div.className = 'msg msg-' + role;
+    div.dataset.id = id;
 
-      var body = document.createElement('div');
-      body.className = 'msg-body';
-      if (stream) {
-        body.textContent = '';
-        msg._streaming = true;
-      } else {
-        body.innerHTML = formatText(text);
-      }
-      msg.appendChild(body);
-
-      var actions = document.createElement('div');
-      actions.className = 'msg-ai-actions';
-      actions.innerHTML =
-        '<button class="ai-action-btn" title="Copiar"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></button>' +
-        '<button class="ai-action-btn" title="Me gusta"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3H14zM7 22H4a2 2 0 01-2-2v-7a2 2 0 012-2h3"/></svg></button>' +
-        '<button class="ai-action-btn" title="No me gusta"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M10 15v4a3 3 0 003 3l4-9V2H5.72a2 2 0 00-2 1.7l-1.38 9a2 2 0 002 2.3H10zM17 2h2.67A2.31 2.31 0 0122 4v7a2.31 2.31 0 01-2.33 2H17"/></svg></button>' +
-        '<button class="ai-action-btn" title="Regenerar"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg></button>';
-      msg.appendChild(actions);
-    } else {
-      var body = document.createElement('div');
-      body.className = 'msg-body';
-      body.textContent = text;
-      msg.appendChild(body);
+    if (role === 'user') {
+      div.innerHTML = '<div class="msg-bubble">' + esc(opts.text) + '</div>';
+      el.messages.appendChild(div);
+      scrollBottom(el.messages);
+      return div;
     }
 
-    messagesEl.appendChild(msg);
-    scrollToBottom();
-    messages.push({ role: role, text: text });
-    return msg;
+    var a = agent(opts.agent || S.active);
+
+    var html = '<div class="msg-card">';
+    html += '<div class="msg-row"><div class="msg-avatar">' + esc(a.icon) + '</div><span class="msg-author">' + esc(a.name) + '</span></div>';
+
+    // Dynamic pipeline steps
+    var steps = opts.steps;
+    if (steps && steps.length > 0) {
+      html += '<div class="msg-flow">';
+      steps.forEach(function(step, i) {
+        var ic = iconFor(step.app || '');
+        var ab = abbrFor(step.app || '');
+        var label = esc(step.label || step.app || '');
+        var arrow = (i < steps.length - 1) ? '<svg class="flow-arrow" width="12" height="12" fill="currentColor" viewBox="0 0 16 16"><path d="M6.22 3.22a.75.75 0 011.06 0l4.25 4.25a.75.75 0 010 1.06l-4.25 4.25a.75.75 0 01-1.06-1.06L9.94 8 6.22 4.28a.75.75 0 010-1.06z"/></svg>' : '';
+        html += '<div class="flow-step" data-idx="' + i + '"><div class="flow-icon ' + ic + '">' + ab + '</div><span class="flow-label">' + label + '</span></div>' + arrow;
+      });
+      html += '</div>';
+    }
+
+    html += '<div class="msg-content"></div>';
+    html += '</div>';
+    div.innerHTML = html;
+    div._steps = steps;
+    div._content = div.querySelector('.msg-content');
+    el.messages.appendChild(div);
+    scrollBottom(el.messages);
+    return div;
   }
 
-  function streamAiText(msgElement, fullText) {
-    if (!msgElement || !msgElement._streaming) return;
-    var body = msgElement.querySelector('.msg-body');
-    if (!body) return;
-    var index = 0;
-    var chunkSize = 3;
-    var interval = setInterval(function() {
-      if (index < fullText.length) {
-        body.innerHTML = formatText(fullText.substring(0, index + chunkSize));
-        index += chunkSize;
-        scrollToBottom();
-      } else {
-        clearInterval(interval);
-        body.innerHTML = formatText(fullText);
-        msgElement._streaming = false;
-        scrollToBottom();
-      }
-    }, 16);
-  }
-
-  function addStep(app, desc, status) {
-    var welcomeEl = messagesEl.querySelector('.welcome');
-    if (welcomeEl) welcomeEl.remove();
-    var step = document.createElement('div');
-    step.className = 'msg-step';
-    step.innerHTML = '<span>' + app + '</span><span>' + desc + '</span><span class="step-status ' + status + '"></span>';
-    messagesEl.appendChild(step);
-    scrollToBottom();
-    return step;
-  }
-
-  function updateStep(id, status) {
-    var el = messagesEl.querySelector('[data-step-id="' + id + '"] .step-status');
-    if (el) el.className = 'step-status ' + status;
-  }
-
-  function formatText(text) {
-    if (!text) return '';
-    return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n\n/g, '</p><p>').replace(/\n/g, '<br>').replace(/^/, '<p>').replace(/$/, '</p>');
-  }
-
-  function scrollToBottom() {
-    var chatView = document.getElementById('tab-chat');
-    chatView.scrollTop = chatView.scrollHeight;
-  }
-
-  function showThinking(msg) {
-    removeThinking();
-    var el = document.createElement('div');
-    el.className = 'msg msg-thinking';
-    el.innerHTML = '<div class="thinking-dots"><span></span><span></span><span></span></div> ' + (msg || 'Pensando...');
-    messagesEl.appendChild(el);
-    currentThinking = el;
-    scrollToBottom();
-  }
-
-  function removeThinking() {
-    if (currentThinking) { currentThinking.remove(); currentThinking = null; }
-  }
-
-  var LOCAL_JUDGE = 'http://localhost:8082';
-  var CLOUD_JUDGE = 'https://x1-proxy.baosx1.workers.dev';
-  var CLOUD_SECRET = '9ff4b7dda5f7defd5f7fb7c32c133428bc87e8efeb8550d3ce1e5838c1d3b850';
-
-  // Warm the cloud proxy on load so first response is fast
-  function warmJudge() {
-    fetch(CLOUD_JUDGE + '/v1/chat/completions', {
-      method:'POST', headers:{'Content-Type':'application/json','X-X1-Auth':CLOUD_SECRET},
-      body:JSON.stringify({messages:[{role:'user',content:'ping'}]}),
-      signal:AbortSignal.timeout(15000)
-    }).catch(function(){});
-    if (window.X1FCCBridge) window.X1FCCBridge.checkProxy();
-  }
-  warmJudge();
-
-  function callJudge(userMsg) {
-    var p1 = fetch(LOCAL_JUDGE + '/v1/messages', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'nvidia_nim/nvidia/nemotron-3-super-120b-a12b', messages:[{role:'user',content:userMsg}], max_tokens:512, stream:false}),
-      signal:AbortSignal.timeout(2000)
-    }).then(function(r){return r.ok?r.json():null;}).then(function(d){
-      var t=(d&&d.content&&d.content[0]&&d.content[0].text||'').trim();return t||null;
-    }).catch(function(){return null;});
-
-    var p2 = fetch(CLOUD_JUDGE + '/v1/chat/completions', {
-      method:'POST', headers:{'Content-Type':'application/json','X-X1-Auth':CLOUD_SECRET},
-      body:JSON.stringify({messages:[{role:'user',content:userMsg}]}),
-      signal:AbortSignal.timeout(12000)
-    }).then(function(r){return r.ok?r.json():null;}).then(function(d){
-      var t=(d&&d.choices&&d.choices[0]&&d.choices[0].message&&d.choices[0].message.content||'').trim();return t||null;
-    }).catch(function(){return null;});
-
-    return Promise.race([p1, p2]).then(function(txt) {
-      if (txt) return txt;
-      return Promise.all([p1, p2]).then(function(r) { return r[0] || r[1] || null; });
-    });
-  }
-
-  function sendMessage() {
-    var text = input.value.trim();
-    if (!text) return;
-    input.value = '';
-    addMessage('user', text);
-    showThinking();
-    responded = false;
-    if (panelTimeout) clearTimeout(panelTimeout);
-
-    // Try cloud proxy directly + SW fallback IN PARALLEL
-    callJudge(text).then(function(txt) {
-      if (txt) { clearPanelTimeout(); if (!responded) { responded = true; removeThinking(); var m = addMessage('ai', txt, true); streamAiText(m, txt); } return; }
-      tryFallback(text);
-    });
-
-    // Stage 1: "pensando" at 6s, Stage 2: "todavia pensando" at 15s
-    panelTimeout = setTimeout(function() {
-      if (!responded) { removeThinking(); showThinking('X1 está procesando...'); }
-      panelTimeout2 = setTimeout(function() {
-        if (!responded) { removeThinking(); showThinking('Todavía procesando, esto puede tomar un momento...'); }
-      }, 14000);
-    }, 6000);
-  }
-
-  function tryFallback(text) {
-    chrome.runtime.sendMessage(
-      { type: 'VOICE_COMMAND_EXEC', command: text, raw: text, wantsText: true },
-      function(response) {
-        if (chrome.runtime.lastError) {
-          if (!responded) { responded = true; clearTimeout(panelTimeout); removeThinking(); }
-          return;
-        }
-        if (response && response.text) {
-          clearPanelTimeout();
-          if (!responded) {
-            responded = true; removeThinking();
-            var aiMsg = addMessage('ai', response.text, true);
-            streamAiText(aiMsg, response.text);
-          }
-        }
-      }
-    );
-  }
-
-  input.addEventListener('keydown', function(e) {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
-  });
-
-  input.addEventListener('input', function() {
-    input.style.height = 'auto';
-    input.style.height = Math.min(input.scrollHeight, 160) + 'px';
-    var canSend = input.value.trim().length > 0;
-    btnSend.disabled = !canSend;
-  });
-
-  btnSend.addEventListener('click', sendMessage);
-
-  document.querySelectorAll('.toggle-chip').forEach(function(chip) {
-    chip.addEventListener('click', function() {
-      var toggle = this.getAttribute('data-toggle');
-      var pressed = this.getAttribute('aria-pressed') === 'true';
-      this.setAttribute('aria-pressed', String(!pressed));
-      if (toggle === 'think') thinkToggle = !pressed;
-      if (toggle === 'search') searchToggle = !pressed;
-    });
-  });
-
-  function initVoice() {
-    var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) return;
-    recognition = new SpeechRecognition();
-    recognition.lang = 'es-ES';
-    recognition.interimResults = true;
-    recognition.continuous = false;
-    recognition.onresult = function(e) {
-      var transcript = '';
-      for (var i = e.resultIndex; i < e.results.length; i++) transcript += e.results[i][0].transcript;
-      input.value = transcript;
-      if (e.results[e.results.length - 1].isFinal) { stopListening(); sendMessage(); }
-    };
-    recognition.onend = function() { if (listening) stopListening(); };
-    recognition.onerror = function() { stopListening(); };
-  }
-
-  btnMic.addEventListener('click', function() {
-    if (listening) stopListening(); else startListening();
-  });
-
-  function startListening() {
-    if (!recognition) return;
-    listening = true;
-    btnMic.classList.add('listening');
-    try { recognition.start(); } catch(e) {}
-  }
-
-  function stopListening() {
-    listening = false;
-    btnMic.classList.remove('listening');
-    try { recognition.stop(); } catch(e) {}
-  }
-
-  // ── RESPONSE FALLBACK (storage polling) ──
-  var responseFallbackTimer = null;
-
-  function startResponseFallback(requestId) {
-    stopResponseFallback();
-    var attempts = 0;
-    responseFallbackTimer = setInterval(function() {
-      attempts++;
-      if (attempts > 30) { stopResponseFallback(); return; }
-      try {
-        chrome.storage.local.get('x1LastResponse', function(data) {
-          if (data && data.x1LastResponse && data.x1LastResponse.requestId === requestId) {
-            if (!responded) {
-              clearPanelTimeout();
-              responded = true;
-              removeThinking();
-              var resp = data.x1LastResponse;
-              if (resp.text) {
-                var aiMsg = addMessage('ai', resp.text, true);
-                streamAiText(aiMsg, resp.text);
-              } else {
-                addMessage('ai', 'Comando ejecutado.');
-              }
-              chrome.storage.local.remove('x1LastResponse');
-              stopResponseFallback();
-            }
-          }
+  function animateFlow(div, speed) {
+    var steps = div._steps;
+    if (!steps || steps.length === 0) return Promise.resolve();
+    speed = speed || 180;
+    return new Promise(function(resolve) {
+      var els = div.querySelectorAll('.flow-step');
+      var i = 0;
+      function next() {
+        if (i >= els.length) { resolve(); return; }
+        var s = els[i];
+        s.classList.add('active');
+        delay(speed).then(function() {
+          s.classList.remove('active');
+          s.classList.add('done');
+          i++;
+          delay(speed * 0.2).then(next);
         });
-      } catch(e) {}
-    }, 1000);
+      }
+      next();
+    });
   }
 
-  function stopResponseFallback() {
-    if (responseFallbackTimer) { clearInterval(responseFallbackTimer); responseFallbackTimer = null; }
+  function setContent(div, text) {
+    if (div._content) div._content.innerHTML = fmt(text);
   }
 
-  // ── LISTEN FOR RESPONSES ──
-  try {
-    chrome.runtime.onMessage.addListener(function(request) {
-      if (request && request.type === 'X1_VOICE_RESPONSE' && !responded) {
-        clearPanelTimeout();
-        removeThinking();
-        if (request.text) {
-          var aiMsg = addMessage('ai', request.text, true);
-          streamAiText(aiMsg, request.text);
-        } else {
-          addMessage('ai', request.error || 'Comando ejecutado.');
+  function think(text) {
+    unthink();
+    var d = document.createElement('div');
+    d.className = 'msg msg-thinking';
+    d.id = 'think-el';
+    d.innerHTML = '<div class="msg-dots"><span></span><span></span><span></span></div> ' + (text || 'Thinking');
+    el.messages.appendChild(d);
+    scrollBottom(el.messages);
+  }
+
+  function unthink() {
+    var d = document.getElementById('think-el');
+    if (d) d.remove();
+  }
+
+  /* ── PLANNER ── */
+
+  function parseJSON(text) {
+    try { return JSON.parse(text); } catch(e) {}
+    // Try extracting from code block
+    var m = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (m) {
+      try { return JSON.parse(m[1].trim()); } catch(e) {}
+    }
+    // Try finding first { and last }
+    var start = text.indexOf('{');
+    var end = text.lastIndexOf('}');
+    if (start !== -1 && end > start) {
+      try { return JSON.parse(text.substring(start, end + 1)); } catch(e) {}
+    }
+    return null;
+  }
+
+  function planSteps(query) {
+    var a = agent(S.active);
+    var recent = S.mem.slice(-6);
+
+    var msgs = [
+      { role: 'system', content: 'You are X1, a browser agent. Plan the steps needed to fulfil the user\'s request.\n\nReturn ONLY valid JSON (no markdown, no explanation) with this structure:\n{\n  "steps": [\n    {"app": "AppName", "label": "ShortLabel"},\n    ...\n  ],\n  "response": "Your answer to the user"\n}\n\nPossible app names: GitHub, Google, LinkedIn, Docs, Style, PDF, Search, Read, Code, Draft, Email, Synthesize, Test, Export, Result, Done.\n\nExample for "create a document about someone":\n{"steps":[{"app":"GitHub","label":"Repo"},{"app":"Google","label":"Search"},{"app":"LinkedIn","label":"Profile"},{"app":"Docs","label":"Create"},{"app":"Style","label":"Format"},{"app":"PDF","label":"Export"},{"app":"Done","label":"Result"}],"response":"I created the document. Here it is..."}\n\nBe concise. Always end with a "Done" or "Result" step. The response must be in the user\'s language.' },
+      { role: 'user', content: 'Agent: ' + a.name + '\nRepo: ' + a.repo + '\n\n' + query }
+    ];
+
+    return fetch(CLOUD + '/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-X1-Auth': SECRET },
+      body: JSON.stringify({ messages: msgs, max_tokens: 600, temperature: 0.3 }),
+      signal: AbortSignal.timeout(15000)
+    }).then(function(r) {
+      if (!r.ok) return null;
+      return r.json();
+    }).then(function(d) {
+      if (!d) return null;
+      var t = d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content;
+      if (!t || !t.trim()) return null;
+      var parsed = parseJSON(t);
+      if (parsed && parsed.steps && parsed.response) {
+        return parsed;
+      }
+      // Fallback: if JSON parsing failed but we got text, use it as response with default steps
+      return { steps: [{app:'Done', label:'Result'}], response: t.trim() };
+    }).catch(function() { return null; });
+  }
+
+  /* ── SIMPLE ANSWER ── */
+
+  function simpleAnswer(text) {
+    var a = agent(S.active);
+    var recent = S.mem.slice(-4);
+    var msgs = [
+      { role: 'system', content: 'You are X1, a browser agent. Reply briefly and naturally. Current agent: ' + a.name },
+      { role: 'user', content: text }
+    ];
+
+    return fetch(CLOUD + '/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-X1-Auth': SECRET },
+      body: JSON.stringify({ messages: msgs, max_tokens: 150, temperature: 0.5 }),
+      signal: AbortSignal.timeout(8000)
+    }).then(function(r) { return r.ok ? r.json() : null; })
+    .then(function(d) {
+      if (!d) return null;
+      var t = d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content;
+      return (t || '').trim() || null;
+    }).catch(function() { return null; });
+  }
+
+  /* ── RUN ── */
+
+  function run(text) {
+    if (!text.trim() || S.busy) return;
+    S.busy = true;
+    el.input.value = '';
+    el.send.disabled = true;
+
+    var empty = el.messages.querySelector('.empty-state');
+    if (empty) empty.remove();
+
+    pushMem('user', text);
+    addMsg('user', { text: text });
+
+    var simple = isSimple(text);
+
+    if (simple) {
+      var reply = quickReply(text) || '¿En qué puedo ayudarte?';
+      var div = addMsg('agent', { steps: [] });
+      think();
+      simpleAnswer(text).then(function(txt) {
+        unthink();
+        if (txt) reply = txt;
+        setContent(div, reply);
+        pushMem('agent', reply);
+        S.busy = false;
+        el.send.disabled = !el.input.value.trim();
+      });
+      return;
+    }
+
+    // Complex: plan steps dynamically via AI
+    think('Planning');
+    var a = agent(S.active);
+    var fallbackReply = (FALLBACK_ANSWERS[a.id] || FALLBACK_ANSWERS.research);
+
+    planSteps(text).then(function(plan) {
+      unthink();
+      var steps = (plan && plan.steps) ? plan.steps : [{app:'Done', label:'Result'}];
+      var reply = (plan && plan.response) ? plan.response : fallbackReply;
+
+      var div = addMsg('agent', { steps: steps });
+      var anim = animateFlow(div, 200);
+      anim.then(function() {
+        setContent(div, reply);
+        pushMem('agent', reply);
+        S.busy = false;
+        el.send.disabled = !el.input.value.trim();
+        scrollBottom(el.messages);
+      });
+    }).catch(function() {
+      unthink();
+      var div = addMsg('agent', { steps: [] });
+      setContent(div, fallbackReply);
+      pushMem('agent', fallbackReply);
+      S.busy = false;
+      el.send.disabled = !el.input.value.trim();
+    });
+  }
+
+  /* ── WARM ── */
+
+  function warm() {
+    fetch(CLOUD + '/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-X1-Auth': SECRET },
+      body: JSON.stringify({ messages: [{ role: 'user', content: 'ping' }], max_tokens: 1 }),
+      signal: AbortSignal.timeout(8000)
+    }).catch(function(){});
+  }
+
+  /* ── RESTORE ── */
+
+  function restore() {
+    var d = loadMem();
+    if (d && d.messages && d.messages.length > 0) {
+      var memIdx = 0;
+      d.messages.forEach(function(m) {
+        if (m.role === 'user') {
+          addMsg('user', { text: m.content });
+        } else if (m.role === 'agent') {
+          var div = addMsg('agent', { agent: d.active || S.active, steps: [] });
+          setContent(div, m.content);
         }
+      });
+    } else {
+      var e = document.createElement('div');
+      e.className = 'empty-state';
+      e.innerHTML = '<div class="empty-icon"><svg width="18" height="18" fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a6 6 0 00-6 6v3.5a.75.75 0 001.5 0V8a4.5 4.5 0 119 0v3.5a.75.75 0 001.5 0V8a6 6 0 00-6-6zM4.5 12.5a.75.75 0 00-.75.75v1a3 3 0 003 3h1.5a.75.75 0 000-1.5h-1.5a1.5 1.5 0 01-1.5-1.5v-1a.75.75 0 00-.75-.75zm11 0a.75.75 0 00-.75.75v1a1.5 1.5 0 01-1.5 1.5h-1.5a.75.75 0 000 1.5h1.5a3 3 0 003-3v-1a.75.75 0 00-.75-.75z"/></svg></div><div class="empty-title">How can I help?</div><div class="empty-desc">I can search the web, read pages, create documents, write code, and act across your tools.</div>';
+      el.messages.appendChild(e);
+    }
+  }
+
+  /* ── INIT ── */
+
+  function init() {
+    el = cache();
+
+    warm();
+    buildDropdown();
+
+    var d = loadMem();
+    selectAgent((d && d.active) ? d.active : 'research');
+    restore();
+
+    // Dropdown
+    el.picker.addEventListener('click', function(e) {
+      e.stopPropagation();
+      S.dropdown = !S.dropdown;
+      el.dropdown.classList.toggle('hidden', !S.dropdown);
+    });
+
+    el.dropdown.addEventListener('click', function(e) {
+      var item = e.target.closest('.dropdown-item');
+      if (item) {
+        selectAgent(item.dataset.id);
+        el.dropdown.classList.add('hidden');
+        S.dropdown = false;
       }
     });
-  } catch(e) {}
+
+    document.addEventListener('click', function() {
+      el.dropdown.classList.add('hidden');
+      S.dropdown = false;
+    });
+
+    // GitHub
+    el.gh.addEventListener('click', function() {
+      chrome.tabs.create({ url: 'https://github.com/' + agent(S.active).repo });
+    });
+
+    // Input
+    el.input.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+        e.preventDefault();
+        run(el.input.value);
+      }
+    });
+
+    el.input.addEventListener('input', function() {
+      el.send.disabled = !el.input.value.trim() || S.busy;
+    });
+
+    el.send.addEventListener('click', function() { run(el.input.value); });
+
+    // Mic
+    el.mic.addEventListener('click', function() {
+      if (S.listening) {
+        S.listening = false;
+        el.mic.classList.remove('btn-mic-active');
+        el.input.placeholder = 'Ask me anything...';
+        return;
+      }
+      S.listening = true;
+      el.mic.classList.add('btn-mic-active');
+      el.input.placeholder = 'Listening...';
+      setTimeout(function() {
+        S.listening = false;
+        el.mic.classList.remove('btn-mic-active');
+        el.input.placeholder = 'Ask me anything...';
+        run('Create a document about Sam Altman');
+      }, 1600);
+    });
+
+    setTimeout(function() { el.input.focus(); }, 100);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
 
 })();
