@@ -59,39 +59,45 @@ const useStyles = makeStyles({
     color: tokens.colorNeutralForeground3
   },
   emptyIcon: {
-    width: '46px', height: '46px', borderRadius: '12px',
+    width: '52px', height: '52px', borderRadius: '15px',
     display: 'grid', placeItems: 'center',
-    backgroundColor: tokens.colorBrandBackground2, color: tokens.colorBrandForeground2,
+    background: 'linear-gradient(135deg, #a8c7fa 0%, #c4b5f7 55%, #f3c6e2 100%)',
+    color: '#ffffff',
+    boxShadow: '0 4px 14px rgba(150, 140, 240, 0.35)',
     marginBottom: tokens.spacingVerticalS
   },
   userRow: { display: 'flex', justifyContent: 'flex-end' },
   userBubble: {
     maxWidth: '82%', ...shorthands.padding(tokens.spacingVerticalS, tokens.spacingHorizontalM),
-    backgroundColor: tokens.colorBrandBackground, color: tokens.colorNeutralForegroundOnBrand,
-    borderRadius: '14px', borderBottomRightRadius: '4px',
-    fontSize: tokens.fontSizeBase300, whiteSpace: 'pre-wrap', wordBreak: 'break-word'
+    background: 'linear-gradient(135deg, #5f8bf7 0%, #7d6cf0 100%)',
+    color: '#ffffff',
+    borderRadius: '16px', borderBottomRightRadius: '5px',
+    fontSize: tokens.fontSizeBase300, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+    boxShadow: '0 2px 8px rgba(95, 139, 247, 0.25)'
   },
   card: {
-    ...shorthands.padding(tokens.spacingVerticalM, tokens.spacingHorizontalM),
+    ...shorthands.padding(tokens.spacingVerticalL, tokens.spacingHorizontalL),
     backgroundColor: tokens.colorNeutralBackground1,
-    border: `${tokens.strokeWidthThin} solid ${tokens.colorNeutralStroke2}`,
-    borderRadius: tokens.borderRadiusLarge,
-    boxShadow: tokens.shadow2
+    borderRadius: '16px',
+    boxShadow: '0 2px 10px rgba(0, 0, 0, 0.06), 0 0 0 0.5px rgba(0, 0, 0, 0.03)'
   },
   cardHead: { display: 'flex', alignItems: 'center', gap: tokens.spacingHorizontalS, marginBottom: tokens.spacingVerticalS },
   answer: { whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: '1.5' },
   thinking: { display: 'flex', alignItems: 'center', gap: tokens.spacingHorizontalS, color: tokens.colorNeutralForeground3 },
   composer: {
-    ...shorthands.padding(tokens.spacingVerticalM, tokens.spacingHorizontalL),
-    backgroundColor: tokens.colorNeutralBackground1,
-    borderTop: `${tokens.strokeWidthThin} solid ${tokens.colorNeutralStroke2}`
+    ...shorthands.padding(tokens.spacingVerticalS, tokens.spacingHorizontalL, tokens.spacingVerticalM)
   },
   inputWrap: {
     display: 'flex', alignItems: 'flex-end', gap: tokens.spacingHorizontalXS,
-    backgroundColor: tokens.colorNeutralBackground3,
-    ...shorthands.padding(tokens.spacingVerticalXS, tokens.spacingHorizontalXS, tokens.spacingVerticalXS, tokens.spacingHorizontalS),
-    borderRadius: tokens.borderRadiusXLarge,
-    border: `${tokens.strokeWidthThin} solid ${tokens.colorNeutralStroke2}`
+    backgroundColor: tokens.colorNeutralBackground1,
+    ...shorthands.padding(tokens.spacingVerticalXS, tokens.spacingHorizontalXS, tokens.spacingVerticalXS, tokens.spacingHorizontalM),
+    borderRadius: '22px',
+    boxShadow: '0 2px 10px rgba(0, 0, 0, 0.07), 0 0 0 0.5px rgba(0, 0, 0, 0.04)'
+  },
+  sendBtn: {
+    background: 'linear-gradient(135deg, #5f8bf7 0%, #7d6cf0 100%)',
+    ':hover': { background: 'linear-gradient(135deg, #4f7df3 0%, #6d5ce8 100%)' },
+    ':disabled': { background: tokens.colorNeutralBackgroundDisabled }
   },
   textarea: { flexGrow: 1, backgroundColor: 'transparent' },
   hint: { display: 'block', textAlign: 'center', marginTop: tokens.spacingVerticalXS, color: tokens.colorNeutralForeground4 }
@@ -109,8 +115,25 @@ export default function App({ mode, onToggleMode }) {
   const [listening, setListening] = React.useState(false);
   const logRef = React.useRef(null);
 
-  // Restaurar memoria + warm-up (contrato backend intacto)
+  // Modo demo (?demo en la URL): conversación de muestra sin red, útil para
+  // grabar demos y para verificar el timeline. La extensión nunca añade ?demo,
+  // así que en uso real jamás se activa.
   React.useEffect(() => {
+    if (typeof location !== 'undefined' && location.search.indexOf('demo') !== -1) {
+      setMessages([
+        { id: nid(), role: 'user', text: 'Prepara mi reunión con Jordan Logan' },
+        { id: nid(), role: 'agent', agent: 'research', phase: 'running',
+          steps: [
+            { app: 'Calendar', label: 'Consultando los detalles de la reunión' },
+            { app: 'LinkedIn', label: 'Conociendo mejor a Jordan' },
+            { app: 'Gmail', label: 'Revisando conversaciones pasadas' },
+            { app: 'HubSpot', label: 'Repasando el historial de interacción' },
+            { app: 'Docs', label: 'Preparando tu resumen de reunión' }
+          ],
+          response: 'Listo. He combinado la información de la reunión, el perfil de Jordan y vuestro historial en un resumen preparado para revisar.' }
+      ]);
+      return;
+    }
     B.warm();
     const d = B.loadMem();
     if (d) {
@@ -186,7 +209,7 @@ export default function App({ mode, onToggleMode }) {
     <div className={styles.app}>
       <header className={styles.header}>
         <div className={styles.brand}>
-          <img className={styles.brandMark} src="../assets/x1-logo-square.png" alt=""
+          <img className={styles.brandMark} src="../assets/x1-logo.png" alt="X1"
             onError={(e) => { e.currentTarget.style.display = 'none'; }} />
           <Text size={400} className={styles.brandName}>X1</Text>
           <Menu positioning="below-start">
@@ -263,7 +286,7 @@ export default function App({ mode, onToggleMode }) {
               icon={listening ? <Mic24Filled /> : <Mic24Regular />}
               onClick={toggleMic} aria-label="Voz" />
           </Tooltip>
-          <Button appearance="primary" shape="circular" icon={<Send24Filled />}
+          <Button appearance="primary" shape="circular" className={styles.sendBtn} icon={<Send24Filled />}
             disabled={!input.trim() || busy} onClick={() => run(input)} aria-label="Enviar" />
         </div>
         <Caption1 className={styles.hint}>X1 puede cometer errores. Verifica la información importante.</Caption1>

@@ -91,31 +91,37 @@ export function metaFor(app) {
   return APP_META[key] || { ...FALLBACK, title: app || 'Step' };
 }
 
-const tileBase = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  borderRadius: '8px',
-  flexShrink: 0,
-  boxShadow: '0 1px 3px rgba(0,0,0,0.10), 0 0 0 0.5px rgba(0,0,0,0.04)'
+/** Tintes pastel para los pasos abstractos (estilo cristal suave). */
+const PASTEL = {
+  '#5b5fc7': '#eceafc',
+  '#107c41': '#e3f4ea',
+  '#c19c00': '#faf3d8',
+  '#8764b8': '#f0eafa',
+  '#c50f1f': '#fdebed'
 };
 
-/** Icono del paso: tile blanco con logo original, ó tile de color con icono Fluent. */
+/**
+ * Icono del paso, estilo de la referencia: los logos originales van "sueltos"
+ * (sin caja), tal como aparecen en la imagen; los pasos abstractos usan un tile
+ * redondeado con tinte pastel e icono Fluent en su color.
+ */
 export function StepIcon({ app, size = 30 }) {
   const meta = metaFor(app);
   if (meta.png) {
     return (
-      <span style={{ ...tileBase, width: size, height: size, background: '#fff' }}>
-        <img src={meta.png} alt="" width={size - 8} height={size - 8}
-          style={{ objectFit: 'contain' }}
-          onError={(e) => { e.currentTarget.style.visibility = 'hidden'; }} />
-      </span>
+      <img src={meta.png} alt="" width={size} height={size}
+        style={{ objectFit: 'contain', flexShrink: 0, display: 'block' }}
+        onError={(e) => { e.currentTarget.style.visibility = 'hidden'; }} />
     );
   }
   const Icon = meta.Icon;
   return (
-    <span style={{ ...tileBase, width: size, height: size, background: meta.color }}>
-      <Icon style={{ color: '#fff', fontSize: size - 12 }} />
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+      width: size, height: size, borderRadius: '9px', flexShrink: 0,
+      background: PASTEL[meta.color] || '#f0f0f0'
+    }}>
+      <Icon style={{ color: meta.color, fontSize: size - 10 }} />
     </span>
   );
 }

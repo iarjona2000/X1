@@ -1,67 +1,74 @@
 /*
  * Timeline de proceso vertical — se "razona" en el momento en que el usuario
- * pregunta y revela cada paso con el icono original de la app (estilo de la
- * imagen de referencia). Cada paso: icono + título + subtítulo, unidos por una
- * línea vertical que se ilumina en el paso activo.
+ * pregunta y revela cada paso con el icono original de la app, con el estilo
+ * de la referencia: logos sueltos, tipografía grande y amable, subtítulo gris
+ * claro, conector fino que se ilumina en azul en el paso activo, y espaciado
+ * generoso.
  */
 
 import * as React from 'react';
-import { makeStyles, tokens, Caption1, Text } from '@fluentui/react-components';
+import { makeStyles, tokens, Text } from '@fluentui/react-components';
 import { StepIcon, metaFor } from './icons.jsx';
 
 const useStyles = makeStyles({
   root: {
     display: 'flex',
     flexDirection: 'column',
-    paddingTop: tokens.spacingVerticalXS
+    paddingTop: tokens.spacingVerticalS
   },
   head: {
-    color: tokens.colorNeutralForeground3,
-    fontStyle: 'italic',
-    marginBottom: tokens.spacingVerticalS,
+    color: tokens.colorNeutralForeground4,
+    fontSize: tokens.fontSizeBase300,
+    marginBottom: tokens.spacingVerticalM,
     paddingLeft: '2px'
   },
   row: {
     display: 'grid',
-    gridTemplateColumns: '30px 1fr',
-    columnGap: tokens.spacingHorizontalM,
+    gridTemplateColumns: '32px 1fr',
+    columnGap: tokens.spacingHorizontalL,
     position: 'relative'
   },
   railWrap: {
     display: 'flex',
     flexDirection: 'column',
-    alignItems: 'center'
+    alignItems: 'center',
+    gap: '6px'
   },
   connector: {
     width: '2px',
     flexGrow: 1,
-    minHeight: '14px',
-    background: tokens.colorNeutralStroke2,
+    minHeight: '18px',
+    background: tokens.colorNeutralStroke3,
     borderRadius: '1px',
-    transition: 'background 0.4s ease'
+    transition: 'background 0.5s ease'
   },
   connectorActive: {
-    background: `linear-gradient(${tokens.colorBrandStroke1}, ${tokens.colorNeutralStroke2})`
+    background: 'linear-gradient(#7cb6f8, #cfe4fc)'
   },
   body: {
-    paddingBottom: tokens.spacingVerticalL,
+    paddingBottom: '26px',
     minWidth: 0,
-    transform: 'translateY(2px)'
+    transform: 'translateY(3px)'
   },
   title: {
+    display: 'block',
+    fontSize: '16px',
     fontWeight: tokens.fontWeightSemibold,
     color: tokens.colorNeutralForeground1,
-    lineHeight: '20px'
+    lineHeight: '22px'
   },
   sub: {
+    display: 'block',
+    fontSize: '14px',
     color: tokens.colorNeutralForeground3,
-    display: 'block'
+    lineHeight: '20px',
+    marginTop: '1px'
   },
-  hidden: { opacity: 0, transform: 'translateY(6px)' },
+  hidden: { opacity: 0, transform: 'translateY(8px)' },
   shown: {
     opacity: 1,
     transform: 'none',
-    transition: 'opacity 0.35s ease, transform 0.35s ease'
+    transition: 'opacity 0.4s ease, transform 0.4s ease'
   },
   pulse: {
     animationName: {
@@ -87,12 +94,12 @@ export function ProcessTimeline({ steps, onComplete }) {
       i += 1;
       setRevealed(i);
       if (i < list.length) {
-        timer = setTimeout(tick, 520);
+        timer = setTimeout(tick, 560);
       } else {
-        timer = setTimeout(() => onComplete && onComplete(), 480);
+        timer = setTimeout(() => onComplete && onComplete(), 500);
       }
     };
-    timer = setTimeout(tick, 260);
+    timer = setTimeout(tick, 280);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [list.length]);
@@ -102,7 +109,7 @@ export function ProcessTimeline({ steps, onComplete }) {
 
   return (
     <div className={styles.root}>
-      {running && <Caption1 className={styles.head}>Ejecutando…</Caption1>}
+      {running && <Text className={styles.head}>Ejecutando…</Text>}
       {list.map((step, i) => {
         const meta = metaFor(step.app);
         const isShown = i < revealed;
@@ -112,7 +119,7 @@ export function ProcessTimeline({ steps, onComplete }) {
           <div key={i} className={`${styles.row} ${isShown ? styles.shown : styles.hidden}`}>
             <div className={styles.railWrap}>
               <div className={isActive ? styles.pulse : undefined}>
-                <StepIcon app={step.app} />
+                <StepIcon app={step.app} size={30} />
               </div>
               {!isLast && (
                 <div className={`${styles.connector} ${isActive ? styles.connectorActive : ''}`} />
@@ -120,7 +127,7 @@ export function ProcessTimeline({ steps, onComplete }) {
             </div>
             <div className={styles.body}>
               <Text className={styles.title}>{meta.title || step.app}</Text>
-              <Caption1 className={styles.sub}>{step.label || meta.title}</Caption1>
+              <Text className={styles.sub}>{step.label || meta.title}</Text>
             </div>
           </div>
         );
