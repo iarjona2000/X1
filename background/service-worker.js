@@ -554,6 +554,16 @@ function warmJudge() {
     headers:{'Content-Type':'application/json','X-X1-Auth':PROXY_SHARED_SECRET},
     body:JSON.stringify({messages:[{role:'user',content:'ping'}]}),
     signal:AbortSignal.timeout(10000)
+  }).then(function(r){ if (r.ok) console.log('[X1] Judge warm ping OK'); }).catch(function(){});
+}
+
+function warmJudge() {
+  if (!PROXY_URL || !PROXY_SHARED_SECRET) return;
+  fetch(PROXY_URL + '/v1/chat/completions', {
+    method:'POST',
+    headers:{'Content-Type':'application/json','X-X1-Auth':PROXY_SHARED_SECRET},
+    body:JSON.stringify({messages:[{role:'user',content:'ping'}]}),
+    signal:AbortSignal.timeout(10000)
   }).then(function(r){
     if (r.ok) console.log('[X1] Judge warm ping OK');
   }).catch(function(){});
