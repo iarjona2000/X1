@@ -6,6 +6,12 @@
       "runtimeExecutable": "npx",
       "runtimeArgs": ["http-server", "sidepanel", "-p", "3847", "-c-1"],
       "port": 3847
+    },
+    {
+      "name": "x1-panel",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["http-server", ".", "-p", "3849", "-c-1"],
+      "port": 3849
     }
   ]
 }

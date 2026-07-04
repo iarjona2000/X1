@@ -16,3 +16,6 @@ background/x1-core/.wrangler/
 x1-extension/node_modules/
 x1-extension/.wrangler/
 x1-extension/dist/
+
+# sidepanel UI build deps
+sidepanel-ui/node_modules/
