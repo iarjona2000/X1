@@ -35,13 +35,13 @@
     // ── Voice commands (source: "x1-voice") ──
     if (data.source === 'x1-voice') {
       if (data.type === 'open-panel') {
-        chrome.runtime.sendMessage({type: 'X1_OPEN_PANEL'}).catch(function(){});
+        chrome.runtime.sendMessage({type: legacyAlias('X1_OPEN_PANEL')}).catch(function(){});
         return;
       }
       if (data.type !== 'command') return;
 
       if (data.command === 'x1-greet') {
-        chrome.runtime.sendMessage({type: 'X1_GREET'}).then(function(resp) {
+        chrome.runtime.sendMessage({type: legacyAlias('X1_GREET')}).then(function(resp) {
           if (resp && resp.text) {
             window.postMessage({
               source: 'x1-voice-response',
