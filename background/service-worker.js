@@ -6511,6 +6511,7 @@ chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
       try { sendResponse({text: text, showText: !!(data && data.showText)}); } catch(e) {}
     }
 
+    try { sendResponse({ack: true}); } catch(e) {}
     handleVoice(cmdText, wantsText, function(data) { sendResp(data); });
     setTimeout(function() {
       if (!swResponded) { sendResp({text: 'Procesando...'}); }
