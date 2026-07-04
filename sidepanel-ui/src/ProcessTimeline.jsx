@@ -1,123 +1,110 @@
 import * as React from 'react';
-import { makeStyles, tokens } from '@fluentui/react-components';
+import { makeTokens } from '@fluentui/react-components';
 import { StepIcon, metaFor } from './icons.jsx';
 
-const useStyles = makeStyles({
+const iOS = {
+  separator: '#f0f0f0', connector: '#e0e0e0', connectorActive: '#4b3ac9',
+  title: '#1c1c1e', subtitle: '#8e8e93'
+};
+
+const styles = {
   root: {
-    display: 'flex',
-    flexDirection: 'column',
-    paddingTop: '4px',
-    paddingBottom: '8px'
+    display: 'flex', flexDirection: 'column',
+    paddingTop: '4px', paddingBottom: '8px'
   },
   row: {
     display: 'grid',
-    gridTemplateColumns: '28px 1fr',
-    columnGap: '14px',
-    position: 'relative',
-    minHeight: '48px'
+    gridTemplateColumns: '24px 1fr',
+    gap: '12px',
+    minHeight: '44px',
+    transition: 'opacity 0.45s ease, transform 0.45s ease'
   },
-  railWrap: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center'
-  },
-  connector: {
-    width: '2px',
-    flexGrow: 1,
-    minHeight: '20px',
-    backgroundColor: '#e8e8e8',
-    borderRadius: '1px',
-    transition: 'background-color 0.4s ease'
-  },
-  connectorActive: {
-    background: 'linear-gradient(180deg, #7c6ae0 0%, #c4b5fd 100%)'
-  },
-  body: {
-    paddingBottom: '20px',
+  rail: {
+    display: 'flex', flexDirection: 'column', alignItems: 'center',
     transform: 'translateY(2px)'
   },
+  line: {
+    width: '2px', flexGrow: 1, minHeight: '18px',
+    backgroundColor: iOS.connector, borderRadius: '1px',
+    transition: 'background 0.3s'
+  },
+  lineActive: {
+    background: 'linear-gradient(180deg, #4b3ac9 0%, #c4b5fd 100%)'
+  },
   title: {
-    display: 'block',
-    fontSize: '15px',
-    fontWeight: 600,
-    color: '#1a1a1a',
-    lineHeight: '22px'
+    fontSize: '14px', fontWeight: 600, color: iOS.title, lineHeight: '22px'
   },
   sub: {
-    display: 'block',
-    fontSize: '13px',
-    color: '#999',
-    lineHeight: '18px',
-    marginTop: '2px'
+    fontSize: '13px', color: iOS.subtitle, lineHeight: '18px', marginTop: '1px'
   },
-  hidden: { opacity: 0, transform: 'translateY(12px)' },
-  shown: {
-    opacity: 1, transform: 'none',
-    transition: 'opacity 0.5s cubic-bezier(0.22, 1, 0.36, 1), transform 0.5s cubic-bezier(0.22, 1, 0.36, 1)'
-  },
+  hidden: { opacity: 0, transform: 'translateY(10px)' },
+  shown: { opacity: 1, transform: 'none' },
   pulse: {
     animationName: {
       '0%, 100%': { opacity: 1, transform: 'scale(1)' },
-      '50%': { opacity: 0.5, transform: 'scale(1.1)' }
+      '50%': { opacity: 0.5, transform: 'scale(1.15)' }
     },
     animationDuration: '1.2s',
     animationIterationCount: 'infinite',
     animationTimingFunction: 'ease-in-out'
   }
-});
+};
 
 export function ProcessTimeline({ steps, onComplete }) {
-  const styles = useStyles();
   const [revealed, setRevealed] = React.useState(0);
-  const list = steps && steps.length ? steps : [];
+  const list = steps?.length ? steps : [];
 
   React.useEffect(() => {
     setRevealed(0);
-    if (!list.length) { onComplete && onComplete(); return; }
+    if (!list.length) { onComplete?.(); return; }
     let i = 0;
-    let timer;
     const tick = () => {
       i += 1;
       setRevealed(i);
       if (i < list.length) {
-        timer = setTimeout(tick, 500);
+        setTimeout(tick, 480);
       } else {
-        timer = setTimeout(() => onComplete && onComplete(), 400);
+        setTimeout(() => onComplete?.(), 400);
       }
     };
-    timer = setTimeout(tick, 300);
-    return () => clearTimeout(timer);
+    const t = setTimeout(tick, 280);
+    return () => clearTimeout(t);
   }, [list.length, onComplete]);
 
   if (!list.length) return null;
+
   const running = revealed < list.length;
 
-  return (
-    <div className={styles.root}>
-      {list.map((step, i) => {
-        const meta = metaFor(step.app);
-        const isShown = i < revealed;
-        const isActive = i === revealed - 1 && running;
-        const isLast = i === list.length - 1;
-        return (
-          <div key={i}
-            className={`${styles.row} ${isShown ? styles.shown : styles.hidden}`}
-            style={{ transitionDelay: isShown ? '0ms' : `${i * 60}ms` }}>
-            <div className={styles.railWrap}>
-              <div className={isActive ? styles.pulse : undefined}>
-                <StepIcon app={step.app} size={24} />
-              </div>
-              {!isLast && (
-                <div className={`${styles.connector} ${isActive ? styles.connectorActive : ''}`} />
-              )}
-            </div>
-            <div className={styles.body}>
-              <span className={styles.title}>{meta.title || step.app}</span>
-              <span className={styles.sub}>{step.label || meta.title}</span>
-            </div>
-          </div>
-        );
-      })}
-    </div>
+  return React.createElement('div', { style: styles.root },
+    list.map((step, i) => {
+      const meta = metaFor(step.app);
+      const isShown = i < revealed;
+      const isActive = i === revealed - 1 && running;
+      const isLast = i === list.length - 1;
+      return React.createElement('div', {
+        key: i,
+        style: {
+          ...styles.row,
+          ...styles.hidden,
+          ...(isShown ? styles.shown : {}),
+          transitionDelay: isShown ? '0ms' : `${i * 50}ms`
+        }
+      },
+        React.createElement('div', { style: styles.rail },
+          React.createElement('div', {
+            style: isActive ? { ...styles.pulse, display: 'flex' } : { display: 'flex' }
+          },
+            React.createElement(StepIcon, { app: step.app, size: 22 })
+          ),
+          !isLast && React.createElement('div', {
+            style: { ...styles.line, ...(isActive ? styles.lineActive : {}) }
+          })
+        ),
+        React.createElement('div', { style: { paddingBottom: '18px', transform: 'translateY(1px)' } },
+          React.createElement('div', { style: styles.title }, meta.title || step.app),
+          React.createElement('div', { style: styles.sub }, step.label || meta.title)
+        )
+      );
+    })
   );
 }
