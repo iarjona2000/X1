@@ -17,7 +17,7 @@ fuente: censo GitHub (≥10k estrellas), categoría "Seguridad y hacking ético"
 
 **Por qué entra en CTO:** primer candidato real para el hueco de ciberseguridad de la vertical (antes cubierto solo por personas de prompt de `agency-agents`, sin software real). Uso exclusivamente autorizado — auditorías de seguridad sobre sistemas propios o con permiso explícito, nunca contra terceros sin autorización.
 
-**Alternativas descartadas (mismo nicho, mismo censo):** `vxcontrol/pentagi` (18k⭐, sistema de pentesting autónomo similar, menos estrellas) y `0x4m4/hexstrike-ai` (10k⭐, agente MCP que orquesta 150+ herramientas de pentesting existentes en vez de razonar sobre el código como Shannon) — Shannon elegido por ser el más maduro (mayor tracción) y por su enfoque de caja blanca (analiza código, no solo caja negra).
+**Alternativas descartadas (mismo nicho, mismo censo):** `usestrix/strix` (35k⭐, pentesting de IA open-source, hallado en la segunda pasada del censo), `vxcontrol/pentagi` (18k⭐, sistema de pentesting autónomo similar) y `0x4m4/hexstrike-ai` (10k⭐, agente MCP que orquesta 150+ herramientas de pentesting existentes en vez de razonar sobre el código como Shannon) — Shannon sigue siendo el más starred de las cuatro y el único con enfoque de caja blanca (analiza código, no solo caja negra).
 
 ## Enlaces
 [[00-CTO]]

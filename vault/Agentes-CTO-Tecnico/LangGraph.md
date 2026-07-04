@@ -5,7 +5,7 @@ subdominio: Frameworks de agentes
 capacidades: [orquesta, encadena, mantiene-estado, bifurca]
 nivel_integracion: api-selfhosted
 candidato_desde: 2026-07-06
-comparado_con: ["[[Browser-Use]]", "[[CrewAI]]"]
+comparado_con: ["[[Browser-Use]]", "[[AutoGen]]"]
 fuente: censo GitHub (≥10k estrellas), categoría "Agentes de IA", langchain-ai/langgraph, 36.443⭐, Python
 ---
 
@@ -17,7 +17,7 @@ fuente: censo GitHub (≥10k estrellas), categoría "Agentes de IA", langchain-a
 
 **Por qué entra en CTO:** referencia técnica del panorama de frameworks de orquestación de agentes de terceros — comparable conceptualmente al `TaskGraph`/`CollaborativeEngine` que el socio ya construyó en `x1-core` (documentado en el clúster `Sistema-Orquestacion`), pero es software independiente de X1, no parte de su código.
 
-**Comparado con:** [[Browser-Use]] (navegador-específico) y [[CrewAI]] (equipos de rol con menos control de bajo nivel sobre el flujo) — LangGraph es el más flexible mecánicamente, a costa de más código explícito por flujo.
+**Comparado con:** [[Browser-Use]] (navegador-específico) y [[AutoGen]] (conversación entre agentes, con menos control de bajo nivel sobre el flujo) — LangGraph es el más flexible mecánicamente, a costa de más código explícito por flujo.
 
 ## Enlaces
 [[00-CTO]]

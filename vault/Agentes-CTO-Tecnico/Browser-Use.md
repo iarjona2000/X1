@@ -5,7 +5,7 @@ subdominio: Frameworks de agentes
 capacidades: [navega, automatiza, extrae, hace-clic, rellena-formularios]
 nivel_integracion: api-selfhosted
 candidato_desde: 2026-07-06
-comparado_con: ["[[LangGraph]]", "[[CrewAI]]"]
+comparado_con: ["[[LangGraph]]", "[[AutoGen]]", "[[OmniParser]]"]
 fuente: censo GitHub (≥10k estrellas), categoría "Agentes de IA", browser-use/browser-use, 102.583⭐, Python
 ---
 
@@ -17,7 +17,7 @@ fuente: censo GitHub (≥10k estrellas), categoría "Agentes de IA", browser-use
 
 **Por qué entra en CTO y no en Conectores:** no es un conector a un servicio SaaS concreto — es una pieza de infraestructura de automatización de navegador, comparable en función (no en cobertura) a lo que ya hace X1 nativamente. Se cataloga aquí como referencia técnica del panorama competitivo/complementario, no como un conector a instalar.
 
-**Comparado con:** [[LangGraph]] (orquestación de grafos de agentes, no específico de navegador) y [[CrewAI]] (equipos de rol, tampoco navegador-específico) — Browser-Use es el único de los tres centrado exclusivamente en interacción web.
+**Comparado con:** [[LangGraph]] (orquestación de grafos de agentes, no específico de navegador) y [[AutoGen]] (conversación entre agentes con roles, tampoco navegador-específico) — Browser-Use es el único de los tres centrado exclusivamente en interacción web.
 
 ## Enlaces
 [[00-CTO]]
