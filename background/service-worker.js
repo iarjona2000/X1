@@ -5750,13 +5750,13 @@ function handleVoice(cmd, wantsText, sendResponse) {
         }
       });
     }
-  }, 3000);
+    }, 3000);
   var slowTimer = setTimeout(function(){
     if (!responded) {
-      console.log('[X1] Slow timeout 10s — forcing response');
+      console.log('[X1] Slow timeout 18s — forcing response');
       respond({text:'Tiempo agotado. Reintentando...', showText:true});
     }
-  }, 10000);
+  }, 18000);
 
   addMem('user', cmd);
   console.log('[X1] handleVoice start:', cmd.substring(0, 50));
