@@ -21,6 +21,7 @@ Reestructurado 2026-07-05: fusiona `Agentes-Estrategia` y `Agentes-Research` baj
 - [[OSINT-Agent-Skills]] — MCP puro con 23 herramientas (DNS, Shodan, certificados, brechas de datos, blockchain).
 - [[GPT-Researcher]] — **Lote 3**. Agente autónomo de investigación general con informes citados, distinto de las herramientas OSINT (seguridad/infraestructura).
 - [[Firecrawl]] — **Lote 3**. Scraping/búsqueda web a escala como API gestionada, infraestructura de research general.
+- [[TrendRadar]] — **Lote 3 (2ª pasada)**. Monitorización continua de tendencias/opinión con MCP nativo y alertas — vigilancia en tiempo real, no consulta puntual.
 
 Nota de uso: herramientas OSINT son legítimas para investigación de mercado/competencia (el caso de uso de X1), pero todas advierten explícitamente de uso autorizado solamente — no usar para vigilancia de personas sin consentimiento.
 

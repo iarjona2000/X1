@@ -23,6 +23,7 @@ Vault de Obsidian (basta con abrir esta carpeta en Obsidian, no requiere configu
 - [[Meta/04-Diseno-de-Red|04 — Diseño de Red]] — regla de aislamiento de clústeres
 - [[Meta/05-Notas-de-Fusion|05 — Notas de Fusión]] — historial de merges con el socio
 - [[Meta/06-Plan-de-Expansion-Masiva|06 — Plan de Expansión Masiva]] — plan de ampliación por temas, búsqueda en GitHub, listón de calidad
+- [[Meta/07-Candidatos-Por-Confirmar|07 — Candidatos por Confirmar]] — repos del censo con duda genuina, esperando decisión de Ivan (cuántos por vertical, memoria, chat UIs, RAG, ciencia)
 
 ## Verticales (jerarquía CEO — orquestador especializado por vertical, sin departamentos sueltos)
 

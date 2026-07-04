@@ -52,5 +52,8 @@ Antes existían 6 clústeres separados por "departamento técnico" (`Agentes-Age
 ## Automatización de GUI por visión
 - [[OmniParser]] — **Lote 3, segunda pasada**. Parseo de pantalla puramente por visión (cualquier app, no solo navegador), complementa a Browser-Use.
 
+## Procesamiento de documentos
+- [[MinerU]] — **Lote 3, segunda pasada**. Documento complejo (PDF/Office) → markdown/JSON estructurado para LLMs. Nivel por encima del OCR (estructura, no solo texto). Elegido sobre Docling/marker por tracción.
+
 ## Enlaces
 [[00-Indice]] · [[Meta/02-Plan-de-Fases]] · [[Meta/06-Plan-de-Expansion-Masiva]]
