@@ -81,7 +81,13 @@ export const DEFAULT_RESOLVER_CONFIG = {
   // Nº de líneas del cuerpo de la nota que se concatenan al texto a embeber
   // (además de domain+subdomain+capabilities). Más líneas = más contexto pero
   // más ruido y coste de tokens.
-  embeddingBodyLines: 4
+  embeddingBodyLines: 4,
+
+  // --- Clasificación de clúster (etapa 1, spec §6) ---
+  // Score mínimo de `detectSector` para aceptar un sector como señal de clúster
+  // (por debajo, se considera ruido y no acota). Alineado con el umbral interno
+  // de detectSector (que cae a "general" con score < 2).
+  stage1SectorMinScore: 2
 };
 
 Object.freeze(DEFAULT_RESOLVER_CONFIG);
