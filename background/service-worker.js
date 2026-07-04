@@ -6355,6 +6355,26 @@ function detectPageContext(host, url, title) {
 chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
   console.log('[X1-SW] onMessage:', msg && msg.type, 'sender:', sender && (sender.tab && sender.tab.id || sender.url || 'no-tab'));
   if(!msg) return;
+
+  // ── Protocol-aware instrumentation (Mavis 2026-07-04) ──
+  // Resuelve el tipo legacy X1_* a su equivalente en X1Protocol si existe,
+  // y loggea warning si llega un tipo totalmente desconocido. Esto NO bloquea
+  // los handlers legacy: sólo añade visibilidad durante la migración al
+  // protocolo unificado (background/protocol.js).
+  try {
+    if (typeof X1Protocol !== 'undefined') {
+      var resolved = X1Protocol.resolveLegacyType(msg.type);
+      if (resolved) {
+        console.log('[X1-SW] legacy→new:', msg.type, '→', resolved);
+      } else if (!X1Protocol.isRequest(msg.type) && !X1Protocol.isEvent(msg.type)) {
+        // UI-only legacy (X1_TOGGLE etc) o tipo totalmente desconocido
+        console.warn('[X1-SW] tipo no catalogado en protocolo:', msg.type);
+      }
+    }
+  } catch (protoErr) {
+    console.warn('[X1-SW] protocol instrumentation failed:', protoErr && protoErr.message);
+  }
+
   if(msg.type==='X1_GET_CONTEXT'){
     var url = msg.url || '';
     var title = msg.title || '';
