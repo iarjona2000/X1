@@ -105,3 +105,48 @@ colapsar género genera más falsos positivos que aciertos en español
 (`marketing`≠`marketinga`, pero `crítico`/`crítica` cambian de sentido). En su
 lugar, `extractPromptTerms` conserva tanto la forma original como la lematizada,
 así no se pierde ningún match. Revisable con datos reales de retrieval.
+
+---
+
+## 2026-07-06 — §8: qué sistema de juez se reutiliza para la etapa 3
+
+**Decisión:** se reutiliza el CONTRATO de `JudgeSystem` (x1-core/core/judge.js),
+no el de `ai-judge.js`/`ai-voting.js` ni `EnsembleEngine`.
+
+**Dos razones concretas basadas en el código leído:**
+1. `JudgeSystem.compare(responses, query)` ya devuelve exactamente
+   `{winner, ranking, consensus}` — la forma que la etapa 3 necesita para elegir
+   entre 2-4 candidatos. Los otros sistemas (`ai-voting.js`, `EnsembleEngine`)
+   orquestan además llamadas a varios proveedores, lo que sobra para "elegir
+   agente" (no hay que generar respuestas, solo puntuar encaje).
+2. `JudgeSystem` es estático y sin estado interno, así que envolverlo para
+   puntuar "encaje de agente" no obliga a instanciar ni tocar su lógica.
+
+**Matiz importante (confirmado leyendo el código, coincide con la auditoría
+`ISSUES_NEEDING_YOUR_INPUT.md` #1):** el scoring de `JudgeSystem` es puramente
+heurístico sobre el TEXTO de una respuesta ya generada — no aplica a un agente
+que todavía no ha respondido. Por eso la etapa 3 NO llama a `JudgeSystem`
+directamente: define un juez INYECTABLE (`stage3_panelJudge({judgeFn})`). En
+producción ese `judgeFn` sería una llamada LLM real que puntúa encaje; el
+fallback (`heuristicAgentJudge`) reusa la INTENCIÓN de las rúbricas
+(`SCORING_WEIGHTS`) reinterpretadas por `adaptRubricToAgentSelection`. Se deja
+al socio la decisión de conectar un juez LLM real cuando quiera.
+
+---
+
+## 2026-07-06 — Frontera de integración: subsistema construido y probado, NO cableado a producción todavía
+
+**Alcance real de esta entrega:** el embudo completo (`resolveAgentsForPrompt` +
+etapas 0-3 + caché + coordinación + dispatch + logging) está implementado y
+cubierto por 160 tests en verde DENTRO de `x1-core`. NO está aún llamado desde
+el service worker en vivo ni desde `x1-bridge.js`/`x1-integration.js`.
+
+**Por qué:** el spec §3 dice explícitamente que el punto de integración es "solo
+añadir la llamada a `resolveAgentsForPrompt` donde hoy se decide a qué se
+responde, sin tocar la lógica interna de `x1-bridge.js`/`x1-integration.js`". Ese
+cableado (a) cruza al service worker, que otra sesión concurrente está editando
+en paralelo, y (b) requiere primero completar la metadata de la bóveda
+(`integration_ref`, ver `vault/MIGRACION_PENDIENTES.md`: 0 de 118 notas listas
+para dispatch real). Cablearlo a ciegas ahora activaría un dispatch que fallaría
+en producción. Queda como el siguiente paso explícito, a hacer de forma
+coordinada, no en paralelo a otra sesión.
