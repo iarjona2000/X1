@@ -6511,11 +6511,10 @@ chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
       try { sendResponse({text: text, showText: !!(data && data.showText)}); } catch(e) {}
     }
 
-    try { sendResponse({ack: true}); } catch(e) {}
     handleVoice(cmdText, wantsText, function(data) { sendResp(data); });
     setTimeout(function() {
       if (!swResponded) { sendResp({text: 'Procesando...'}); }
-    }, 15000);
+    }, 25000);
     return true;
   }
   if(msg.type==='X1_MEETING_END'){
