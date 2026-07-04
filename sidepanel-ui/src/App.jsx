@@ -1,20 +1,13 @@
-/*
- * X1 — app del side panel (Fluent 2 / React v9). Solo UI: toda la lógica de red
- * y memoria vive en backend.js (contrato intacto).
- */
-
 import * as React from 'react';
 import {
   makeStyles, tokens, shorthands,
-  Text, Caption1, Subtitle2, Body1,
-  Button, Textarea, Spinner, Avatar, Badge,
-  Menu, MenuTrigger, MenuPopover, MenuList, MenuItem,
-  Tooltip
+  Caption1, Body1, Button, Textarea, Avatar, Menu,
+  MenuTrigger, MenuPopover, MenuList, MenuItem, MenuDivider
 } from '@fluentui/react-components';
 import {
-  Send24Filled, Mic24Regular, Mic24Filled,
-  WeatherSunny24Regular, WeatherMoon24Regular,
-  ChevronDown16Regular, Sparkle24Regular, Add20Regular
+  Send24Filled, Sparkle28Filled, ArrowRight16Regular,
+  CheckmarkCircle24Filled, ChevronDown16Regular,
+  History24Regular, ThumbLike24Regular, ThumbDislike24Regular
 } from '@fluentui/react-icons';
 import { ProcessTimeline } from './ProcessTimeline.jsx';
 import * as B from './backend.js';
@@ -22,118 +15,189 @@ import * as B from './backend.js';
 const useStyles = makeStyles({
   app: {
     display: 'flex', flexDirection: 'column', height: '100vh',
-    backgroundColor: tokens.colorNeutralBackground2,
-    color: tokens.colorNeutralForeground1
+    backgroundColor: '#ffffff', color: '#1a1a1a',
+    fontFamily: "'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif"
   },
   header: {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    ...shorthands.padding(tokens.spacingVerticalS, tokens.spacingHorizontalL),
-    backgroundColor: tokens.colorNeutralBackground1,
-    borderBottom: `${tokens.strokeWidthThin} solid ${tokens.colorNeutralStroke2}`,
-    position: 'sticky', top: 0, zIndex: 10
+    padding: '14px 18px 10px 18px', backgroundColor: '#ffffff',
+    borderBottom: '1px solid #f0f0f0', position: 'sticky', top: 0, zIndex: 10
   },
-  brand: { display: 'flex', alignItems: 'center', gap: tokens.spacingHorizontalS },
-  brandMark: { width: '22px', height: '22px', borderRadius: '6px' },
-  brandName: { fontWeight: tokens.fontWeightBold, letterSpacing: '0.5px' },
-  headerEnd: { display: 'flex', alignItems: 'center', gap: tokens.spacingHorizontalXS },
-  picker: {
-    minWidth: 'auto', ...shorthands.padding('0', tokens.spacingHorizontalS),
-    fontWeight: tokens.fontWeightSemibold
+  headerLeft: { display: 'flex', alignItems: 'center', gap: '12px' },
+  brandMark: {
+    width: '26px', height: '26px', borderRadius: '7px', display: 'block', flexShrink: 0
   },
-  status: {
-    display: 'inline-flex', alignItems: 'center', gap: '6px',
-    color: tokens.colorNeutralForeground3, marginRight: tokens.spacingHorizontalXS
+  agentToggle: {
+    display: 'inline-flex', alignItems: 'center', gap: '8px',
+    backgroundColor: '#f5f5f5', padding: '5px 12px 5px 8px',
+    borderRadius: '20px', cursor: 'pointer', border: '1px solid transparent',
+    transition: 'all 0.15s ease',
+    ':hover': { backgroundColor: '#eeeeee' }
   },
-  dot: {
-    width: '7px', height: '7px', borderRadius: '50%',
-    backgroundColor: tokens.colorPaletteGreenBackground3
-  },
+  agentAiIcon: { width: '16px', height: '16px', borderRadius: '3px', display: 'block', flexShrink: 0 },
   log: {
-    flexGrow: 1, overflowY: 'auto',
-    ...shorthands.padding(tokens.spacingVerticalL, tokens.spacingHorizontalL),
-    display: 'flex', flexDirection: 'column', gap: tokens.spacingVerticalL
+    flexGrow: 1, overflowY: 'auto', padding: '20px 16px 8px',
+    display: 'flex', flexDirection: 'column', gap: '18px',
+    '::-webkit-scrollbar': { width: '4px' },
+    '::-webkit-scrollbar-thumb': { backgroundColor: '#e0e0e0', borderRadius: '2px' }
   },
   empty: {
     margin: 'auto', textAlign: 'center', maxWidth: '300px',
-    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: tokens.spacingVerticalS,
-    color: tokens.colorNeutralForeground3
+    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px',
+    paddingTop: '48px'
   },
-  emptyIcon: {
-    width: '52px', height: '52px', borderRadius: '15px',
-    display: 'grid', placeItems: 'center',
-    background: 'linear-gradient(135deg, #a8c7fa 0%, #c4b5f7 55%, #f3c6e2 100%)',
-    color: '#ffffff',
-    boxShadow: '0 4px 14px rgba(150, 140, 240, 0.35)',
-    marginBottom: tokens.spacingVerticalS
+  emptyIconWrap: {
+    width: '72px', height: '72px', borderRadius: '22px',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    background: 'linear-gradient(135deg, #f0eefe 0%, #e8e3fd 100%)',
+    boxShadow: '0 4px 16px rgba(75,58,201,0.08)'
   },
-  userRow: { display: 'flex', justifyContent: 'flex-end' },
+  emptyIcon: { color: '#4b3ac9', fontSize: '32px' },
+  emptyTitle: { fontSize: '18px', fontWeight: 600, color: '#1a1a1a' },
+  emptyDesc: { fontSize: '14px', color: '#999', lineHeight: '1.5', marginTop: '-8px' },
+  suggestions: { display: 'flex', flexWrap: 'wrap', gap: '10px', justifyContent: 'center', marginTop: '4px' },
+  chip: {
+    display: 'inline-flex', alignItems: 'center', gap: '6px',
+    backgroundColor: '#f5f5f5', padding: '9px 16px', borderRadius: '14px',
+    fontSize: '13px', color: '#555', cursor: 'pointer', border: '1px solid #eee',
+    transition: 'all 0.15s ease', userSelect: 'none',
+    ':hover': { backgroundColor: '#f0eefe', borderColor: '#c4b5fd', color: '#4b3ac9' }
+  },
+  userRow: { display: 'flex', justifyContent: 'flex-end', marginBottom: '2px' },
   userBubble: {
-    maxWidth: '82%', ...shorthands.padding(tokens.spacingVerticalS, tokens.spacingHorizontalM),
-    background: 'linear-gradient(135deg, #5f8bf7 0%, #7d6cf0 100%)',
-    color: '#ffffff',
-    borderRadius: '16px', borderBottomRightRadius: '5px',
-    fontSize: tokens.fontSizeBase300, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-    boxShadow: '0 2px 8px rgba(95, 139, 247, 0.25)'
+    maxWidth: '82%', padding: '11px 18px',
+    backgroundColor: '#4b3ac9', color: '#ffffff',
+    borderRadius: '18px', borderBottomRightRadius: '5px',
+    fontSize: '15px', lineHeight: '1.5',
+    whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+    boxShadow: '0 2px 8px rgba(75,58,201,0.12)'
   },
   card: {
-    ...shorthands.padding(tokens.spacingVerticalL, tokens.spacingHorizontalL),
-    backgroundColor: tokens.colorNeutralBackground1,
-    borderRadius: '16px',
-    boxShadow: '0 2px 10px rgba(0, 0, 0, 0.06), 0 0 0 0.5px rgba(0, 0, 0, 0.03)'
+    padding: '18px',
+    backgroundColor: '#ffffff',
+    border: '1px solid #f0f0f0',
+    borderRadius: '18px',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.03), 0 1px 2px rgba(0,0,0,0.02)',
+    transition: 'box-shadow 0.2s ease, transform 0.15s ease',
+    ':hover': {
+      boxShadow: '0 4px 14px rgba(0,0,0,0.05), 0 2px 4px rgba(0,0,0,0.03)',
+      transform: 'translateY(-1px)'
+    }
   },
-  cardHead: { display: 'flex', alignItems: 'center', gap: tokens.spacingHorizontalS, marginBottom: tokens.spacingVerticalS },
-  answer: { whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: '1.5' },
-  thinking: { display: 'flex', alignItems: 'center', gap: tokens.spacingHorizontalS, color: tokens.colorNeutralForeground3 },
+  cardHead: {
+    display: 'flex', alignItems: 'center', gap: '10px',
+    marginBottom: '14px', paddingBottom: '14px',
+    borderBottom: '1px solid #f5f5f5'
+  },
+  cardMeta: { display: 'flex', flexDirection: 'column', gap: '1px' },
+  cardName: { fontSize: '14px', fontWeight: 600, color: '#1a1a1a', lineHeight: '1.3' },
+  cardTime: { fontSize: '12px', color: '#bbb', lineHeight: '1.2' },
+  answer: {
+    fontSize: '15px', lineHeight: '1.65', color: '#333',
+    whiteSpace: 'pre-wrap', wordBreak: 'break-word'
+  },
+  thinkingCard: {
+    display: 'flex', alignItems: 'center', gap: '12px',
+    padding: '16px 18px', backgroundColor: '#fafafa',
+    border: '1px solid #f0f0f0', borderRadius: '16px',
+    color: '#999', fontSize: '14px'
+  },
+  dots: {
+    display: 'inline-flex', gap: '4px',
+    '> span': {
+      width: '7px', height: '7px', borderRadius: '50%',
+      backgroundColor: '#ccc',
+      animationName: {
+        '0%, 80%, 100%': { transform: 'scale(0.6)', opacity: 0.3 },
+        '40%': { transform: 'scale(1)', opacity: 1 }
+      },
+      animationDuration: '1.2s', animationIterationCount: 'infinite'
+    }
+  },
+  compareDivider: {
+    display: 'flex', alignItems: 'center', gap: '12px', margin: '4px 0 8px',
+    color: '#bbb', fontSize: '12px', fontWeight: 500,
+    '::before, ::after': { content: '""', flexGrow: 1, height: '1px', backgroundColor: '#eee' }
+  },
+  comparePanel: {
+    display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px',
+    marginTop: '12px'
+  },
+  compareCol: {
+    padding: '14px', borderRadius: '14px', border: '1px solid #f0f0f0',
+    backgroundColor: '#fafafa'
+  },
+  compareColHead: {
+    display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px',
+    paddingBottom: '10px', borderBottom: '1px solid #f0f0f0'
+  },
+  compareColIcon: { width: '18px', height: '18px', borderRadius: '4px', display: 'block' },
+  compareColTitle: { fontSize: '13px', fontWeight: 600, color: '#555' },
+  compareColText: { fontSize: '13px', lineHeight: '1.55', color: '#555', whiteSpace: 'pre-wrap', wordBreak: 'break-word' },
+  voteRow: {
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    gap: '8px', marginTop: '12px', padding: '8px'
+  },
+  voteBtn: {
+    display: 'inline-flex', alignItems: 'center', gap: '5px',
+    padding: '6px 14px', borderRadius: '10px', fontSize: '12px', fontWeight: 500,
+    border: '1px solid #eee', backgroundColor: '#fff', color: '#888', cursor: 'pointer',
+    transition: 'all 0.12s ease',
+    ':hover': { backgroundColor: '#f5f5f5', borderColor: '#ddd' }
+  },
+  voteBtnActive: {
+    backgroundColor: '#f0eefe', borderColor: '#c4b5fd', color: '#4b3ac9'
+  },
+  statsRow: {
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    gap: '16px', marginTop: '6px', padding: '6px'
+  },
+  statBadge: {
+    display: 'inline-flex', alignItems: 'center', gap: '4px',
+    fontSize: '11px', color: '#aaa'
+  },
+  statIcon: { fontSize: '12px', marginRight: '2px' },
   composer: {
-    ...shorthands.padding(tokens.spacingVerticalS, tokens.spacingHorizontalL, tokens.spacingVerticalM)
+    padding: '8px 16px 14px', backgroundColor: '#ffffff',
+    borderTop: '1px solid #f0f0f0'
   },
   inputWrap: {
-    display: 'flex', alignItems: 'flex-end', gap: tokens.spacingHorizontalXS,
-    backgroundColor: tokens.colorNeutralBackground1,
-    ...shorthands.padding(tokens.spacingVerticalXS, tokens.spacingHorizontalXS, tokens.spacingVerticalXS, tokens.spacingHorizontalM),
-    borderRadius: '22px',
-    boxShadow: '0 2px 10px rgba(0, 0, 0, 0.07), 0 0 0 0.5px rgba(0, 0, 0, 0.04)'
+    display: 'flex', alignItems: 'flex-end', gap: '8px',
+    backgroundColor: '#f5f5f5', padding: '7px 8px 7px 16px',
+    borderRadius: '22px', border: '1px solid #e8e8e8',
+    transition: 'border-color 0.15s ease, background-color 0.15s ease',
+    ':focus-within': { borderColor: '#4b3ac9', backgroundColor: '#ffffff' }
   },
-  sendBtn: {
-    background: 'linear-gradient(135deg, #5f8bf7 0%, #7d6cf0 100%)',
-    ':hover': { background: 'linear-gradient(135deg, #4f7df3 0%, #6d5ce8 100%)' },
-    ':disabled': { background: tokens.colorNeutralBackgroundDisabled }
+  textarea: {
+    flexGrow: 1, backgroundColor: 'transparent',
+    fontSize: '15px', lineHeight: '1.45',
+    '> textarea': { '::placeholder': { color: '#bbb' } }
   },
-  textarea: { flexGrow: 1, backgroundColor: 'transparent' },
-  hint: { display: 'block', textAlign: 'center', marginTop: tokens.spacingVerticalXS, color: tokens.colorNeutralForeground4 }
+  hint: {
+    display: 'block', textAlign: 'center', marginTop: '7px',
+    fontSize: '11px', color: '#d0d0d0'
+  }
 });
 
 let MID = 0;
 const nid = () => 'm' + (++MID);
 
-export default function App({ mode, onToggleMode }) {
+const SUGGESTIONS = [
+  { text: 'Research AI trends 2026' },
+  { text: 'Create a Google Doc' },
+  { text: 'Check my emails' },
+  { text: 'Write a React component' }
+];
+
+export default function App() {
   const styles = useStyles();
   const [active, setActive] = React.useState('research');
   const [messages, setMessages] = React.useState([]);
   const [input, setInput] = React.useState('');
   const [busy, setBusy] = React.useState(false);
-  const [listening, setListening] = React.useState(false);
   const logRef = React.useRef(null);
 
-  // Modo demo (?demo en la URL): conversación de muestra sin red, útil para
-  // grabar demos y para verificar el timeline. La extensión nunca añade ?demo,
-  // así que en uso real jamás se activa.
   React.useEffect(() => {
-    if (typeof location !== 'undefined' && location.search.indexOf('demo') !== -1) {
-      setMessages([
-        { id: nid(), role: 'user', text: 'Prepara mi reunión con Jordan Logan' },
-        { id: nid(), role: 'agent', agent: 'research', phase: 'running',
-          steps: [
-            { app: 'Calendar', label: 'Consultando los detalles de la reunión' },
-            { app: 'LinkedIn', label: 'Conociendo mejor a Jordan' },
-            { app: 'Gmail', label: 'Revisando conversaciones pasadas' },
-            { app: 'HubSpot', label: 'Repasando el historial de interacción' },
-            { app: 'Docs', label: 'Preparando tu resumen de reunión' }
-          ],
-          response: 'Listo. He combinado la información de la reunión, el perfil de Jordan y vuestro historial en un resumen preparado para revisar.' }
-      ]);
-      return;
-    }
     B.warm();
     const d = B.loadMem();
     if (d) {
@@ -143,7 +207,7 @@ export default function App({ mode, onToggleMode }) {
         setMessages(d.messages.map((m) => ({
           id: nid(), role: m.role === 'user' ? 'user' : 'agent',
           text: m.content, agent: d.active || 'research',
-          steps: [], response: m.content, phase: 'done'
+          steps: [], response: m.content, phase: 'done', time: Date.now()
         })));
       }
     }
@@ -161,90 +225,145 @@ export default function App({ mode, onToggleMode }) {
 
   const update = (id, patch) => setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, ...patch } : m)));
 
+  function switchAgent(id) {
+    setActive(id);
+    B.saveMem({ messages: [], active: id, mid: 0 });
+    setMessages([]);
+    setInput('');
+  }
+
   function run(text) {
     const q = text.trim();
     if (!q || busy) return;
     setBusy(true);
     setInput('');
-    const userMsg = { id: nid(), role: 'user', text: q };
-    const agentMsg = { id: nid(), role: 'agent', agent: active, phase: 'planning', steps: [], response: '' };
+    const now = Date.now();
+    const userMsg = { id: nid(), role: 'user', text: q, time: now };
+    const agentMsg = {
+      id: nid(), role: 'agent', agent: active, phase: 'planning',
+      steps: [], response: '', time: now, compare: null, voted: false
+    };
     setMessages((prev) => [...prev, userMsg, agentMsg]);
 
     if (B.isSimple(q)) {
-      const fallback = B.quickReply(q) || '¿En qué puedo ayudarte?';
       B.simpleAnswer(q, active).then((txt) => {
-        update(agentMsg.id, { phase: 'done', response: txt || fallback });
+        update(agentMsg.id, { phase: 'done', response: txt || B.HONEST_ERROR, time: Date.now() });
         setBusy(false);
         setMessages((prev) => { persist(prev, active); return prev; });
       });
       return;
     }
 
-    const fallback = B.FALLBACK_ANSWERS[active] || B.FALLBACK_ANSWERS.research;
     B.planSteps(q, active).then((plan) => {
-      const steps = (plan && plan.steps) ? plan.steps : [{ app: 'Done', label: 'Result' }];
-      const response = (plan && plan.response) ? plan.response : fallback;
-      update(agentMsg.id, { phase: 'running', steps, response });
+      if (!plan) {
+        update(agentMsg.id, { phase: 'done', steps: [], response: B.HONEST_ERROR, time: Date.now() });
+        setBusy(false);
+        return;
+      }
+      const steps = plan.steps || [{ app: 'Done', label: 'Result' }];
+      const response = plan.response || B.HONEST_ERROR;
+      update(agentMsg.id, { phase: 'running', steps, response, time: Date.now() });
     }).catch(() => {
-      update(agentMsg.id, { phase: 'done', steps: [], response: fallback });
+      update(agentMsg.id, { phase: 'done', steps: [], response: B.HONEST_ERROR, time: Date.now() });
       setBusy(false);
     });
   }
 
-  const onTimelineDone = (id) => {
+  const onTimelineDone = (id, response) => {
     update(id, { phase: 'done' });
     setBusy(false);
     setMessages((prev) => { persist(prev, active); return prev; });
   };
 
-  function toggleMic() {
-    if (listening) { setListening(false); return; }
-    setListening(true);
-    setTimeout(() => { setListening(false); run('Create a document about Sam Altman'); }, 1500);
+  function runCompare(id) {
+    const msg = messages.find((m) => m.id === id);
+    if (!msg || msg.compare) return;
+    const q = messages.filter((m) => m.id === id)
+      .flatMap(() => messages.filter((m) => m.role === 'user' && messages.indexOf(m) < messages.indexOf(messages.find(x => x.id === id))))
+    const query = messages.slice(0, messages.indexOf(msg)).filter(m => m.role === 'user').pop();
+    if (!query) return;
+    update(id, { compare: 'loading' });
+    B.compareAnswers(query.text, active).then((result) => {
+      update(id, { compare: result, voted: false });
+    });
   }
 
+  function vote(msgId, winner) {
+    const msg = messages.find((m) => m.id === msgId);
+    if (!msg || !msg.compare) return;
+    B.recordVote({ winner, query: msg.text, agent: active });
+    update(msgId, { voted: winner });
+    setMessages((prev) => { persist(prev, active); return prev; });
+  }
+
+  function chipClick(text) { run(text); }
+
   const activeAgent = B.agentById(active);
+  const prefs = B.getPreferences();
 
   return (
     <div className={styles.app}>
       <header className={styles.header}>
-        <div className={styles.brand}>
-          <img className={styles.brandMark} src="../assets/x1-logo.png" alt="X1"
+        <div className={styles.headerLeft}>
+          <img className={styles.brandMark} src="../assets/x1-logo-square.png" alt="X1"
             onError={(e) => { e.currentTarget.style.display = 'none'; }} />
-          <Text size={400} className={styles.brandName}>X1</Text>
-          <Menu positioning="below-start">
+          <Menu>
             <MenuTrigger disableButtonEnhancement>
-              <Button appearance="subtle" size="small" className={styles.picker}
-                iconPosition="after" icon={<ChevronDown16Regular />}>
-                {activeAgent.name}
-              </Button>
+              <div className={styles.agentToggle} role="button" tabIndex={0}>
+                <img className={styles.agentAiIcon} src={activeAgent.aiIcon} alt={activeAgent.ai}
+                  onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                <Caption1 style={{ fontWeight: 500, color: '#555' }}>{activeAgent.name}</Caption1>
+                <ChevronDown16Regular style={{ fontSize: '12px', color: '#999' }} />
+              </div>
             </MenuTrigger>
             <MenuPopover>
               <MenuList>
                 {B.AGENTS.map((a) => (
-                  <MenuItem key={a.id} onClick={() => { setActive(a.id); B.saveMem({ messages: [], active: a.id, mid: MID }); }}>
+                  <MenuItem key={a.id}
+                    onClick={() => switchAgent(a.id)}
+                    icon={<img src={a.aiIcon} alt="" style={{ width: '16px', height: '16px', borderRadius: '3px' }}
+                      onError={(e) => { e.currentTarget.style.display = 'none'; }} />}
+                    secondaryContent={a.ai}>
                     {a.name}
                   </MenuItem>
                 ))}
+                <MenuDivider />
+                <MenuItem icon={<History24Regular />} onClick={() => { B.clearMem(); setMessages([]); }}>
+                  Clear history
+                </MenuItem>
               </MenuList>
             </MenuPopover>
           </Menu>
         </div>
-        <div className={styles.headerEnd}>
-          <span className={styles.status}><span className={styles.dot} /><Caption1>Online</Caption1></span>
-          <Tooltip content={mode === 'light' ? 'Tema oscuro' : 'Tema claro'} relationship="label">
-            <Button appearance="subtle" icon={mode === 'light' ? <WeatherMoon24Regular /> : <WeatherSunny24Regular />}
-              onClick={onToggleMode} aria-label="Cambiar tema" />
-          </Tooltip>
-        </div>
+        {Object.keys(prefs).length > 0 && (
+          <Caption1 style={{ color: '#ccc', fontSize: '11px' }}>
+            {Object.entries(prefs).sort((a, b) => b[1] - a[1]).slice(0, 2).map(([k, v]) => `${k} ${v}`).join(' | ')}
+          </Caption1>
+        )}
       </header>
 
       <div className={styles.log} ref={logRef}>
         {messages.length === 0 && (
           <div className={styles.empty}>
-            <div className={styles.emptyIcon}><Sparkle24Regular /></div>
-            <Subtitle2>¿En qué puedo ayudarte?</Subtitle2>
-            <Caption1>Busco en la web, leo páginas, creo documentos, escribo código y actúo en tus herramientas.</Caption1>
+            <div className={styles.emptyIconWrap}>
+              <Sparkle28Filled className={styles.emptyIcon} />
+            </div>
+            <div>
+              <div className={styles.emptyTitle}>En que puedo ayudarte?</div>
+              <div className={styles.emptyDesc}>
+                Activo: <strong>{activeAgent.name}</strong> ({activeAgent.ai}). Busco, leo, creo documentos, escribo codigo y actuo en tus herramientas.
+              </div>
+            </div>
+            <div className={styles.suggestions}>
+              {SUGGESTIONS.map((s, i) => (
+                <div key={i} className={styles.chip} onClick={() => chipClick(s.text)}
+                  role="button" tabIndex={0}
+                  onKeyDown={(e) => e.key === 'Enter' && chipClick(s.text)}>
+                  <span>{s.text}</span>
+                  <ArrowRight16Regular style={{ fontSize: '12px', color: '#bbb' }} />
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
@@ -255,12 +374,27 @@ export default function App({ mode, onToggleMode }) {
         ) : (
           <div key={m.id} className={styles.card}>
             <div className={styles.cardHead}>
-              <Avatar size={24} color="brand" name={B.agentById(m.agent).name} />
-              <Caption1><b>{B.agentById(m.agent).name}</b></Caption1>
+              <img className={styles.brandMark}
+                style={{ width: '22px', height: '22px', borderRadius: '6px' }}
+                src={B.agentById(m.agent).aiIcon} alt={B.agentById(m.agent).ai}
+                onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+              <div className={styles.cardMeta}>
+                <span className={styles.cardName}>{B.agentById(m.agent).name} &middot; {B.agentById(m.agent).ai}</span>
+                <span className={styles.cardTime}>
+                  {m.time ? new Date(m.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                </span>
+              </div>
             </div>
 
             {m.phase === 'planning' && (
-              <div className={styles.thinking}><Spinner size="tiny" /><Caption1>Razonando el proceso…</Caption1></div>
+              <div className={styles.thinkingCard}>
+                <div className={styles.dots}>
+                  <span style={{ animationDelay: '0s' }} />
+                  <span style={{ animationDelay: '0.2s' }} />
+                  <span style={{ animationDelay: '0.4s' }} />
+                </div>
+                <span>Razonando el proceso...</span>
+              </div>
             )}
 
             {(m.phase === 'running' || m.phase === 'done') && m.steps && m.steps.length > 0 && (
@@ -271,6 +405,79 @@ export default function App({ mode, onToggleMode }) {
             {m.phase === 'done' && m.response && (
               <Body1 className={styles.answer}>{m.response}</Body1>
             )}
+
+            {m.phase === 'done' && !m.compare && m.response && m.response !== B.HONEST_ERROR && (
+              <div style={{ marginTop: '8px', display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                <Button size="small" appearance="subtle"
+                  style={{ fontSize: '12px', color: '#999' }}
+                  onClick={() => runCompare(m.id)}>
+                  Comparar
+                </Button>
+              </div>
+            )}
+
+            {m.compare === 'loading' && (
+              <div className={styles.thinkingCard} style={{ marginTop: '12px' }}>
+                <div className={styles.dots}>
+                  <span style={{ animationDelay: '0s' }} />
+                  <span style={{ animationDelay: '0.2s' }} />
+                  <span style={{ animationDelay: '0.4s' }} />
+                </div>
+                <span>Obteniendo segunda opinion...</span>
+              </div>
+            )}
+
+            {m.compare && m.compare !== 'loading' && (
+              <div>
+                <div className={styles.compareDivider}>
+                  <span>Analisis comparativo</span>
+                </div>
+                <div className={styles.comparePanel}>
+                  <div className={styles.compareCol}>
+                    <div className={styles.compareColHead}>
+                      <CheckmarkCircle24Filled style={{ color: '#107c41', fontSize: '16px' }} />
+                      <span className={styles.compareColTitle}>Respuesta principal</span>
+                    </div>
+                    <div className={styles.compareColText}>{m.compare.primary.text}</div>
+                  </div>
+                  <div className={styles.compareCol}>
+                    <div className={styles.compareColHead}>
+                      <Sparkle28Filled style={{ color: '#8764b8', fontSize: '16px' }} />
+                      <span className={styles.compareColTitle}>Perspectiva critica</span>
+                    </div>
+                    <div className={styles.compareColText}>{m.compare.critical.text}</div>
+                  </div>
+                </div>
+
+                {!m.voted && (
+                  <div className={styles.voteRow}>
+                    <span style={{ fontSize: '12px', color: '#bbb', marginRight: '4px' }}>Cual fue mejor?</span>
+                    <div className={`${styles.voteBtn}`}
+                      onClick={() => vote(m.id, 'primary')} role="button" tabIndex={0}
+                      onKeyDown={(e) => e.key === 'Enter' && vote(m.id, 'primary')}>
+                      <ThumbLike24Regular style={{ fontSize: '14px' }} /> Principal
+                    </div>
+                    <div className={`${styles.voteBtn}`}
+                      onClick={() => vote(m.id, 'critical')} role="button" tabIndex={0}
+                      onKeyDown={(e) => e.key === 'Enter' && vote(m.id, 'critical')}>
+                      <ThumbLike24Regular style={{ fontSize: '14px' }} /> Critica
+                    </div>
+                  </div>
+                )}
+                {m.voted && (
+                  <div className={styles.statsRow}>
+                    <span className={styles.statBadge}>
+                      <CheckmarkCircle24Filled style={{ fontSize: '12px', color: '#107c41' }} />
+                      Votado: {m.voted === 'primary' ? 'Principal' : 'Critica'}
+                    </span>
+                    <span className={styles.statBadge}>
+                      <History24Regular style={{ fontSize: '12px' }} />
+                      {(prefs[m.voted] || 0) + 1} votos totales
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         ))}
       </div>
@@ -278,18 +485,19 @@ export default function App({ mode, onToggleMode }) {
       <div className={styles.composer}>
         <div className={styles.inputWrap}>
           <Textarea className={styles.textarea} appearance="filled-lighter" resize="none"
-            value={input} placeholder="Pregúntame lo que quieras…"
+            value={input} placeholder="Preguntame lo que quieras..."
             onChange={(_, d) => setInput(d.value)}
             onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); run(input); } }} />
-          <Tooltip content="Voz" relationship="label">
-            <Button appearance="subtle" shape="circular"
-              icon={listening ? <Mic24Filled /> : <Mic24Regular />}
-              onClick={toggleMic} aria-label="Voz" />
-          </Tooltip>
-          <Button appearance="primary" shape="circular" className={styles.sendBtn} icon={<Send24Filled />}
-            disabled={!input.trim() || busy} onClick={() => run(input)} aria-label="Enviar" />
+          <Button appearance="primary" shape="circular" icon={<Send24Filled />}
+            disabled={!input.trim() || busy}
+            onClick={() => run(input)}
+            aria-label="Enviar"
+            style={{
+              minWidth: '38px', height: '38px', width: '38px',
+              backgroundColor: '#4b3ac9', border: 'none'
+            }} />
         </div>
-        <Caption1 className={styles.hint}>X1 puede cometer errores. Verifica la información importante.</Caption1>
+        <Caption1 className={styles.hint}>X1 puede cometer errores. Verifica la informacion importante.</Caption1>
       </div>
     </div>
   );

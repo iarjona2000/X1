@@ -1,21 +1,35 @@
-﻿node_modules/
+﻿# Dependencies
+node_modules/
+
+# Build artifacts
+sidepanel/dist/
+sidepanel/chunks/
+sidepanel-ui/node_modules/
+background/x1-core/node_modules/
+background/x1-core/dist/
+background/x1-core/bundle/
+x1-extension/node_modules/
+x1-extension/dist/
+worker/node_modules/
+
+# Logs
 *.log
+
+# OS
 .DS_Store
+Thumbs.db
+
+# Secrets & config
+.env
+.env.local
 *.pem
 *.key
 *.crt
-.env
 *.local
-sidepanel/chunks/
 
-# x1-core build artifacts
-background/x1-core/node_modules/
-background/x1-core/.wrangler/
+# IDE
+.vscode/
+.idea/
 
-# x1-extension reference (full copy)
-x1-extension/node_modules/
-x1-extension/.wrangler/
-x1-extension/dist/
-
-# sidepanel UI build deps
-sidepanel-ui/node_modules/
+# Wrangler
+.wrangler/

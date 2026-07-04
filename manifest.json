@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "X1",
   "version": "3.0.0",
-  "description": "Browser agent powered by open-source GitHub repos — no API keys needed. free-claude-code (38.4k stars) gives Claude-level AI locally. FreeWeb + WebLLM. Voice or text input. Navigate, click, search, email, create.",
+  "description": "Browser agent con voz + texto. Sin API keys. Navega, busca, gestiona email/calendario, ejecuta tareas multi-paso.",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAxby3wxothK8kGSwB6ZnvopHjH7AV5x5+YGuYYTNK8iQhuGZHiXNIoHxVLPrF/xCi5vPuWwWPZ5PHh9ObnfJpjk1u7oJwcuhEPsbHGi9uMfNS8E24ywS8YcR335zfxZC0nQF+GUBsXeM24oRhKn3h0+SN/G7c3NNVMv4HpWuevQjYXDyeRIhojNWpvoBhHUUPaDw+nYrUnGxZ5f6nzrBATiizwZIvft2BO7cPfgzdo95TSocTima14rExvQNAvYa+RiAaKQMOc9LFm2bTtBhTs+A/0Lg7XIFTZwxJEgN/GTtuNXLsnDplX/oCnJQp/ASsfWRw00Fi/FhGiojA5Ki33QIDAQAB",
   "permissions": [
     "identity",
@@ -116,15 +116,15 @@
     }
   ],
   "icons": {
-    "16": "assets/x1-logo-square.png",
-    "48": "assets/x1-logo-square.png",
-    "128": "assets/x1-logo.png"
+    "16": "assets/icon-16.png",
+    "48": "assets/icon-48.png",
+    "128": "assets/icon-128.png"
   },
   "side_panel": {
     "default_path": "sidepanel/panel.html"
   },
   "action": {
-    "default_icon": "assets/x1-logo-square.png",
+    "default_icon": "assets/icon-128.png",
     "default_title": "Abrir X1"
   }
 }

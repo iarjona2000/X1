@@ -1,18 +1,8 @@
-/*
- * Punto de entrada del side panel. Monta React con FluentProvider y un tema de
- * marca X1 propio (rampa violeta-índigo) — Fluent 2, pero identidad propia.
- */
-
 import * as React from 'react';
 import { createRoot } from 'react-dom/client';
-import {
-  FluentProvider,
-  createLightTheme,
-  createDarkTheme
-} from '@fluentui/react-components';
+import { FluentProvider, createLightTheme } from '@fluentui/react-components';
 import App from './App.jsx';
 
-// Rampa de marca X1 (no es el azul por defecto de Fluent): índigo/violeta.
 const x1Brand = {
   10: '#050318',
   20: '#0f0a2e',
@@ -32,25 +22,11 @@ const x1Brand = {
   160: '#e8e3fd'
 };
 
-const x1Light = createLightTheme(x1Brand);
-const x1Dark = createDarkTheme(x1Brand);
-
-function Root() {
-  const initial = (() => {
-    try { return localStorage.getItem('x1_theme') || 'light'; } catch (e) { return 'light'; }
-  })();
-  const [mode, setMode] = React.useState(initial);
-  const toggle = () => setMode((m) => {
-    const next = m === 'light' ? 'dark' : 'light';
-    try { localStorage.setItem('x1_theme', next); } catch (e) {}
-    return next;
-  });
-  return (
-    <FluentProvider theme={mode === 'light' ? x1Light : x1Dark} style={{ height: '100vh' }}>
-      <App mode={mode} onToggleMode={toggle} />
-    </FluentProvider>
-  );
-}
+const theme = createLightTheme(x1Brand);
 
 const container = document.getElementById('root');
-createRoot(container).render(<Root />);
+createRoot(container).render(
+  <FluentProvider theme={theme} style={{ height: '100vh' }}>
+    <App />
+  </FluentProvider>
+);

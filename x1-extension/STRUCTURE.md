@@ -1,6 +1,7 @@
-# X1 Project Structure
+# X1 Project Structure (reference copy)
 
-Descripción completa de la estructura de archivos de X1.
+> Esta documentación describe la estructura de la **versión empaquetada con webpack** (`x1-extension/`).  
+> La versión activa de X1 está en la raíz de `cbos-ext/`. Esta copia se mantiene como referencia.
 
 ---
 

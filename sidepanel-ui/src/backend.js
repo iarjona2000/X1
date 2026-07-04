@@ -1,61 +1,35 @@
-/*
- * X1 — conexión con el backend (SIN CAMBIOS de contrato).
- *
- * Extraído verbatim de sidepanel/panel.js: mismo endpoint del proxy, mismo
- * secreto, mismo protocolo de mensajes, misma memoria en localStorage y los
- * mismos planificadores (planSteps / simpleAnswer). La UI nueva (Fluent) solo
- * consume estas funciones; la lógica de red no se toca.
- */
+import * as React from 'react';
 
 export const CLOUD = 'https://x1-proxy.baosx1.workers.dev';
 export const SECRET = '9ff4b7dda5f7defd5f7fb7c32c133428bc87e8efeb8550d3ce1e5838c1d3b850';
 const MEM_KEY = 'x1_mem';
+const VOTE_KEY = 'x1_votes';
 const MAX_MEM = 40;
 
+const AI = '../assets/ai/';
+
 export const AGENTS = [
-  { id: 'research', name: 'Research', repo: 'iarjona2000/research-lib' },
-  { id: 'writer', name: 'Writer', repo: 'iarjona2000/content-models' },
-  { id: 'developer', name: 'Developer', repo: 'iarjona2000/codebase' },
-  { id: 'marketing', name: 'Marketing', repo: 'iarjona2000/marketing-kit' },
-  { id: 'finance', name: 'Finance', repo: 'iarjona2000/finance-models' },
-  { id: 'legal', name: 'Legal', repo: 'iarjona2000/legal-docs' },
-  { id: 'email', name: 'Email', repo: 'iarjona2000/email-templates' },
-  { id: 'meeting', name: 'Meeting', repo: 'iarjona2000/meeting-notes' }
+  { id: 'research', name: 'Research', ai: 'Gemini', aiIcon: AI + 'googlegemini.svg' },
+  { id: 'writer', name: 'Writer', ai: 'Claude', aiIcon: AI + 'anthropic.svg' },
+  { id: 'developer', name: 'Developer', ai: 'GPT-4o', aiIcon: AI + 'openai.svg' },
+  { id: 'marketing', name: 'Marketing', ai: 'Gemini', aiIcon: AI + 'googlegemini.svg' },
+  { id: 'finance', name: 'Finance', ai: 'Claude', aiIcon: AI + 'anthropic.svg' },
+  { id: 'legal', name: 'Legal', ai: 'Mistral', aiIcon: AI + 'mistralai.svg' },
+  { id: 'email', name: 'Email', ai: 'Llama', aiIcon: AI + 'meta.svg' },
+  { id: 'meeting', name: 'Meeting', ai: 'Gemini', aiIcon: AI + 'googlegemini.svg' }
 ];
 
-export const FALLBACK_ANSWERS = {
-  research: 'Here\'s what I found. I searched multiple sources and cross-referenced the results. The main signal is clear. Saved to memory.',
-  writer: 'Done. The draft front-loads the key message and uses short paragraphs. I can adjust the tone.',
-  developer: 'I read the relevant code. Core logic is sound. I can generate the helper, add tests, or wire it in.',
-  marketing: 'I analysed the page. Three angles stood out. I can expand any into a campaign wireframe.',
-  finance: 'The numbers check out. Revenue is growing; margin is the metric to watch. I can build scenarios.',
-  legal: 'I reviewed against the legal knowledge base. Two clauses worth a second look.',
-  email: 'Done. I read your inbox and drafted a reply. Review and send when ready.',
-  meeting: 'Transcribed. Three decisions, four action items. Recap ready to share.'
-};
+export function agentById(id) {
+  return AGENTS.find((a) => a.id === id) || AGENTS[0];
+}
 
 const GREETINGS = [
   /^hola/i, /^buenas/i, /^hey/i, /^hello/i, /^hi\b/i, /^heyy/i,
   /^qu[eé] tal/i, /^c[oó]mo est[áa]s/i, /^buen[oa]s/i,
   /^gracias/i, /^thanks/i, /^thank you/i,
-  /^who are you/i, /^qu[eé] eres/i, /^qu[eé] puedes hacer/i,
-  /^q tal/i, /^tal/i,
-  /^s[ií]/i, /^no$/i, /^ok$/i, /^vale/i, /^de acuerdo/i,
-  /^buen trabajo/i, /^nice/i, /^great/i, /^perfect/i,
-  /^bien$/i, /^mal$/i, /^jaja/i, /^lol/i
+  /^s[ií]$/i, /^no$/i, /^ok$/i, /^vale/i, /^de acuerdo/i,
+  /^bien$/i, /^jaja/i, /^lol/i
 ];
-
-const QUICK_REPLIES = {
-  hola: '¡Hola! ¿En qué puedo ayudarte hoy?',
-  quien: 'Soy X1, un agente autónomo de navegador. Puedo buscar información, leer páginas, crear documentos, escribir código y actuar en tu navegador. ¿Qué necesitas?',
-  gracias: '¡De nada! Si necesitas algo más, aquí estoy.',
-  bien: 'Me alegra. ¿En qué puedo ayudarte?',
-  default: 'Claro, ¿qué necesitas que haga?'
-};
-
-export function agentById(id) {
-  return AGENTS.find((a) => a.id === id) || AGENTS[0];
-}
 
 export function isSimple(text) {
   const t = text.trim();
@@ -68,18 +42,6 @@ export function isSimple(text) {
   }
   return false;
 }
-
-export function quickReply(text) {
-  const t = text.trim().toLowerCase();
-  if (/^hola|^buenas|^hey|^hello|^hi\b|^heyy/.test(t)) return QUICK_REPLIES.hola;
-  if (/^thanks|^thank you|^gracias/.test(t)) return QUICK_REPLIES.gracias;
-  if (/quien eres|who are you|qu[eé] eres|qu[eé] puedes hacer/.test(t)) return QUICK_REPLIES.quien;
-  if (/^bien$|^mal$|^bien y tu/.test(t)) return QUICK_REPLIES.bien;
-  if (/^s[ií]$|^ok$|^vale$|^de acuerdo$/.test(t)) return QUICK_REPLIES.default;
-  return null;
-}
-
-/* ── Memoria (localStorage) ── */
 
 export function loadMem() {
   try {
@@ -102,7 +64,29 @@ export function saveMem(state) {
   } catch (e) {}
 }
 
-/* ── Parser JSON tolerante ── */
+export function clearMem() {
+  try { localStorage.removeItem(MEM_KEY); } catch (e) {}
+}
+
+export function hasEngine() {
+  return typeof chrome !== 'undefined' && !!(chrome.runtime && chrome.runtime.sendMessage);
+}
+
+export function execInX1(command) {
+  return new Promise((resolve) => {
+    if (!hasEngine()) { resolve(null); return; }
+    let settled = false;
+    const finish = (v) => { if (!settled) { settled = true; resolve(v); } };
+    try {
+      chrome.runtime.sendMessage({ type: 'VOICE_COMMAND_EXEC', command, wantsText: true }, (resp) => {
+        if (chrome.runtime.lastError) { finish(null); return; }
+        const text = resp && resp.text ? String(resp.text).trim() : '';
+        finish(text || null);
+      });
+    } catch (e) { finish(null); }
+    setTimeout(() => finish(null), 30000);
+  });
+}
 
 function parseJSON(text) {
   try { return JSON.parse(text); } catch (e) {}
@@ -116,53 +100,116 @@ function parseJSON(text) {
   return null;
 }
 
-/* ── Planificador (llamada real al proxy) ── */
+const SYSTEM_BASE = 'You are X1, a browser agent. ';
 
-export function planSteps(query, activeId) {
-  const a = agentById(activeId);
-  const msgs = [
-    { role: 'system', content: 'You are X1, a browser agent. Plan the steps needed to fulfil the user\'s request.\n\nReturn ONLY valid JSON (no markdown, no explanation) with this structure:\n{\n  "steps": [\n    {"app": "AppName", "label": "ShortLabel"},\n    ...\n  ],\n  "response": "Your answer to the user"\n}\n\nPossible app names: GitHub, Google, LinkedIn, Docs, Style, PDF, Search, Read, Code, Draft, Email, Synthesize, Test, Export, Result, Done.\n\nExample for "create a document about someone":\n{"steps":[{"app":"GitHub","label":"Repo"},{"app":"Google","label":"Search"},{"app":"LinkedIn","label":"Profile"},{"app":"Docs","label":"Create"},{"app":"Style","label":"Format"},{"app":"PDF","label":"Export"},{"app":"Done","label":"Result"}],"response":"I created the document. Here it is..."}\n\nBe concise. Always end with a "Done" or "Result" step. The response must be in the user\'s language.' },
-    { role: 'user', content: 'Agent: ' + a.name + '\nRepo: ' + a.repo + '\n\n' + query }
-  ];
+const AGENT_PROMPTS = {
+  research: SYSTEM_BASE + 'You research the web thoroughly. Be analytical, cite sources, synthesize findings. Reply in the user\'s language.',
+  writer: SYSTEM_BASE + 'You write clear, compelling content. Be concise, structured, and engaging. Reply in the user\'s language.',
+  developer: SYSTEM_BASE + 'You write clean, well-structured code. Explain your approach briefly. Reply in the user\'s language.',
+  marketing: SYSTEM_BASE + 'You are a marketing strategist. Analyse audiences, positioning, and channels. Reply in the user\'s language.',
+  finance: SYSTEM_BASE + 'You are a financial analyst. Be precise with numbers, identify trends and risks. Reply in the user\'s language.',
+  legal: SYSTEM_BASE + 'You are a legal analyst. Be precise, reference relevant concepts, identify risks. Reply in the user\'s language.',
+  email: SYSTEM_BASE + 'You manage email communication. Be professional, clear, and efficient. Reply in the user\'s language.',
+  meeting: SYSTEM_BASE + 'You prepare and summarise meetings. Extract decisions and action items. Reply in the user\'s language.'
+};
 
+const CRITICAL_PROMPT = SYSTEM_BASE + 'Analyse the same query from a critical perspective. Identify gaps, risks, or alternative approaches the first response might miss. Be constructive. Reply in the user\'s language.';
+
+function apiCall(messages, opts = {}) {
   return fetch(CLOUD + '/v1/chat/completions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-X1-Auth': SECRET },
-    body: JSON.stringify({ messages: msgs, max_tokens: 600, temperature: 0.3 }),
-    signal: AbortSignal.timeout(15000)
+    body: JSON.stringify({
+      messages,
+      max_tokens: opts.max_tokens || 600,
+      temperature: opts.temperature || 0.3
+    }),
+    signal: AbortSignal.timeout(opts.timeout || 15000)
   }).then((r) => (r.ok ? r.json() : null)).then((d) => {
     if (!d) return null;
     const t = d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content;
-    if (!t || !t.trim()) return null;
-    const parsed = parseJSON(t);
-    if (parsed && parsed.steps && parsed.response) return parsed;
-    return { steps: [{ app: 'Done', label: 'Result' }], response: t.trim() };
+    const provider = d.x_provider || 'unknown';
+    return { text: (t || '').trim(), provider };
   }).catch(() => null);
+}
+
+export function planSteps(query, activeId) {
+  const a = agentById(activeId);
+  const prompt = AGENT_PROMPTS[a.id] || AGENT_PROMPTS.research;
+  const msgs = [
+    { role: 'system', content: prompt + '\n\nPlan the steps needed. Return ONLY valid JSON: {"steps":[{"app":"...","label":"..."}],"response":"..."}' },
+    { role: 'user', content: 'Agent: ' + a.name + '\n\n' + query }
+  ];
+  return apiCall(msgs, { max_tokens: 600, temperature: 0.3, timeout: 15000 }).then((r) => {
+    if (!r || !r.text) return null;
+    const parsed = parseJSON(r.text);
+    if (parsed && parsed.steps && parsed.response) return parsed;
+    return { steps: [{ app: 'Done', label: 'Result' }], response: r.text };
+  });
 }
 
 export function simpleAnswer(text, activeId) {
   const a = agentById(activeId);
+  const prompt = AGENT_PROMPTS[a.id] || AGENT_PROMPTS.research;
   const msgs = [
-    { role: 'system', content: 'You are X1, a browser agent. Reply briefly and naturally. Current agent: ' + a.name },
+    { role: 'system', content: prompt + '\nReply briefly and naturally.' },
     { role: 'user', content: text }
   ];
-  return fetch(CLOUD + '/v1/chat/completions', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-X1-Auth': SECRET },
-    body: JSON.stringify({ messages: msgs, max_tokens: 150, temperature: 0.5 }),
-    signal: AbortSignal.timeout(8000)
-  }).then((r) => (r.ok ? r.json() : null)).then((d) => {
-    if (!d) return null;
-    const t = d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content;
-    return (t || '').trim() || null;
-  }).catch(() => null);
+  return apiCall(msgs, { max_tokens: 150, temperature: 0.5, timeout: 8000 }).then((r) => {
+    return (r && r.text) || null;
+  });
+}
+
+export function compareAnswers(query, activeId) {
+  const a = agentById(activeId);
+  const prompt = AGENT_PROMPTS[a.id] || AGENT_PROMPTS.research;
+  const msgs = [
+    { role: 'system', content: prompt },
+    { role: 'user', content: query }
+  ];
+  const msgsCritical = [
+    { role: 'system', content: CRITICAL_PROMPT },
+    { role: 'user', content: query }
+  ];
+  return Promise.all([
+    apiCall(msgs, { max_tokens: 400, temperature: 0.3, timeout: 15000 }),
+    apiCall(msgsCritical, { max_tokens: 400, temperature: 0.5, timeout: 15000 })
+  ]).then(([primary, critical]) => ({
+    primary: primary || { text: 'Error al obtener respuesta', provider: 'error' },
+    critical: critical || { text: 'Error al obtener respuesta crítica', provider: 'error' }
+  }));
 }
 
 export function warm() {
-  fetch(CLOUD + '/v1/chat/completions', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-X1-Auth': SECRET },
-    body: JSON.stringify({ messages: [{ role: 'user', content: 'ping' }], max_tokens: 1 }),
-    signal: AbortSignal.timeout(8000)
-  }).catch(() => {});
+  apiCall([{ role: 'user', content: 'ping' }], { max_tokens: 1, timeout: 8000 }).catch(() => {});
 }
+
+/* ── Judge / Voting System ── */
+
+export function loadVotes() {
+  try {
+    const raw = localStorage.getItem(VOTE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) { return []; }
+}
+
+export function recordVote(vote) {
+  const votes = loadVotes();
+  votes.push({ ...vote, timestamp: Date.now() });
+  try {
+    localStorage.setItem(VOTE_KEY, JSON.stringify(votes.slice(-100)));
+  } catch (e) {}
+}
+
+export function getPreferences() {
+  const votes = loadVotes();
+  if (!votes.length) return {};
+  const counts = {};
+  for (const v of votes) {
+    const key = v.winner || 'unknown';
+    counts[key] = (counts[key] || 0) + 1;
+  }
+  return counts;
+}
+
+export const HONEST_ERROR = 'No he podido completar esto ahora mismo: no hay conexion con el motor de X1. Vuelve a intentarlo en unos segundos.';

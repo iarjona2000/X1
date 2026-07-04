@@ -1,4 +1,4 @@
-# 📦 Guía de Instalación de X1
+# Guía de Instalación de X1 (older version)
 
 Pasos detallados para instalar y configurar X1 en tu máquina.
 

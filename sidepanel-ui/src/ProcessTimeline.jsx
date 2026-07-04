@@ -1,82 +1,68 @@
-/*
- * Timeline de proceso vertical — se "razona" en el momento en que el usuario
- * pregunta y revela cada paso con el icono original de la app, con el estilo
- * de la referencia: logos sueltos, tipografía grande y amable, subtítulo gris
- * claro, conector fino que se ilumina en azul en el paso activo, y espaciado
- * generoso.
- */
-
 import * as React from 'react';
-import { makeStyles, tokens, Text } from '@fluentui/react-components';
+import { makeStyles, tokens } from '@fluentui/react-components';
 import { StepIcon, metaFor } from './icons.jsx';
 
 const useStyles = makeStyles({
   root: {
     display: 'flex',
     flexDirection: 'column',
-    paddingTop: tokens.spacingVerticalS
-  },
-  head: {
-    color: tokens.colorNeutralForeground4,
-    fontSize: tokens.fontSizeBase300,
-    marginBottom: tokens.spacingVerticalM,
-    paddingLeft: '2px'
+    paddingTop: '4px',
+    paddingBottom: '8px'
   },
   row: {
     display: 'grid',
-    gridTemplateColumns: '32px 1fr',
-    columnGap: tokens.spacingHorizontalL,
-    position: 'relative'
+    gridTemplateColumns: '28px 1fr',
+    columnGap: '14px',
+    position: 'relative',
+    minHeight: '48px'
   },
   railWrap: {
     display: 'flex',
     flexDirection: 'column',
-    alignItems: 'center',
-    gap: '6px'
+    alignItems: 'center'
   },
   connector: {
     width: '2px',
     flexGrow: 1,
-    minHeight: '18px',
-    background: tokens.colorNeutralStroke3,
+    minHeight: '20px',
+    backgroundColor: '#e8e8e8',
     borderRadius: '1px',
-    transition: 'background 0.5s ease'
+    transition: 'background-color 0.4s ease'
   },
   connectorActive: {
-    background: 'linear-gradient(#7cb6f8, #cfe4fc)'
+    background: 'linear-gradient(180deg, #7c6ae0 0%, #c4b5fd 100%)'
   },
   body: {
-    paddingBottom: '26px',
-    minWidth: 0,
-    transform: 'translateY(3px)'
+    paddingBottom: '20px',
+    transform: 'translateY(2px)'
   },
   title: {
     display: 'block',
-    fontSize: '16px',
-    fontWeight: tokens.fontWeightSemibold,
-    color: tokens.colorNeutralForeground1,
+    fontSize: '15px',
+    fontWeight: 600,
+    color: '#1a1a1a',
     lineHeight: '22px'
   },
   sub: {
     display: 'block',
-    fontSize: '14px',
-    color: tokens.colorNeutralForeground3,
-    lineHeight: '20px',
-    marginTop: '1px'
+    fontSize: '13px',
+    color: '#999',
+    lineHeight: '18px',
+    marginTop: '2px'
   },
-  hidden: { opacity: 0, transform: 'translateY(8px)' },
+  hidden: { opacity: 0, transform: 'translateY(12px)' },
   shown: {
-    opacity: 1,
-    transform: 'none',
-    transition: 'opacity 0.4s ease, transform 0.4s ease'
+    opacity: 1, transform: 'none',
+    transition: 'opacity 0.5s cubic-bezier(0.22, 1, 0.36, 1), transform 0.5s cubic-bezier(0.22, 1, 0.36, 1)'
   },
   pulse: {
     animationName: {
-      '0%, 100%': { opacity: 1 },
-      '50%': { opacity: 0.45 }
+      '0%, 100%': { opacity: 1, transform: 'scale(1)' },
+      '50%': { opacity: 0.5, transform: 'scale(1.1)' }
     },
-    animationDuration: '1.1s',
-    animationIterationCount: 'infinite'
+    animationDuration: '1.2s',
+    animationIterationCount: 'infinite',
+    animationTimingFunction: 'ease-in-out'
   }
 });
 
@@ -94,40 +80,40 @@ export function ProcessTimeline({ steps, onComplete }) {
       i += 1;
       setRevealed(i);
       if (i < list.length) {
-        timer = setTimeout(tick, 560);
+        timer = setTimeout(tick, 500);
       } else {
-        timer = setTimeout(() => onComplete && onComplete(), 500);
+        timer = setTimeout(() => onComplete && onComplete(), 400);
       }
     };
-    timer = setTimeout(tick, 280);
+    timer = setTimeout(tick, 300);
     return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [list.length]);
+  }, [list.length, onComplete]);
 
   if (!list.length) return null;
   const running = revealed < list.length;
 
   return (
     <div className={styles.root}>
-      {running && <Text className={styles.head}>Ejecutando…</Text>}
       {list.map((step, i) => {
         const meta = metaFor(step.app);
         const isShown = i < revealed;
         const isActive = i === revealed - 1 && running;
         const isLast = i === list.length - 1;
         return (
-          <div key={i} className={`${styles.row} ${isShown ? styles.shown : styles.hidden}`}>
+          <div key={i}
+            className={`${styles.row} ${isShown ? styles.shown : styles.hidden}`}
+            style={{ transitionDelay: isShown ? '0ms' : `${i * 60}ms` }}>
             <div className={styles.railWrap}>
               <div className={isActive ? styles.pulse : undefined}>
-                <StepIcon app={step.app} size={30} />
+                <StepIcon app={step.app} size={24} />
               </div>
               {!isLast && (
                 <div className={`${styles.connector} ${isActive ? styles.connectorActive : ''}`} />
               )}
             </div>
             <div className={styles.body}>
-              <Text className={styles.title}>{meta.title || step.app}</Text>
-              <Text className={styles.sub}>{step.label || meta.title}</Text>
+              <span className={styles.title}>{meta.title || step.app}</span>
+              <span className={styles.sub}>{step.label || meta.title}</span>
             </div>
           </div>
         );

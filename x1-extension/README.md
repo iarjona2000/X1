@@ -1,6 +1,6 @@
-# X1 — IA Personalizada para Chrome
+# X1 Extension — Reference copy (older version)
 
-Tuasistente de IA personalizable que compara múltiples modelos, aprende de tus preferencias y se integra perfectamente con Google Workspace.
+Copia de referencia de una versión anterior de X1 empaquetada con webpack (concepto original: multi-modelo con BYOK). La versión activa del proyecto está en la raíz de `cbos-ext/`.
 
 ![Version](https://img.shields.io/badge/version-1.0.0-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
