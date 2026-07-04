@@ -43,9 +43,9 @@ Cobertura amplia deliberada, no solo lo que ya está. Marco qué vertical tiene 
 
 **CEO** — ✅ Estrategia (3), Research/OSINT (4)
 
-**CTO — vacío, hueco total tras retirar agency-agents.** Antes "cubierto (parcial)" por 6 clústeres de personas de prompt (Engineering/Security/Testing/GIS/SpatialComputing/GameDev) — ninguno era un agente real. ⬜ Ingeniería de software, seguridad (por sub-especialidad: forense, red team, threat intel), testing, GIS, MLOps/datos, DevOps/SRE, spatial computing, game dev — todo pendiente de candidatos reales.
+**CTO — poblado en el Lote 3 (2026-07-06), 17 candidatos.** ✅ Frameworks de agentes (4), MCP/infraestructura (2), RAG/vectores (2), asistentes de código (1), visión/OCR (2), voz/audio (2), ciberseguridad (1), inferencia local/MLOps (2), scraping (1). ⬜ Testing, GIS, spatial computing, game dev — el censo GitHub de julio 2026 no dio candidatos con enfoque de IA/agente real en estas cuatro sub-especialidades (dominadas por librerías genéricas sin componente de IA), siguen siendo hueco real.
 
-**CPO — vacío, hueco total.** Antes "cubierto (parcial)" por 2 clústeres de agency-agents (Product/Design) — ninguno real. ⬜ Gestión de producto, diseño.
+**CPO — sigue vacío tras el Lote 3.** El censo GitHub no sacó a la luz candidatos reales de gestión de producto/diseño con enfoque de IA (dominado por librerías de UI genéricas) — ⬜ Gestión de producto, diseño, sigue pendiente de una búsqueda dedicada.
 
 **Sin vertical CEO clara (evaluar si necesitan una nueva o encajan en una existente)**
 - ⬜ Ciencia e investigación: bioinformática, química, medicina/salud, ciencia climática — candidatas a vivir bajo CEO (informan estrategia) o como vertical propia si crecen mucho.
@@ -87,8 +87,15 @@ Esto no es orquestación — es metadata de catálogo, terreno nuestro. Si el so
 1. **Lote 1 (hecho, 2026-07-04) — rellenar huecos flacos**: CLO (+1, Legal-MCP), CHRO (+1, Horilla), CEO/Research (+2, SpiderFoot + OSINT-Agent-Skills).
 2. **Lote 2 (en curso) — verticales de negocio no cubiertas**: Cadena de suministro (hecho, NocoBase, ahora vive bajo COO), CFO/datos de mercado (hecho, OpenBB) — pendiente: banca/fintech, seguros, bienes raíces, retail/e-commerce (todos bajo COO o vertical propia si crecen).
 3. **Lote 2.5 (hecho, 2026-07-05) — Conectores**: 59 conectores MCP del directorio oficial de Claude, clúster transversal nuevo.
-4. **Lote 3 — CTO desde cero**: MLOps/datos, DevOps/SRE, ciberseguridad por sub-especialidad, testing, GIS, spatial computing, game dev — todo el territorio que antes "cubría" agency-agents sin agentes reales, ahora hueco total.
-5. **Lote 4 — CPO desde cero + ciencia e investigación**: gestión de producto, diseño, bioinformática, química, medicina, clima.
+4. **Lote 3 (hecho, 2026-07-06) — censo GitHub completo (5.354 repos, ≥10k estrellas, 35 categorías) → CTO desde cero + refuerzo de otras verticales**. Metodología: filtrado por relevancia real de IA/agente (la mayoría del censo es ruido no-IA — frontend genérico, lenguajes de programación, apps móviles, juegos, blockchain — descartado explícitamente por no cumplir el listón de la sección 1), deduplicado contra la bóveda existente, un ganador por nicho distinto cuando había varios candidatos comparables.
+   - **CTO-Tecnico (+17, vertical antes vacía):** Frameworks de agentes (Browser-Use, LangGraph, CrewAI, LiteLLM) · MCP (MCP-Servers-Oficial, FastMCP) · RAG/vectores (Qdrant, AnythingLLM) · Código (Aider) · Visión/OCR (Zerox, Tesseract) · Voz (Whisper, Coqui-TTS) · Ciberseguridad (Shannon, elegido sobre pentagi/hexstrike-ai por mayor tracción y enfoque de caja blanca) · Inferencia local/MLOps (Ollama — ya integrado en X1, catalogado por completitud; vLLM) · Scraping (Scrapling).
+   - **CEO-Estrategia (+2):** GPT-Researcher, Firecrawl — investigación general y scraping a escala, distintos del enfoque OSINT/seguridad ya cubierto.
+   - **CFO-Finanzas (+2):** AI-Trader (trading 100% autónomo), FinRL (aprendizaje por refuerzo, técnica distinta a los agentes de lenguaje ya catalogados).
+   - **COO-Operaciones (+3):** Kestra, Activepieces (automatización de procesos, alternativas a n8n), Huginn (monitorización continua encadenable).
+   - **Conectores (+3):** Playwright-MCP, Chrome-DevTools-MCP, MCP-Toolbox-Databases — herramientas de protocolo/desarrollo genéricas, no conectores de producto SaaS ya cubiertos (se verificó explícitamente que GitHub-MCP.md y Figma.md ya cubrían los repos equivalentes del censo, para no duplicar).
+   - **CMO/CLO/CHRO/CRO/CPO:** sin candidatos nuevos — el censo no sacó a la luz repos con enfoque de IA/agente real y tracción suficiente en estos dominios (hueco genuino, no una omisión; una búsqueda dedicada por tema seguirá siendo necesaria, no derivada de este censo generalista).
+   - **Testing, GIS, spatial computing, game dev (dentro de CTO):** siguen como hueco — el censo no dio candidatos con componente de IA/agente real en estas cuatro sub-especialidades.
+5. **Lote 4 — CPO desde cero + ciencia e investigación**: gestión de producto, diseño, bioinformática, química, medicina, clima. El censo GitHub del Lote 3 no cubrió este terreno — sigue pendiente de búsqueda dedicada.
 6. **Lote 5 — creativo y transversal restante**: escritura, audio/vídeo, traducción, accesibilidad, cumplimiento normativo.
 7. **Lotes posteriores — mantenimiento**: revisar candidatos ya elegidos cada cierto tiempo (el ecosistema cambia), y seguir añadiendo verticales o clústeres nuevos que vayan apareciendo.
 

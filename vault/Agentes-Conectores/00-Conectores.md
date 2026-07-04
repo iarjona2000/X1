@@ -4,7 +4,7 @@ tags: [categoria, "tema/conectores", conector-mcp]
 
 # Conectores (ecosistema MCP de Claude)
 
-Catálogo de 59 conectores MCP tomados directamente del directorio oficial de Claude (claude.com/connectors, vía [rdmgator12/awesome-claude-connectors](https://github.com/rdmgator12/awesome-claude-connectors) — 343 conectores verificados en total, esta es una selección curada de los más relevantes para X1). Todos son Nivel 1 (MCP) por definición — el mismo protocolo que `X1MCPClient` ya implementa. Petición explícita de Ivan (2026-07-05): "añade todos los conectores que puedas, si es posible todos los de Claude".
+Catálogo de 62 conectores MCP: 59 tomados directamente del directorio oficial de Claude (claude.com/connectors, vía [rdmgator12/awesome-claude-connectors](https://github.com/rdmgator12/awesome-claude-connectors) — 343 conectores verificados en total, esta es una selección curada de los más relevantes para X1) más 3 añadidos en el Lote 3 (2026-07-06) desde el censo completo de GitHub — implementaciones de protocolo/herramienta genéricas en vez de conectores por producto SaaS. Todos son Nivel 1 (MCP) por definición — el mismo protocolo que `X1MCPClient` ya implementa. Petición explícita de Ivan (2026-07-05): "añade todos los conectores que puedas, si es posible todos los de Claude".
 
 Distinto de los demás clústeres: esto no son personas/especialistas, son **conectores de infraestructura/datos** — encajan con cualquier rol (Legal puede usar Docusign, Finanzas puede usar Stripe, etc.), así que viven en su propio clúster transversal en vez de plegarse en uno temático.
 
@@ -79,6 +79,7 @@ Distinto de los demás clústeres: esto no son personas/especialistas, son **con
 | [[Snowflake]] | data warehouse |
 | [[PostHog]] | analítica de producto open-source |
 | [[Metabase]] | BI open-source self-hosted |
+| [[MCP-Toolbox-Databases]] | toolbox MCP genérico de Google para cualquier base de datos, sin conector dedicado por producto |
 
 ### Diseño y creatividad
 
@@ -95,6 +96,8 @@ Distinto de los demás clústeres: esto no son personas/especialistas, son **con
 | [[GitHub-MCP]] | oficial — issues, PRs, código — el más natural de todos dado que ya clonamos repos de GitHub a mano |
 | [[GitLab]] | alternativa self-hostable a GitHub |
 | [[Sourcegraph]] | búsqueda de código a gran escala |
+| [[Playwright-MCP]] | automatización de navegador de propósito general, motor de Microsoft |
+| [[Chrome-DevTools-MCP]] | depuración e introspección de páginas (consola, red, DOM) |
 
 ### Documentos y archivos
 

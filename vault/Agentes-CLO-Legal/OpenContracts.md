@@ -13,7 +13,7 @@ estado: candidato-fase-1
 **Licencia:** MIT
 
 ## Cómo se conectaría a X1
-Nivel 1 (MCP) confirmado — el README expone endpoints HTTP reales: `/mcp/` (público, corpus anónimos) y `/mcp/me/` (autenticado). Esto SÍ es HTTP, compatible con `X1MCPClient` (a diferencia de [[../Agentes-Research/OpenOSINT|OpenOSINT]], que usa stdio). El usuario despliega OpenContracts, añade `http://localhost:3000/mcp/` (o el puerto que use) en Settings de X1, disponible vía `mcpCall`.
+Nivel 1 (MCP) confirmado — el README expone endpoints HTTP reales: `/mcp/` (público, corpus anónimos) y `/mcp/me/` (autenticado). Esto SÍ es HTTP, compatible con `X1MCPClient` (a diferencia del OSINT ya catalogado bajo CEO-Estrategia, que usa stdio). El usuario despliega OpenContracts, añade `http://localhost:3000/mcp/` (o el puerto que use) en Settings de X1, disponible vía `mcpCall`.
 
 ## Despliegue (lo ejecutas tú, verificado contra el README real 2026-07-04)
 ```bash

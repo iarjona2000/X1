@@ -16,7 +16,7 @@ Las claves reales de proveedores de IA **no viven en el código de la extensión
 
 ## Por qué esta nota vive en `Codigo-Seguridad/` y no en `Sistema-Orquestacion/`
 
-El proxy/Worker es infraestructura de despliegue y seguridad de X1 como programa, no parte del razonamiento del orquestador (Judge/Voting/Router/Ensemble, ver [[../Sistema-Orquestacion/00-Sistema-Orquestacion|Sistema-Orquestacion]]) — de ahí el clúster separado, siguiendo la misma regla de aislamiento por tema del resto de la bóveda.
+El proxy/Worker es infraestructura de despliegue y seguridad de X1 como programa, no parte del razonamiento del orquestador (Judge/Voting/Router/Ensemble, documentado en el clúster `Sistema-Orquestacion`) — de ahí el clúster separado, siguiendo la misma regla de aislamiento por tema del resto de la bóveda.
 
 ## Enlaces
 [[00-Codigo-Seguridad]] · [[Arquitectura-X1]]

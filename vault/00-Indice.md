@@ -33,7 +33,7 @@ Vault de Obsidian (basta con abrir esta carpeta en Obsidian, no requiere configu
 - [[Agentes-CHRO-RRHH/00-CHRO|CHRO-RRHH]]
 - [[Agentes-CRO-Ventas/00-CRO|CRO-Ventas — Ventas / CRM]] — ya integrado en X1 (Pipedrive/HubSpot)
 - [[Agentes-COO-Operaciones/00-COO|COO-Operaciones]] — PMO, atención al cliente, cadena de suministro/procurement
-- [[Agentes-CTO-Tecnico/00-CTO|CTO-Tecnico — Técnico / Ingeniería]] — nuevo, vacío, pendiente de candidatos reales (Lote 3)
+- [[Agentes-CTO-Tecnico/00-CTO|CTO-Tecnico — Técnico / Ingeniería]] — poblado en el Lote 3 (2026-07-06) desde el censo GitHub: frameworks de agentes, MCP, RAG/vectores, código, visión/OCR, voz, ciberseguridad, inferencia local
 - [[Agentes-CPO-Producto/00-CPO|CPO-Producto — Producto y Diseño]] — nuevo, vacío, pendiente de candidatos reales
 
 ## Transversal (sin CEO — cruza todas las verticales o documenta el programa entero)

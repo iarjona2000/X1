@@ -19,6 +19,8 @@ Reestructurado 2026-07-05: fusiona `Agentes-Estrategia` y `Agentes-Research` baj
 - [[Taranis-AI]] — recolección de noticias/inteligencia situacional continua.
 - [[SpiderFoot]] — 200+ módulos de automatización OSINT, para barridos amplios.
 - [[OSINT-Agent-Skills]] — MCP puro con 23 herramientas (DNS, Shodan, certificados, brechas de datos, blockchain).
+- [[GPT-Researcher]] — **Lote 3**. Agente autónomo de investigación general con informes citados, distinto de las herramientas OSINT (seguridad/infraestructura).
+- [[Firecrawl]] — **Lote 3**. Scraping/búsqueda web a escala como API gestionada, infraestructura de research general.
 
 Nota de uso: herramientas OSINT son legítimas para investigación de mercado/competencia (el caso de uso de X1), pero todas advierten explícitamente de uso autorizado solamente — no usar para vigilancia de personas sin consentimiento.
 

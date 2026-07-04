@@ -18,5 +18,10 @@ Reestructurado 2026-07-05: fusiona tres clústeres que antes eran "departamentos
 ## Cadena de suministro / procurement
 - [[NocoBase]] — **elegido Lote 2**. ERP ligero no-code con módulos de compras/inventario/pedidos.
 
+## Automatización de procesos y monitorización (Lote 3)
+- [[Kestra]] — orquestación de eventos/pipelines robusta para cargas críticas.
+- [[Activepieces]] — automatización visual tipo n8n con ~400 servidores MCP nativos.
+- [[Huginn]] — agentes de monitorización continua encadenables (alertas, vigilancia de fuentes).
+
 ## Enlaces
 [[00-Indice]] · [[02-Plan-de-Fases]] · [[06-Plan-de-Expansion-Masiva]]
