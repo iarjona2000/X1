@@ -383,11 +383,11 @@ export function RepoView({ conversations, githubUser }) {
                 </div>
 
                 {/* Data flow */}
-                <div style={{ marginBottom: '16px' }}>
-                  <h3 style={{ fontSize: '14px', fontWeight: '600', color: '#1f2328', marginBottom: '8px', padding: '0 0 8px', borderBottom: '1px solid #d0d7de' }}>
+                <div style={{ marginBottom: '24px' }}>
+                  <h3 style={{ fontSize: '14px', fontWeight: '600', color: '#1f2328', marginBottom: '12px', padding: '0 0 10px', borderBottom: '1px solid #d0d7de', lineHeight: '1.6' }}>
                     Flujo de datos
                   </h3>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                     {[
                       { step: '1', title: 'Conversacion', desc: 'Cada mensaje que envias se guarda en memoria local', color: '#0969da' },
                       { step: '2', title: 'Analisis', desc: 'El sistema juez analiza tu consulta y selecciona el mejor agente', color: '#8250df' },
@@ -396,13 +396,13 @@ export function RepoView({ conversations, githubUser }) {
                       { step: '5', title: 'Almacenamiento', desc: 'La conversacion se guarda en tu repositorio local y GitHub', color: '#cf222e' },
                     ].map(function(item) {
                       return (
-                        <div key={item.step} style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '12px', border: '1px solid #d0d7de', borderRadius: '6px', background: '#ffffff' }}>
+                        <div key={item.step} style={{ display: 'flex', alignItems: 'flex-start', gap: '14px', padding: '14px 16px', border: '1px solid #d0d7de', borderRadius: '6px', background: '#ffffff', lineHeight: '1.7' }}>
                           <div style={{ width: '32px', height: '32px', borderRadius: '6px', background: item.color + '15', border: '1px solid ' + item.color + '30', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: '13px', fontWeight: '700', color: item.color }}>
                             {item.step}
                           </div>
-                          <div>
-                            <div style={{ fontSize: '14px', fontWeight: '600', color: '#1f2328', marginBottom: '2px' }}>{item.title}</div>
-                            <div style={{ fontSize: '12px', color: '#59636e', lineHeight: '1.4' }}>{item.desc}</div>
+                          <div style={{ flex: 1, lineHeight: '1.7' }}>
+                            <div style={{ fontSize: '14px', fontWeight: '600', color: '#1f2328', marginBottom: '6px', lineHeight: '1.6' }}>{item.title}</div>
+                            <div style={{ fontSize: '13px', color: '#59636e', lineHeight: '1.9' }}>{item.desc}</div>
                           </div>
                         </div>
                       );
