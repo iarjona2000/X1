@@ -268,9 +268,9 @@ function buildLocalFallback(query, agentId, sector) {
     return 'Modo local. Para emails puedo acceder a Gmail si inicias sesion. Prueba a conectarte desde la pestana de Ajustes. Mientras tanto, dime el destinatario y el tema y preparo un borrador.';
   }
 
-  // Pregunta de reunion -> sugerir calendar
-  if (/reunion|meeting|calendario|agenda/.test(t)) {
-    return 'Modo local. Para reuniones puedo leer Google Calendar si inicias sesion. Prueba "mostrame las reuniones de hoy" cuando estes autenticado.';
+  // Redaccion / Writer -> crear documento en modo local
+  if (/documento|doc|writer|redaccion|redactar|escribir|texto|informe|propuesta|carta|ensayo|articulo|plantilla/.test(t)) {
+    return 'Modo local activo. Writer esta seleccionado para el sector Redaccion. Puedo ayudarte a estructurar el documento ahora mismo. Dime el tipo de documento y el tema, y te genero un borrador listo para copiar.';
   }
 
   // Respuesta generica orientada
