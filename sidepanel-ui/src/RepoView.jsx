@@ -181,7 +181,7 @@ export function RepoView({ conversations, githubUser }) {
             </div>
 
             {/* Filter chips */}
-            <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', flexWrap: 'wrap' }}>
               {[
                 { id: 'all', label: 'Todo' },
                 { id: 'conversation', label: 'Conversaciones' },
@@ -190,12 +190,12 @@ export function RepoView({ conversations, githubUser }) {
                 { id: 'note', label: 'Notas' },
               ].map(cat => (
                 <button key={cat.id} onClick={() => setCategory(cat.id)} style={{
-                  padding: '5px 14px', borderRadius: '999px',
+                  padding: '6px 16px', borderRadius: '999px',
                   border: '1px solid ' + (category === cat.id ? '#0969da' : '#d0d7de'),
                   background: category === cat.id ? '#ddf4ff' : '#ffffff',
                   color: category === cat.id ? '#0969da' : '#59636e',
                   fontSize: '12px', fontWeight: '500', cursor: 'pointer',
-                  transition: 'all 80ms',
+                  transition: 'all 80ms', lineHeight: '1.5',
                 }}>{cat.label}</button>
               ))}
             </div>
