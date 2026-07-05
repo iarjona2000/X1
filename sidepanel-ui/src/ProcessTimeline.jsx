@@ -1,11 +1,6 @@
 import * as React from 'react';
 
-const S = {
-  border: '#d0d7de', bgSubtle: '#f6f8fa', bgDefault: '#ffffff',
-  fgDefault: '#1f2328', fgMuted: '#59636e', fgSubtle: '#818b98', fgAccent: '#0969da',
-  fgSuccess: '#1a7f37', fgDanger: '#d1242f',
-  font: "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif",
-};
+const F = "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif";
 
 const APP_ICONS = {
   github: { letter: 'G', bg: '#1f2328', fg: '#fff' },
@@ -35,11 +30,12 @@ function StepCard({ step, index, total }) {
     <div style={{
       display: 'flex', alignItems: 'center', gap: '6px',
       padding: '4px 10px', borderRadius: '6px',
-      background: isActive ? '#ddf4ff' : S.bgDefault,
-      border: '1px solid ' + (isActive ? 'rgba(9,105,218,0.3)' : S.border),
+      background: isActive ? '#ddf4ff' : '#ffffff',
+      border: '1px solid ' + (isActive ? 'rgba(9,105,218,0.4)' : '#d0d7de'),
       fontSize: '11px', whiteSpace: 'nowrap',
       animation: 'slideIn 0.2s ease',
       minWidth: '60px',
+      transition: 'all 80ms',
     }}>
       {/* App icon */}
       <div style={{
@@ -50,12 +46,12 @@ function StepCard({ step, index, total }) {
       }}>{icon.letter}</div>
 
       {/* Status dot */}
-      {isActive && <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: S.fgAccent, animation: 'pulse 1s infinite', flexShrink: 0 }} />}
-      {isDone && <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: S.fgSuccess, flexShrink: 0 }} />}
-      {isError && <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: S.fgDanger, flexShrink: 0 }} />}
+      {isActive && <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#0969da', animation: 'pulse 1s infinite', flexShrink: 0 }} />}
+      {isDone && <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#1a7f37', flexShrink: 0 }} />}
+      {isError && <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#d1242f', flexShrink: 0 }} />}
 
       {/* Description */}
-      <span style={{ color: S.fgMuted, overflow: 'hidden', textOverflow: 'ellipsis' }}>{step.description || step.app || 'Procesando...'}</span>
+      <span style={{ color: '#59636e', overflow: 'hidden', textOverflow: 'ellipsis' }}>{step.description || step.app || 'Procesando...'}</span>
     </div>
   );
 }
@@ -66,15 +62,15 @@ export function ProcessTimeline({ steps = [] }) {
   return (
     <div style={{
       display: 'flex', alignItems: 'center', gap: '6px',
-      padding: '8px 16px', borderBottom: '1px solid ' + S.border,
-      background: S.bgSubtle, overflowX: 'auto',
-      scrollbarWidth: 'thin',
+      padding: '8px 16px', borderBottom: '1px solid #d0d7de',
+      background: '#f6f8fa', overflowX: 'auto',
+      scrollbarWidth: 'thin', fontFamily: F,
     }}>
       {steps.map((step, i) => (
         <React.Fragment key={step.id || i}>
           <StepCard step={step} index={i} total={steps.length} />
           {i < steps.length - 1 && (
-            <svg viewBox="0 0 16 16" width="8" height="8" fill={S.fgSubtle} style={{ flexShrink: 0 }}>
+            <svg viewBox="0 0 16 16" width="8" height="8" fill="#818b98" style={{ flexShrink: 0 }}>
               <path d="M4.427 7.427l3.396 3.396a.25.25 0 00.354 0l3.396-3.396A.25.25 0 0011.396 7H4.604a.25.25 0 00-.177.427z"/>
             </svg>
           )}
