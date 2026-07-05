@@ -1,356 +1,280 @@
-import * as React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import * as B from './backend.js';
-import { ProcessTimeline } from './ProcessTimeline.jsx';
+import * as T from './tools.js';
 
-const F = "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif";
-const C = {
-  border: '#d0d7de', borderSubtle: '#d8dee4', bg: '#ffffff', bgSubtle: '#f6f8fa',
-  fg: '#1f2328', fgMuted: '#59636e', fgSubtle: '#818b98', fgAccent: '#0969da',
-  fgSuccess: '#1a7f37', fgDanger: '#d1242f', fgAttention: '#bf8700',
+const AGENTS = B.AGENTS;
+
+const THINKING_MESSAGES = [
+  'Conectando con el motor...',
+  'Procesando tu consulta...',
+  'Analizando la informacion...',
+  'Construyendo la respuesta...',
+];
+
+const S = {
+  container: { flex:1, display:'flex', flexDirection:'column', position:'relative', minWidth:0 },
+  messages: { flex:1, overflow:'auto', padding:'16px 0' },
+  empty: { textAlign:'center', padding:'60px 40px', color:'#484F58' },
+  emptyIcon: { fontSize:48, marginBottom:16, opacity:0.5 },
+  emptyTitle: { fontSize:20, fontWeight:600, color:'#E6EDF3', marginBottom:8, letterSpacing:'-0.02em' },
+  emptyDesc: { fontSize:14, marginBottom:24, maxWidth:400, margin:'0 auto 24px auto', lineHeight:1.6, color:'#8B949E' },
+  agentPills: { display:'flex', gap:8, justifyContent:'center', flexWrap:'wrap', marginBottom:16 },
+  agentPill: { padding:'6px 12px', borderRadius:20, background:'#161B22', border:'1px solid #21262D', fontSize:12, color:'#B6BFB8', display:'flex', alignItems:'center', gap:6, transition:'all 0.15s' },
+  agentPillDot: (color) => ({ width:8, height:8, borderRadius:4, background:color }),
+  emptyHint: { fontSize:12, color:'#484F58' },
+  msgRow: (isUser) => ({ display:'flex', gap:8, padding:'4px 16px', animation:'fadeIn 0.2s ease', justifyContent:isUser?'flex-end':'flex-start' }),
+  agentAvatar: (color) => ({ width:28, height:28, borderRadius:6, background:color, display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontSize:13, fontWeight:700, flexShrink:0, marginTop:2 }),
+  bubble: (isUser) => ({ padding:'10px 14px', borderRadius:12, background:isUser?'#0FBF3E':'#161B22', border:isUser?'1px solid rgba(15,191,62,0.3)':'1px solid #21262D', color:isUser?'#101411':'#B6BFB8', fontSize:14, lineHeight:1.6, wordBreak:'break-word', maxWidth:isUser?'75%':'85%' }),
+  systemBubble: { textAlign:'center', padding:'8px 0' },
+  systemPill: { display:'inline-block', padding:'6px 14px', borderRadius:20, background:'#21262D', border:'1px solid #30363D', fontSize:12, color:'#8B949E' },
+  toolBadges: { display:'flex', gap:6, flexWrap:'wrap', marginBottom:8 },
+  toolBadge: (color) => ({ display:'inline-flex', alignItems:'center', gap:4, padding:'2px 8px', borderRadius:12, background:'#21262D', border:'1px solid #30363D', fontSize:11, color }),
+  processCard: { margin:'12px 0', padding:12, background:'#0D1117', borderRadius:12, border:'1px solid #21262D' },
+  processTitle: { fontSize:11, color:'#8B949E', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.5px', marginBottom:8 },
+  processSteps: { display:'flex', gap:8, flexWrap:'wrap' },
+  processStep: { display:'flex', alignItems:'center', gap:6, padding:'8px 10px', background:'#161B22', borderRadius:8, border:'1px solid #21262D', animation:'slideIn 0.2s ease', flex:'1 1 auto', minWidth:120 },
+  processIcon: { fontSize:16, lineHeight:1 },
+  processDesc: { fontSize:11, color:'#B6BFB8', lineHeight:1.3 },
+  processStatus: { fontSize:10, color:'#8B949E' },
+  reasoningCard: { margin:'12px 0', padding:12, background:'#161B22', borderRadius:12, border:'1px solid #21262D', display:'flex', alignItems:'flex-start', gap:10 },
+  reasoningAvatar: (color) => ({ width:28, height:28, borderRadius:6, background:color, display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontSize:13, fontWeight:700, flexShrink:0 }),
+  reasoningTitle: { fontSize:12, fontWeight:600, color:'#E6EDF3', marginBottom:2 },
+  reasoningText: { fontSize:12, color:'#8B949E', lineHeight:1.5 },
+  agentFooter: { marginTop:8, paddingTop:8, borderTop:'1px solid #21262D', display:'flex', alignItems:'center', gap:8 },
+  agentLabel: { fontSize:11, color:'#8B949E' },
+  agentLink: { fontSize:11, color:'#0FBF3E', cursor:'pointer', textDecoration:'none' },
+  thinking: { display:'flex', gap:8, padding:'4px 16px' },
+  thinkingBubble: { padding:'10px 14px', borderRadius:12, background:'#161B22', border:'1px solid #21262D', display:'flex', alignItems:'center', gap:8 },
+  thinkingDots: { display:'flex', gap:4 },
+  thinkingDot: (i) => ({ width:6, height:6, borderRadius:3, background:'#0FBF3E', animation:'pulse 1s infinite', animationDelay:i*0.15+'s' }),
+  thinkingText: { fontSize:13, color:'#8B949E' },
+  inputArea: { padding:'12px 16px', borderTop:'1px solid #21262D', background:'#101411' },
+  inputRow: { display:'flex', gap:8, alignItems:'flex-end' },
+  agentBtn: (color) => ({ width:36, height:36, borderRadius:'var(--radius)', background:color, display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer', flexShrink:0, border:'2px solid rgba(255,255,255,0.1)', transition:'all 0.15s' }),
+  textarea: { flex:1, position:'relative' },
+  textareaInput: { width:'100%', minHeight:40, maxHeight:120, padding:'10px 12px', borderRadius:10, border:'1px solid #30363D', background:'#0D1117', color:'#E6EDF3', fontSize:14, fontFamily:'inherit', resize:'none', outline:'none', lineHeight:1.4, transition:'border-color 0.15s' },
+  sendBtn: (active) => ({ width:36, height:36, borderRadius:'var(--radius)', background:active?'#0FBF3E':'#21262D', border:active?'1px solid rgba(15,191,62,0.3)':'1px solid #30363D', display:'flex', alignItems:'center', justifyContent:'center', cursor:active?'pointer':'not-allowed', color:active?'#101411':'#484F58', fontSize:16, flexShrink:0, transition:'all 0.15s' }),
+  agentPicker: { position:'absolute', bottom:60, left:16, background:'#161B22', border:'1px solid #30363D', borderRadius:12, padding:12, width:280, boxShadow:'0 8px 24px rgba(0,0,0,0.44)', zIndex:9999 },
+  agentPickerTitle: { fontSize:11, fontWeight:600, color:'#8B949E', textTransform:'uppercase', letterSpacing:'0.5px', marginBottom:8, paddingBottom:6, borderBottom:'1px solid #21262D' },
+  agentOption: (selected) => ({ display:'flex', alignItems:'center', gap:8, padding:'8px 10px', borderRadius:'var(--radius)', cursor:'pointer', background:selected?'#21262D':'transparent', transition:'background 0.15s', marginBottom:2 }),
+  agentOptionAvatar: (color) => ({ width:28, height:28, borderRadius:6, background:color, display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontSize:13, fontWeight:700, flexShrink:0 }),
+  agentOptionName: { fontSize:13, color:'#E6EDF3', fontWeight:500 },
+  agentOptionDesc: { fontSize:11, color:'#8B949E' },
+  agentCheck: { fontSize:12, color:'#0FBF3E' },
 };
 
-function timeAgo(ts) {
-  var d = Date.now() - ts;
-  if (d < 60000) return 'ahora';
-  if (d < 3600000) return Math.floor(d / 60000) + 'm';
-  if (d < 86400000) return Math.floor(d / 3600000) + 'h';
-  return Math.floor(d / 86400000) + 'd';
-}
-
-const AGENTS = [
-  { id: 'auto',     name: 'X1',       ai: 'Automatico',   letter: 'X', color: '#0969da', aiIcon: 'dist/x1-logo.png' },
-  { id: 'research',  name: 'Research',  ai: 'Gemini',       letter: 'R', color: '#4285f4', aiIcon: '../assets/ai/googlegemini.svg' },
-  { id: 'writer',    name: 'Writer',    ai: 'Claude',       letter: 'W', color: '#d97706', aiIcon: '../assets/ai/anthropic.svg' },
-  { id: 'developer', name: 'Developer', ai: 'GPT-4o',       letter: 'D', color: '#10a37f', aiIcon: '../assets/ai/openai.svg' },
-  { id: 'marketing', name: 'Marketing', ai: 'Gemini',       letter: 'M', color: '#4285f4', aiIcon: '../assets/ai/googlegemini.svg' },
-  { id: 'finance',   name: 'Finance',   ai: 'Claude',       letter: 'F', color: '#d97706', aiIcon: '../assets/ai/anthropic.svg' },
-  { id: 'legal',     name: 'Legal',     ai: 'Mistral',      letter: 'L', color: '#ff7000', aiIcon: '../assets/ai/mistralai.svg' },
-  { id: 'email',     name: 'Email',     ai: 'Llama',        letter: 'E', color: '#0668e1', aiIcon: '../assets/ai/meta.svg' },
-  { id: 'meeting',   name: 'Meeting',   ai: 'Gemini',       letter: 'G', color: '#4285f4', aiIcon: '../assets/ai/googlegemini.svg' },
-];
-
-function agentById(id) {
-  return AGENTS.find(function(a) { return a.id === id; }) || AGENTS[0];
-}
-
-function AgentAvatar({ agent, size }) {
-  size = size || 20;
-  if (agent.aiIcon) {
-    return React.createElement('img', { src: agent.aiIcon, alt: '', style: { width: size, height: size, borderRadius: '4px', objectFit: 'contain' }, onError: function(e) { e.currentTarget.style.display = 'none'; } });
-  }
-  return React.createElement('div', {
-    style: {
-      width: size, height: size, borderRadius: '4px',
-      background: agent.color || '#0969da', color: '#fff',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      fontSize: size * 0.55, fontWeight: '600',
-    }
-  }, agent.letter);
-}
-
-function ToolIcon({ tool, size }) {
-  size = size || 14;
-  var colors = { github: '#1f2328', npm: '#cb3837', stackoverflow: '#f48024', web: '#de5833' };
-  var letters = { github: 'G', npm: 'N', stackoverflow: 'S', web: 'W' };
-  return React.createElement('div', {
-    style: {
-      width: size, height: size, borderRadius: '3px',
-      background: colors[tool] || '#656d76', color: '#fff',
-      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-      fontSize: size * 0.5, fontWeight: '700', flexShrink: 0,
-    }
-  }, letters[tool] || '?');
-}
-
-const QUICK = [
-  { label: 'Resumir', prompt: 'Resume la pagina que tengo abierta' },
-  { label: 'Investigar', prompt: 'Investiga sobre esta pagina' },
-  { label: 'Codigo', prompt: 'Escribe codigo para esto' },
-  { label: 'Email', prompt: 'Redacta un email profesional' },
-];
-
-export function ChatView({ conversations, activeConv, onSelectConv, onCreateConv, onUpdateConv }) {
-  const [text, setText] = React.useState('');
-  const textRef = React.useState('');
-  const [busy, setBusy] = React.useState(false);
-  const [activeAgent, setActiveAgent] = React.useState('auto');
-  const [agentMenu, setAgentMenu] = React.useState(false);
-  const logRef = React.useRef(null);
-  const safetyRef = React.useRef(null);
-  const busyRef = React.useRef(false);
-
-  React.useEffect(function() { busyRef.current = busy; }, [busy]);
-  React.useEffect(function() { if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight; }, [activeConv && activeConv.messages && activeConv.messages.length]);
-
-  function patchMsg(convId, msgId, patch) {
-    onUpdateConv(convId, { messages: function(prevMsgs) {
-      return prevMsgs.map(function(m) { return m.id === msgId ? Object.assign({}, m, patch) : m; });
-    }});
-  }
-
-  function send(input) {
-    var q = (input || textRef.current).trim();
-    if (!q || busyRef.current || !activeConv) return;
-    setBusy(true); setText(''); textRef.current = '';
-    var agentId = activeAgent === 'auto' ? B.getBestAgent(q) : activeAgent;
-    var title = activeConv.messages.length === 0 ? q.slice(0, 40) : activeConv.title;
-    var userMsg = { id: Date.now(), role: 'user', content: q, timestamp: Date.now() };
-    var aiMsg = { id: Date.now() + 1, role: 'assistant', content: '', status: 'thinking', agent: agentId, toolsUsed: [] };
-    var newMessages = activeConv.messages.concat([userMsg, aiMsg]);
-    onUpdateConv(activeConv.id, { messages: newMessages, title: title, agent: agentId });
-
-    safetyRef.current = setTimeout(function() {
-      if (busyRef.current) {
-        patchMsg(activeConv.id, aiMsg.id, { content: 'Tiempo de espera agotado.', status: 'done' });
-        setBusy(false);
-      }
-    }, 20000);
-
-    B.smartQuery(q, agentId).then(function(result) {
-      if (safetyRef.current) clearTimeout(safetyRef.current);
-      if (result) patchMsg(activeConv.id, aiMsg.id, { content: result.response || 'Completado.', status: 'done', toolsUsed: result.tools || [] });
-      else patchMsg(activeConv.id, aiMsg.id, { content: 'No pude procesar eso.', status: 'done' });
-      setBusy(false);
-    }).catch(function() {
-      if (safetyRef.current) clearTimeout(safetyRef.current);
-      patchMsg(activeConv.id, aiMsg.id, { content: 'Error de conexion.', status: 'done' });
-      setBusy(false);
-    });
-  }
-
-  var agent = agentById(activeAgent);
-  var msgs = (activeConv && activeConv.messages) || [];
-
-  return React.createElement('div', { style: { display: 'flex', flex: 1, overflow: 'hidden', fontFamily: F } },
-
-    // Sidebar conversaciones
-    React.createElement('div', { style: { width: '220px', borderRight: '1px solid #d0d7de', display: 'flex', flexDirection: 'column', background: '#f6f8fa' } },
-      React.createElement('div', { style: { padding: '12px', borderBottom: '1px solid #d0d7de' } },
-        React.createElement('button', {
-          onClick: onCreateConv,
-          style: {
-            width: '100%', padding: '5px 12px', borderRadius: '6px',
-            border: '1px solid rgba(27,31,36,0.15)', background: '#2da44e', color: '#ffffff',
-            fontSize: '12px', fontWeight: '600', cursor: 'pointer',
-            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.25)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
-          }
-        }, '+ Nueva')
-      ),
-      React.createElement('div', { style: { flex: 1, overflow: 'auto', padding: '4px 8px' } },
-        conversations.map(function(c) {
-          var isActive = activeConv && activeConv.id === c.id;
-          return React.createElement('div', {
-            key: c.id, onClick: function() { onSelectConv(c.id); },
-            style: {
-              padding: '8px 10px', borderRadius: '6px', cursor: 'pointer', marginBottom: '2px',
-              background: isActive ? '#ddf4ff' : 'transparent',
-              transition: 'background 80ms',
-            },
-            onMouseEnter: function(e) { if (!isActive) e.currentTarget.style.background = '#eaeef2'; },
-            onMouseLeave: function(e) { if (!isActive) e.currentTarget.style.background = 'transparent'; },
-          },
-            React.createElement('div', { style: { fontSize: '13px', fontWeight: isActive ? '600' : '400', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: isActive ? '#1f2328' : '#24292f' } }, c.title || 'Nueva'),
-            React.createElement('div', { style: { fontSize: '11px', color: '#59636e', marginTop: '2px' } }, timeAgo(c.updatedAt || c.createdAt))
+function ProcessTimeline({ steps }) {
+  if (!steps || steps.length === 0) return null;
+  return (
+    <div style={S.processCard}>
+      <div style={S.processTitle}>Proceso</div>
+      <div style={S.processSteps}>
+        {steps.map((step, i) => {
+          const icons = { github:'&#128187;', npm:'&#128230;', stackoverflow:'&#128221;', web:'&#127760;', gmail:'&#128231;', calendar:'&#128197;' };
+          return (
+            <div key={i} style={S.processStep}>
+              <div style={S.processIcon} dangerouslySetInnerHTML={{ __html: icons[step.app]||'&#128196;' }} />
+              <div>
+                <div style={S.processDesc}>{step.description}</div>
+                <div style={S.processStatus}>{step.status==='done'?'&#10003; Listo':'&#9679; Activo'}</div>
+              </div>
+            </div>
           );
-        })
-      )
-    ),
+        })}
+      </div>
+    </div>
+  );
+}
 
-    // Chat area
-    React.createElement('div', { style: { flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 } },
+function ReasoningPanel({ reasoning }) {
+  if (!reasoning) return null;
+  const agent = AGENTS.find(a => a.id === reasoning.agent);
+  return (
+    <div style={S.reasoningCard}>
+      <div style={S.reasoningAvatar(agent?.color||'#656d76')}>{agent?.letter||'?'}</div>
+      <div>
+        <div style={S.reasoningTitle}>AUTO selecciono: {agent?.name||reasoning.agent}</div>
+        <div style={S.reasoningText}>{reasoning.reason}</div>
+      </div>
+    </div>
+  );
+}
 
-      // Header
-      React.createElement('div', { style: { padding: '8px 16px', borderBottom: '1px solid #d0d7de', display: 'flex', alignItems: 'center', gap: '10px', background: '#ffffff' } },
-        React.createElement('div', { style: { position: 'relative' } },
-          React.createElement('button', {
-            onClick: function() { setAgentMenu(function(v) { return !v; }); },
-            style: {
-              display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 10px',
-              background: '#f6f8fa', border: '1px solid #d0d7de', borderRadius: '6px',
-              fontSize: '13px', cursor: 'pointer', transition: 'border-color 80ms',
-            },
-            onMouseEnter: function(e) { e.currentTarget.style.borderColor = '#0969da'; },
-            onMouseLeave: function(e) { e.currentTarget.style.borderColor = '#d0d7de'; },
-          },
-            React.createElement(AgentAvatar, { agent: agent, size: 16 }),
-            React.createElement('span', { style: { fontWeight: '600', color: '#1f2328' } }, agent.name),
-            React.createElement('span', { style: { color: '#59636e', fontSize: '12px' } }, agent.ai),
-            React.createElement('svg', { viewBox: '0 0 16 16', width: '12', height: '12', fill: '#59636e' },
-              React.createElement('path', { d: 'M4.427 7.427l3.396 3.396a.25.25 0 00.354 0l3.396-3.396A.25.25 0 0011.396 7H4.604a.25.25 0 00-.177.427z' })
-            )
-          ),
-          agentMenu && React.createElement('div', {
-            style: {
-              position: 'absolute', top: '100%', left: 0, zIndex: 30, marginTop: '4px',
-              minWidth: '200px', background: '#ffffff', border: '1px solid #d0d7de',
-              borderRadius: '6px', boxShadow: '0 8px 24px rgba(140,149,159,0.2)', padding: '4px',
-            }
-          },
-            AGENTS.map(function(a) {
-              var isActive = activeAgent === a.id;
-              return React.createElement('div', {
-                key: a.id,
-                onClick: function() { setActiveAgent(a.id); setAgentMenu(false); },
-                style: {
-                  padding: '6px 8px', borderRadius: '4px', cursor: 'pointer',
-                  display: 'flex', alignItems: 'center', gap: '8px',
-                  background: isActive ? '#ddf4ff' : 'transparent',
-                  transition: 'background 80ms',
-                },
-                onMouseEnter: function(e) { if (!isActive) e.currentTarget.style.background = '#eaeef2'; },
-                onMouseLeave: function(e) { if (!isActive) e.currentTarget.style.background = isActive ? '#ddf4ff' : 'transparent'; },
-              },
-                React.createElement(AgentAvatar, { agent: a, size: 24 }),
-                React.createElement('div', { style: { flex: 1 } },
-                  React.createElement('div', { style: { fontSize: '13px', fontWeight: '600', color: '#1f2328' } }, a.name),
-                  React.createElement('div', { style: { fontSize: '11px', color: '#59636e' } }, a.ai)
-                ),
-                isActive && React.createElement('svg', { viewBox: '0 0 16 16', width: '14', height: '14', fill: '#0969da' },
-                  React.createElement('path', { d: 'M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z' })
-                )
-              );
-            })
-          )
-        ),
-        React.createElement('div', { style: { flex: 1 } }),
-        React.createElement('span', { style: { fontSize: '12px', color: '#818b98', fontWeight: '500' } }, 'System X1')
-      ),
+function ToolBadges({ tools }) {
+  if (!tools || tools.length === 0) return null;
+  return (
+    <div style={S.toolBadges}>
+      {tools.map(tool => {
+        const icons = { github:'&#128187;', npm:'&#128230;', stackoverflow:'&#128221;', web:'&#127760;', gmail:'&#128231;', calendar:'&#128197;' };
+        return <div key={tool} style={S.toolBadge('#B6BFB8')}><span dangerouslySetInnerHTML={{ __html: icons[tool]||'&#128196;' }} /><span>{tool}</span></div>;
+      })}
+    </div>
+  );
+}
 
-      // Messages
-      React.createElement('div', { ref: logRef, style: { flex: 1, overflow: 'auto', padding: '24px 20px' } },
-        msgs.length === 0 ?
-          React.createElement('div', { style: { height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '12px' } },
-            React.createElement('div', { style: { width: '56px', height: '56px', borderRadius: '50%', background: '#f6f8fa', border: '1px solid #d0d7de', display: 'flex', alignItems: 'center', justifyContent: 'center' } },
-              React.createElement('svg', { viewBox: '0 0 16 16', width: '24', height: '24', fill: '#818b98' },
-                React.createElement('path', { d: 'M8 0a8 8 0 110 16A8 8 0 018 0zM1.5 8a6.5 6.5 0 1013 0 6.5 6.5 0 00-13 0zm7.25-3.25v2.992l2.028.812a.75.75 0 01-.557 1.392l-2.5-1A.751.751 0 017.25 8.25v-3.5a.75.75 0 011.5 0z' })
-              )
-            ),
-            React.createElement('div', { style: { fontSize: '16px', fontWeight: '600', color: '#1f2328' } }, 'System X1'),
-            React.createElement('div', { style: { fontSize: '14px', color: '#59636e', maxWidth: '260px', textAlign: 'center', lineHeight: '1.5' } }, 'Escribe tu consulta. Puedo buscar en GitHub, npm, Stack Overflow y mas.')
-          )
-        :
-          React.createElement('div', { style: { maxWidth: '680px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '24px' } },
-            msgs.map(function(m) {
-              return React.createElement('div', { key: m.id, style: { display: 'flex', flexDirection: 'column', gap: '8px' } },
-                m.role === 'user' ?
-                  React.createElement('div', { style: { display: 'flex', justifyContent: 'flex-end' } },
-                    React.createElement('div', {
-                      style: {
-                        maxWidth: '70%', padding: '10px 14px', borderRadius: '16px 16px 4px 16px',
-                        background: '#ddf4ff', fontSize: '14px', lineHeight: '1.6', color: '#1f2328',
-                      }
-                    }, m.content)
-                  )
-                :
-                  React.createElement('div', { style: { display: 'flex', gap: '8px', alignItems: 'flex-start' } },
-                    React.createElement(AgentAvatar, { agent: agentById(m.agent), size: 20 }),
-                    React.createElement('div', { style: { flex: 1, minWidth: 0 } },
-                      React.createElement('div', { style: { fontSize: '12px', fontWeight: '600', color: '#59636e', marginBottom: '4px' } }, agentById(m.agent).name),
-                      m.status === 'thinking' ?
-                        React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 0' } },
-                          React.createElement('div', { style: { display: 'flex', gap: '4px' } },
-                            React.createElement('span', { style: { width: '6px', height: '6px', borderRadius: '50%', background: '#0969da', animation: 'pulse 1s infinite' } }),
-                            React.createElement('span', { style: { width: '6px', height: '6px', borderRadius: '50%', background: '#0969da', animation: 'pulse 1s infinite 0.2s' } }),
-                            React.createElement('span', { style: { width: '6px', height: '6px', borderRadius: '50%', background: '#0969da', animation: 'pulse 1s infinite 0.4s' } })
-                          ),
-                          React.createElement('span', { style: { fontSize: '12px', color: '#818b98' } }, 'Pensando...')
-                        )
-                      :
-                      m.status === 'done' && m.content ?
-                        React.createElement('div', { style: { fontSize: '14px', lineHeight: '1.7', color: '#1f2328' } },
-                          React.createElement('div', {
-                            style: {
-                              padding: '12px 16px', borderRadius: '4px',
-                              whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-                              borderLeft: '2px solid #d0d7de', paddingLeft: '14px',
-                            }
-                          }, m.content),
-                          m.toolsUsed && m.toolsUsed.length > 0 ?
-                            React.createElement('div', { style: { display: 'flex', gap: '4px', marginTop: '8px', flexWrap: 'wrap' } },
-                              m.toolsUsed.map(function(tool) {
-                                return React.createElement('span', {
-                                  key: tool,
-                                  style: {
-                                    display: 'inline-flex', alignItems: 'center', gap: '4px',
-                                    fontSize: '11px', padding: '2px 8px', borderRadius: '999px',
-                                    background: '#f6f8fa', border: '1px solid #d0d7de', color: '#59636e',
-                                  }
-                                },
-                                  React.createElement(ToolIcon, { tool: tool, size: 12 }),
-                                  tool
-                                );
-                              })
-                            )
-                          : null
-                        )
-                      : null
-                    )
-                  )
-              );
-            })
-          )
-      ),
+function AgentPicker({ selected, onSelect, onClose }) {
+  return (
+    <div style={S.agentPicker}>
+      <div style={S.agentPickerTitle}>Seleccionar agente</div>
+      {AGENTS.map(agent => (
+        <div key={agent.id} onClick={()=>{onSelect(agent.id);onClose();}} style={S.agentOption(selected===agent.id)}>
+          <div style={S.agentOptionAvatar(agent.color)}>{agent.letter}</div>
+          <div style={{flex:1}}>
+            <div style={S.agentOptionName}>{agent.name}</div>
+            <div style={S.agentOptionDesc}>{agent.ai} &middot; {agent.desc}</div>
+          </div>
+          {selected===agent.id && <div style={S.agentCheck}>&#10003;</div>}
+        </div>
+      ))}
+    </div>
+  );
+}
 
-      // Quick actions
-      React.createElement('div', { style: { padding: '0 20px 8px', display: 'flex', gap: '6px', flexWrap: 'wrap' } },
-        QUICK.map(function(q) {
-          return React.createElement('button', {
-            key: q.label,
-            onClick: function() { send(q.prompt); },
-            style: {
-              padding: '3px 10px', border: '1px solid #d0d7de', borderRadius: '999px',
-              background: '#ffffff', fontSize: '12px', color: '#59636e', cursor: 'pointer',
-              fontFamily: F, transition: 'background 80ms',
-            },
-            onMouseEnter: function(e) { e.currentTarget.style.background = '#f6f8fa'; },
-            onMouseLeave: function(e) { e.currentTarget.style.background = '#ffffff'; },
-          }, q.label);
-        })
-      ),
+function MessageBubble({ msg, onOpenRepo }) {
+  const isUser = msg.role === 'user';
+  const isSystem = msg.role === 'system';
+  if (isSystem) return <div style={S.systemBubble}><div style={S.systemPill}>{msg.content}</div></div>;
+  return (
+    <div style={S.msgRow(isUser)}>
+      {!isUser && <div style={S.agentAvatar(msg.agentColor||'#656d76')}>{msg.agentLetter||'X'}</div>}
+      <div style={S.bubble(isUser)}>
+        {msg.content}
+        {!isUser && msg.tools?.length>0 && <ToolBadges tools={msg.tools} />}
+        {!isUser && msg.process?.length>0 && <ProcessTimeline steps={msg.process} />}
+        {!isUser && msg.reasoning && <ReasoningPanel reasoning={msg.reasoning} />}
+        {!isUser && msg.agent && (
+          <div style={S.agentFooter}>
+            <div style={S.agentLabel}>Agente: {msg.agent}</div>
+            <div onClick={()=>onOpenRepo(msg.agentId)} style={S.agentLink}>Ver repositorio</div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
-      // Input
-      React.createElement('div', { style: { padding: '0 20px 16px' } },
-        React.createElement('div', {
-          style: {
-            display: 'flex', alignItems: 'flex-end', gap: '8px',
-            background: '#ffffff', border: '1px solid #d0d7de', borderRadius: '6px',
-            padding: '8px 12px',
-            transition: 'border-color 80ms',
-          },
-          onFocus: function(e) { e.currentTarget.style.borderColor = '#0969da'; },
-          onBlur: function(e) { e.currentTarget.style.borderColor = '#d0d7de'; },
-        },
-          React.createElement('textarea', {
-            value: text,
-            onChange: function(e) { setText(e.target.value); textRef.current = e.target.value; },
-            placeholder: 'Escribe tu mensaje...',
-            rows: 1,
-            style: {
-              flex: 1, border: 'none', outline: 'none', resize: 'none',
-              fontSize: '14px', fontFamily: F, lineHeight: '1.5',
-              background: 'transparent', minHeight: '22px', maxHeight: '100px', color: '#1f2328',
-            },
-            onKeyDown: function(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }
-          }),
-          React.createElement('button', {
-            onClick: function() { send(); },
-            disabled: !text.trim() || busy,
-            style: {
-              width: '28px', height: '28px', borderRadius: '6px',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              border: 'none', cursor: text.trim() && !busy ? 'pointer' : 'default',
-              background: text.trim() && !busy ? '#2da44e' : '#f6f8fa',
-              color: text.trim() && !busy ? '#ffffff' : '#818b98',
-              flexShrink: 0, transition: 'background 80ms',
-            }
-          },
-            React.createElement('svg', { viewBox: '0 0 16 16', width: '14', height: '14', fill: 'currentColor' },
-              React.createElement('path', { d: '.156 1.763a.75.75 0 011.028-.319l13.25 7.25a.75.75 0 010 1.314l-13.25 7.25a.75.75 0 01-1.028-.319.75.75 0 01-.003-.722L3.237 8 .153 2.485a.75.75 0 01.003-.722z' })
-            )
-          )
-        )
-      )
-    )
+export default function ChatView({ user, conversations, setConversations, activeConv, setActiveConv, onOpenRepo, selectedAgent, setSelectedAgent }) {
+  const [input, setInput] = useState('');
+  const [thinking, setThinking] = useState(false);
+  const [thinkingMsg, setThinkingMsg] = useState('');
+  const [showAgentPicker, setShowAgentPicker] = useState(false);
+  const messagesEndRef = useRef(null);
+  const inputRef = useRef(null);
+
+  const activeConvData = conversations.find(c => c.id === activeConv);
+  const messages = activeConvData?.messages || [];
+
+  useEffect(() => {
+    if (messagesEndRef.current) messagesEndRef.current.scrollIntoView({ behavior:'smooth' });
+  }, [messages, thinking]);
+
+  useEffect(() => {
+    if (inputRef.current) inputRef.current.focus();
+  }, [activeConv]);
+
+  function patchMsg(id, updater) {
+    setConversations(prev => prev.map(c => {
+      if (c.id !== id) return c;
+      return { ...c, messages: (c.messages||[]).map(m => m.id===id ? { ...m, ...updater(m) } : m) };
+    }));
+  }
+
+  async function handleSend() {
+    const q = input.trim();
+    if (!q || thinking) return;
+    setInput('');
+
+    let convId = activeConv;
+    let conv = conversations.find(c => c.id === convId);
+
+    if (!conv) {
+      const newId = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+      conv = { id: newId, title: q.substring(0, 40), messages: [], created: Date.now(), updated: Date.now() };
+      setConversations(prev => [conv, ...prev]);
+      convId = newId;
+      setActiveConv(newId);
+    }
+
+    const userMsg = { id: Date.now().toString(36)+Math.random().toString(36).slice(2,6), role:'user', content:q, ts:Date.now() };
+    setConversations(prev => prev.map(c => c.id===convId ? { ...c, messages:[...(c.messages||[]), userMsg], title:c.messages?.length===0?q.substring(0,40):c.title, updated:Date.now() } : c));
+
+    setThinking(true);
+    setThinkingMsg(THINKING_MESSAGES[0]);
+    const thinkTimer = setInterval(() => {
+      setThinkingMsg(prev => { const idx = THINKING_MESSAGES.indexOf(prev); return THINKING_MESSAGES[(idx+1)%THINKING_MESSAGES.length]; });
+    }, 2000);
+
+    try {
+      const result = await B.smartQuery(q, selectedAgent);
+      const msgId = Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+      const agent = AGENTS.find(a => a.id === (result.agent||selectedAgent));
+      const assistantMsg = {
+        id:msgId, role:'assistant', content:result.response||result.text||result, ts:Date.now(),
+        tools:result.tools||[], process:result.process||[], reasoning:result.reasoning||null,
+        agent:agent?.name||selectedAgent, agentId:agent?.id||selectedAgent,
+        agentLetter:agent?.letter||'?', agentColor:agent?.color||'#656d76',
+      };
+      setConversations(prev => prev.map(c => c.id===convId ? { ...c, messages:[...(c.messages||[]), assistantMsg], updated:Date.now() } : c));
+    } catch (e) {
+      const errMsg = { id:Date.now().toString(36)+Math.random().toString(36).slice(2,6), role:'assistant', content:'Error: '+(e.message||'No se pudo procesar'), ts:Date.now(), tools:[], process:[], reasoning:null };
+      setConversations(prev => prev.map(c => c.id===convId ? { ...c, messages:[...(c.messages||[]), errMsg], updated:Date.now() } : c));
+    } finally {
+      clearInterval(thinkTimer);
+      setThinking(false);
+      setThinkingMsg('');
+    }
+  }
+
+  function handleKeyDown(e) { if (e.key==='Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }
+
+  const currentAgent = AGENTS.find(a => a.id === selectedAgent);
+
+  return (
+    <div style={S.container}>
+      <div style={S.messages}>
+        {messages.length===0 && (
+          <div style={S.empty}>
+            <div style={S.emptyIcon}>&#128172;</div>
+            <div style={S.emptyTitle}>System X1</div>
+            <div style={S.emptyDesc}>Multiples agentes, cada uno con su propio repositorio y motor de IA especializado.</div>
+            <div style={S.agentPills}>
+              {AGENTS.filter(a=>a.id!=='auto').slice(0,4).map(a=>(
+                <div key={a.id} style={S.agentPill}><div style={S.agentPillDot(a.color)} />{a.name}</div>
+              ))}
+            </div>
+            <div style={S.emptyHint}>Escribe un mensaje para comenzar</div>
+          </div>
+        )}
+        {messages.map(msg=><MessageBubble key={msg.id} msg={msg} onOpenRepo={onOpenRepo} />)}
+        {thinking && (
+          <div style={S.thinking}>
+            <div style={S.agentAvatar(currentAgent?.color||'#656d76')}>{currentAgent?.letter||'?'}</div>
+            <div style={S.thinkingBubble}>
+              <div style={S.thinkingDots}>
+                {[0,1,2].map(i=><div key={i} style={S.thinkingDot(i)} />)}
+              </div>
+              <div style={S.thinkingText}>{thinkingMsg}</div>
+            </div>
+          </div>
+        )}
+        <div ref={messagesEndRef} />
+      </div>
+
+      {showAgentPicker && <AgentPicker selected={selectedAgent} onSelect={setSelectedAgent} onClose={()=>setShowAgentPicker(false)} />}
+
+      <div style={S.inputArea}>
+        <div style={S.inputRow}>
+          <div onClick={()=>setShowAgentPicker(!showAgentPicker)} style={S.agentBtn(currentAgent?.color||'#656d76')} title="Cambiar agente">
+            {currentAgent?.letter||'?'}
+          </div>
+          <div style={S.textarea}>
+            <textarea ref={inputRef} value={input} onChange={e=>setInput(e.target.value)} onKeyDown={handleKeyDown} placeholder="Escribe tu mensaje..." style={S.textareaInput} rows={1} />
+          </div>
+          <div onClick={handleSend} style={S.sendBtn(input.trim()&&!thinking)} title="Enviar">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M.989 8 .064 2.68a1.342 1.342 0 011.85-1.462l13.402 5.744a1.13 1.13 0 010 2.076L1.913 14.782a1.343 1.343 0 01-1.85-1.463L.99 8zm5.784-6.04l6.956 3.294-6.956 3.295-5.768-3.295 5.768-3.294z"/></svg>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }

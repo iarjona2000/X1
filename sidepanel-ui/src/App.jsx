@@ -1,177 +1,241 @@
-import * as React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import ChatView from './ChatView.jsx';
+import RepoView from './RepoView.jsx';
 import * as B from './backend.js';
-import { ChatView } from './ChatView.jsx';
-import { RepoView } from './RepoView.jsx';
 
-const F = "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif";
+const S = {
+  shell: { display:'flex', height:'100vh', background:'#101411', fontFamily:'"Mona Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif', color:'#B6BFB8', overflow:'hidden' },
+  sidebar: { width:48, minWidth:48, background:'#010409', borderRight:'1px solid #21262D', display:'flex', flexDirection:'column', alignItems:'center', padding:'12px 0', gap:4, position:'relative' },
+  sidebarBtn: (active) => ({ width:32, height:32, borderRadius:'var(--radius)', background:active?'#21262D':'transparent', border:active?'1px solid #30363D':'1px solid transparent', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', transition:'all 0.15s', color:active?'#E6EDF3':'#484F58', fontSize:14 }),
+  sidebarIcon: { width:20, height:20, objectFit:'contain' },
+  divider: { width:24, height:1, background:'#21262D', margin:'4px 0' },
+  topBar: { height:48, background:'#101411', borderBottom:'1px solid #21262D', display:'flex', alignItems:'center', padding:'0 16px', gap:12, flexShrink:0 },
+  topBarTitle: { fontSize:14, fontWeight:600, color:'#E6EDF3', letterSpacing:'-0.01em' },
+  topBarSubtitle: { fontSize:12, color:'#8B949E' },
+  convPanel: { width:240, borderRight:'1px solid #21262D', display:'flex', flexDirection:'column', background:'#101411' },
+  convHeader: { padding:12, borderBottom:'1px solid #21262D', display:'flex', alignItems:'center', justifyContent:'space-between' },
+  convLabel: { fontSize:11, fontWeight:600, color:'#8B949E', textTransform:'uppercase', letterSpacing:'0.5px' },
+  convNew: { width:24, height:24, borderRadius:'var(--radius)', background:'#0FBF3E', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', color:'#101411', fontSize:16, fontWeight:700, lineHeight:1, transition:'opacity 0.15s', padding:0, border:'none' },
+  convItem: (active) => ({ padding:'8px 12px', borderRadius:'var(--radius)', background:active?'#21262D':'transparent', border:active?'1px solid #30363D':'1px solid transparent', cursor:'pointer', marginBottom:2, transition:'all 0.15s', position:'relative' }),
+  convTitle: (active) => ({ fontSize:13, color:active?'#E6EDF3':'#B6BFB8', fontWeight:active?500:400, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', flex:1 }),
+  convActions: { display:'flex', gap:2, marginLeft:8 },
+  convAction: (color) => ({ width:20, height:20, borderRadius:4, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', fontSize:11, color:color||'#484F58', background:'transparent', border:'none', padding:0, transition:'color 0.15s' }),
+  main: { flex:1, display:'flex', flexDirection:'column', minWidth:0 },
+  settingsOverlay: { position:'absolute', bottom:52, left:0, background:'#161B22', border:'1px solid #30363D', borderRadius:12, padding:16, width:240, boxShadow:'0 8px 24px rgba(0,0,0,0.44)', zIndex:9999 },
+  settingsTitle: { fontSize:11, fontWeight:600, color:'#E6EDF3', marginBottom:12, borderBottom:'1px solid #21262D', paddingBottom:8, textTransform:'uppercase', letterSpacing:'0.5px' },
+  settingsUser: { display:'flex', alignItems:'center', gap:8, padding:'8px 0', borderBottom:'1px solid #21262D', marginBottom:8 },
+  settingsAvatar: { width:24, height:24, borderRadius:12, border:'1px solid #30363D' },
+  settingsName: { fontSize:12, color:'#E6EDF3', fontWeight:500 },
+  settingsLabel: { fontSize:11, color:'#8B949E' },
+  settingsHint: { fontSize:12, color:'#8B949E', marginBottom:12, lineHeight:1.5 },
+  settingsBtn: (color) => ({ padding:'8px 12px', borderRadius:'var(--radius)', border:`1px solid ${color}33`, background:'transparent', color:color, fontSize:12, fontWeight:500, cursor:'pointer', textAlign:'left', transition:'all 0.15s', width:'100%', fontFamily:'inherit' }),
+  deleteConfirm: { position:'absolute', top:40, left:12, background:'#161B22', border:'1px solid #30363D', borderRadius:8, padding:12, zIndex:9999, width:180 },
+  deleteText: { fontSize:12, color:'#8B949E', marginBottom:8 },
+  deleteBtns: { display:'flex', gap:6 },
+  deleteBtn: (bg, color, border) => ({ padding:'4px 10px', borderRadius:'var(--radius)', border:`1px solid ${border}`, background:bg, color:color, fontSize:11, cursor:'pointer', flex:1, fontFamily:'inherit', fontWeight:500 }),
+  content: { flex:1, display:'flex', overflow:'hidden' },
+};
 
-const OctocatSvg = ({ w = 16, h = 16, fill = '#656d76' }) => (
-  <svg viewBox="0 0 98 96" width={w} height={h} fill={fill}>
-    <path d="M48.854 0C21.839 0 0 22 0 49.217c0 21.756 13.993 40.172 33.405 46.69 2.427.49 3.316-1.059 3.316-2.362 0-1.141-.08-5.052-.08-9.127-13.59 2.934-16.42-5.867-16.42-5.867-2.184-5.704-5.42-7.17-5.42-7.17-4.448-3.015.324-3.015.324-3.015 4.934.326 7.523 5.052 7.523 5.052 4.367 7.496 11.404 5.378 14.235 4.074.404-3.178 1.699-5.378 3.074-6.6-10.839-1.141-22.243-5.378-22.243-24.283 0-5.378 1.94-9.778 5.014-13.2-.485-1.222-2.184-6.275.486-13.038 0 0 4.125-1.304 13.426 5.052a46.97 46.97 0 0 1 12.214-1.63c4.125 0 8.33.571 12.213 1.63 9.302-6.356 13.427-5.052 13.427-5.052 2.67 6.763.97 11.816.485 13.038 3.155 3.422 5.015 7.822 5.015 13.2 0 18.905-11.404 23.06-22.324 24.283 1.78 1.548 3.316 4.481 3.316 9.126 0 6.6-.08 11.897-.08 13.526 0 1.304.89 2.853 3.316 2.364 19.412-6.52 33.405-24.935 33.405-46.691C97.707 22 75.788 0 48.854 0z"/>
+const GITHUB_LOGO = (
+  <svg height="20" width="20" viewBox="0 0 16 16" fill="currentColor">
+    <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
   </svg>
 );
 
-const GoogleSvg = ({ w = 16, h = 16 }) => (
-  <svg viewBox="0 0 24 24" width={w} height={h}>
-    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
-    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
-    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-  </svg>
-);
+export default function App({ user }) {
+  const [tab, setTab] = useState('chat');
+  const [conversations, setConversations] = useState([]);
+  const [activeConv, setActiveConv] = useState(null);
+  const [showSettings, setShowSettings] = useState(false);
+  const [selectedAgent, setSelectedAgent] = useState('auto');
+  const [githubUser, setGithubUser] = useState(user);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(null);
+  const [showRenameConv, setShowRenameConv] = useState(null);
+  const [selectedRepoData, setSelectedRepoData] = useState(null);
+  const [showRepoFromChat, setShowRepoFromChat] = useState(false);
+  const settingsRef = useRef(null);
 
-const ChatIcon = ({ active }) => <svg viewBox="0 0 16 16" width="16" height="16" fill={active ? '#ffffff' : '#9198a0'}><path d="M1.5 2.75a.25.25 0 01.25-.25h8.5a.25.25 0 01.25.25v5.5a.25.25 0 01-.25.25h-3.5a.75.75 0 00-.53.22L3.5 11.44V9.25a.75.75 0 00-.75-.75h-1a.25.25 0 01-.25-.25v-5.5zM1.75 1A1.75 1.75 0 000 2.75v5.5C0 9.216.784 10 1.75 10H2v1.543a1.457 1.457 0 002.487 1.03L7.061 10h3.189A1.75 1.75 0 0012 8.25v-5.5A1.75 1.75 0 0010.25 1h-8.5z"/></svg>;
-
-const RepoIcon = ({ active }) => <svg viewBox="0 0 16 16" width="16" height="16" fill={active ? '#ffffff' : '#9198a0'}><path d="M2 2.5A2.5 2.5 0 014.5 0h8.75a.75.75 0 01.75.75v12.5a.75.75 0 01-.75.75h-2.5a.75.75 0 110-1.5h1.75v-2h-8a1 1 0 00-.714 1.7.75.75 0 01-1.072 1.05A2.495 2.495 0 012 11.5v-9zm10.5-1h-8a1 1 0 00-1 1v6.708A2.486 2.486 0 014.5 9h8V1.5z"/></svg>;
-
-let convSeq = 0;
-const convUid = () => ++convSeq;
-
-export default function App({ githubUser }) {
-  const [tab, setTab] = React.useState('chat');
-  const [conversations, setConversations] = React.useState([]);
-  const [activeConvId, setActiveConvId] = React.useState(null);
-  const [settingsOpen, setSettingsOpen] = React.useState(false);
-  const [googleStatus, setGoogleStatus] = React.useState(null);
-  const [githubStatus, setGithubStatus] = React.useState(null);
-  const settingsRef = React.useRef(null);
-
-  React.useEffect(() => {
-    const saved = B.loadConversations();
-    if (saved?.length) { setConversations(saved); setActiveConvId(saved[0].id); }
-    if (B.hasEngine()) { B.checkGoogleAuth().then(setGoogleStatus); B.checkGithubAuth().then(setGithubStatus); }
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('x1_conversations');
+      if (raw) { const d = JSON.parse(raw); if (Array.isArray(d) && d.length > 0) { setConversations(d); setActiveConv(d[0].id); } }
+    } catch (e) {}
   }, []);
 
-  React.useEffect(() => {
-    if (!settingsOpen) return;
-    const h = e => { if (settingsRef.current && !settingsRef.current.contains(e.target)) setSettingsOpen(false); };
-    document.addEventListener('mousedown', h);
-    return () => document.removeEventListener('mousedown', h);
-  }, [settingsOpen]);
+  useEffect(() => {
+    try { localStorage.setItem('x1_conversations', JSON.stringify(conversations.slice(0, 100))); } catch (e) {}
+  }, [conversations]);
 
-  const saveConvs = list => { setConversations(list); B.saveConversations(list); };
-  const createConversation = () => {
-    const c = { id: convUid(), title: 'Nueva conversacion', messages: [], tags: [], createdAt: Date.now(), updatedAt: Date.now(), agent: 'research' };
-    saveConvs([c, ...conversations]); setActiveConvId(c.id); setTab('chat');
-  };
-  const updateConversation = (id, patch) => {
-    setConversations(prev => { const list = prev.map(c => { if (c.id !== id) return c; var newMsgs = typeof patch.messages === 'function' ? patch.messages(c.messages || []) : patch.messages; return { ...c, ...patch, messages: newMsgs, updatedAt: Date.now() }; }); B.saveConversations(list); return list; });
-  };
-  const deleteConversation = id => {
-    const list = conversations.filter(c => c.id !== id); saveConvs(list);
-    if (activeConvId === id) setActiveConvId(list[0]?.id || null);
-  };
+  useEffect(() => {
+    function handleClick(e) {
+      if (settingsRef.current && !settingsRef.current.contains(e.target)) setShowSettings(false);
+      if (showRenameConv && !e.target.closest('[data-rename]')) setShowRenameConv(null);
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [showRenameConv]);
 
-  const activeConv = conversations.find(c => c.id === activeConvId);
+  function handleLogoutGithub() {
+    B.logoutGithub().then(() => { setGithubUser(null); localStorage.removeItem('x1_user'); window.location.reload(); });
+  }
+
+  function handleNewConversation() {
+    const newId = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    const newConv = { id: newId, title: 'Nueva conversacion', messages: [], created: Date.now(), updated: Date.now() };
+    setConversations(prev => [newConv, ...prev]);
+    setActiveConv(newId);
+  }
+
+  function handleDeleteConversation(id) {
+    setConversations(prev => {
+      const next = prev.filter(c => c.id !== id);
+      if (activeConv === id) setActiveConv(next.length > 0 ? next[0].id : null);
+      return next;
+    });
+    setShowDeleteConfirm(null);
+  }
+
+  function handleRenameConversation(id, title) {
+    setConversations(prev => prev.map(c => c.id === id ? { ...c, title } : c));
+    setShowRenameConv(null);
+  }
+
+  function handleLogout() {
+    localStorage.removeItem('x1_user');
+    localStorage.removeItem('x1_conversations');
+    B.logoutGithub().then(() => window.location.reload());
+  }
+
+  function handleOpenRepoFromChat(agentId) {
+    setSelectedRepoData({ agentId, source:'chat' });
+    setTab('repo');
+    setShowRepoFromChat(true);
+  }
 
   return (
-    <div style={{ display: 'flex', height: '100vh', width: '100%', minWidth: '420px', fontFamily: F, overflow: 'hidden', background: '#ffffff' }}>
+    <div style={S.shell}>
       {/* Sidebar */}
-      <div style={{
-        width: '48px', flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center',
-        padding: '8px 0', gap: '2px', borderRight: '1px solid #d0d7de', background: '#f6f8fa',
-      }}>
-        <div style={{ width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '8px' }}>
-          <img src="../dist/x1-logo.png" alt="X1" style={{ height: '24px', width: 'auto', objectFit: 'contain' }} onError={e => e.currentTarget.style.display='none'} />
+      <div style={S.sidebar}>
+        <div style={{ ...S.sidebarBtn(false), marginBottom:8, overflow:'hidden' }} title="System X1">
+          <img src={B.hasEngine()?'../assets/x1-logo.png':'assets/x1-logo.png'} style={S.sidebarIcon} alt="X1" onError={e=>{e.target.style.display='none';e.target.parentElement.innerHTML='<span style="font-size:12px;font-weight:700;color:#0FBF3E">X1</span>';}} />
         </div>
-        <button onClick={() => setTab('chat')} title="Chat" style={{
-          width: '32px', height: '32px', borderRadius: '6px', border: 'none',
-          background: tab === 'chat' ? '#0969da' : 'transparent', cursor: 'pointer',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          transition: 'background 80ms',
-        }}><ChatIcon active={tab === 'chat'} /></button>
-        <button onClick={() => setTab('repo')} title="Repositorio" style={{
-          width: '32px', height: '32px', borderRadius: '6px', border: 'none',
-          background: tab === 'repo' ? '#0969da' : 'transparent', cursor: 'pointer',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          transition: 'background 80ms',
-        }}><RepoIcon active={tab === 'repo'} /></button>
-        <div style={{ marginTop: 'auto' }} />
-        {githubUser?.avatar_url ? (
-          <img src={githubUser.avatar_url} alt={githubUser.login}
-            style={{ width: '28px', height: '28px', borderRadius: '50%', border: '1px solid #d0d7de', cursor: 'pointer', marginBottom: '4px', transition: 'border-color 80ms' }}
-            onClick={() => setSettingsOpen(v => !v)} title={githubUser.login}
-            onMouseEnter={e => e.currentTarget.style.borderColor = '#0969da'}
-            onMouseLeave={e => e.currentTarget.style.borderColor = '#d0d7de'} />
-        ) : (
-          <button onClick={() => setSettingsOpen(v => !v)} title="Cuenta" style={{
-            width: '32px', height: '32px', borderRadius: '6px', border: 'none', marginBottom: '4px',
-            background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <svg viewBox="0 0 16 16" width="16" height="16" fill="#9198a0"><path d="M10.561 8.073a6.005 6.005 0 013.432 5.142.75.75 0 11-1.498.07 4.5 4.5 0 00-8.99 0 .75.75 0 11-1.498-.07 6.004 6.004 0 013.431-5.142 3.999 3.999 0 115.123 0zM10.5 5a2.5 2.5 0 10-5 0 2.5 2.5 0 005 0z"/></svg>
-          </button>
-        )}
-      </div>
+        <div style={S.divider} />
+        <div style={S.sidebarBtn(tab==='chat')} onClick={()=>{setTab('chat')}} title="Chat">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M1.5 2.75a.25.25 0 01.25-.25h8.5a.25.25 0 01.25.25v5.5a.25.25 0 01-.25.25h-3.5a.75.75 0 00-.53.22L3.5 11.44V9.25a.75.75 0 00-.75-.75h-1a.25.25 0 01-.25-.25v-5.5zM1.75 1A1.75 1.75 0 000 2.75v5.5C0 9.216.784 10 1.75 10H2v1.543a1.457 1.457 0 002.487 1.03L7.061 10h3.189A1.75 1.75 0 0012 8.25v-5.5A1.75 1.75 0 0010.25 1h-8.5zM14.5 4.75a.25.25 0 00-.25-.25h-.5a.75.75 0 110-1.5h.5c.966 0 1.75.784 1.75 1.75v5.5A1.75 1.75 0 0114.25 12H14v1.543a1.457 1.457 0 01-2.487 1.03L9.22 12.28a.75.75 0 111.06-1.06l2.22 2.22v-2.19a.75.75 0 01.75-.75h1a.25.25 0 00.25-.25v-5.5z"/></svg>
+        </div>
+        <div style={S.sidebarBtn(tab==='repo')} onClick={()=>{setTab('repo');setShowRepoFromChat(false)}} title="Repositorios">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M2 2.5A2.5 2.5 0 014.5 0h8.75a.75.75 0 01.75.75v12.5a.75.75 0 01-.75.75h-2.5a.75.75 0 110-1.5h1.75v-2h-8a1 1 0 00-.714 1.7.75.75 0 01-1.072 1.05A2.495 2.495 0 012 11.5v-9zm10.5-1h-8a1 1 0 00-1 1v6.708A2.486 2.486 0 014.5 9h8V1.5zM5 12.25v3.25a.25.25 0 00.4.2l1.45-1.087a.25.25 0 01.3 0L8.6 15.7a.25.25 0 00.4-.2v-3.25a.25.25 0 00-.25-.25h-3.5a.25.25 0 00-.25.25z"/></svg>
+        </div>
 
-      {/* Main */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden' }}>
-        {tab === 'chat' ? (
-          <ChatView conversations={conversations} activeConv={activeConv} onSelectConv={setActiveConvId} onCreateConv={createConversation} onUpdateConv={updateConversation} onDeleteConv={deleteConversation} />
-        ) : (
-          <RepoView conversations={conversations} githubUser={githubUser} />
-        )}
-      </div>
-
-      {/* Settings */}
-      {settingsOpen && (
-        <>
-          <div style={{ position: 'fixed', inset: 0, zIndex: 99 }} onClick={() => setSettingsOpen(false)} />
-          <div ref={settingsRef} style={{
-            position: 'fixed', bottom: '48px', right: '12px', zIndex: 100,
-            width: '300px', background: '#ffffff', border: '1px solid #d0d7de', borderRadius: '6px',
-            boxShadow: '0 8px 24px rgba(140,149,159,0.2)', overflow: 'hidden',
-          }}>
-            {githubUser && (
-              <div style={{ padding: '16px', borderBottom: '1px solid #d0d7de', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                {githubUser.avatar_url ? (
-                  <img src={githubUser.avatar_url} alt="" style={{ width: '40px', height: '40px', borderRadius: '50%', border: '1px solid #d0d7de' }} />
-                ) : (
-                  <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#f6f8fa', border: '1px solid #d0d7de', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <svg viewBox="0 0 16 16" width="16" height="16" fill="#9198a0"><path d="M10.561 8.073a6.005 6.005 0 013.432 5.142.75.75 0 11-1.498.07 4.5 4.5 0 00-8.99 0 .75.75 0 11-1.498-.07 6.004 6.004 0 013.431-5.142 3.999 3.999 0 115.123 0zM10.5 5a2.5 2.5 0 10-5 0 2.5 2.5 0 005 0z"/></svg>
+        <div style={{ position:'absolute', bottom:12, display:'flex', flexDirection:'column', alignItems:'center', gap:4 }}>
+          <div style={{ position:'relative' }} ref={settingsRef}>
+            <div style={S.sidebarBtn(false)} onClick={()=>setShowSettings(!showSettings)} title="Configuraciones">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0a8.2 8.2 0 01.701.031C9.444.095 9.99.645 10.16 1.29l.288 1.107c.018.066.079.158.212.224.231.114.454.243.668.386.123.082.233.09.3.071L12.44 2.4c.766-.207 1.563.14 1.933.867l.59 1.142a1.015 1.015 0 01-.163 1.201l-.893.835c-.004.004-.01.016-.01.031 0 .105.046.21.129.291l.648.648a.25.25 0 010 .354l-.648.648a.482.482 0 00-.129.291c0 .015.006.027.01.031l.893.835a1.015 1.015 0 01.163 1.201l-.59 1.142c-.37.727-1.167 1.074-1.933.867l-1.073-.285a.75.75 0 00-.3-.071c-.214.143-.437.272-.668.386-.133.066-.194.158-.212.224l-.288 1.107c-.17.645-.716 1.195-1.459 1.26a8.006 8.006 0 01-1.402 0c-.743-.065-1.289-.615-1.459-1.26l-.288-1.107a.75.75 0 00-.212-.224c-.231-.114-.454-.243-.668-.386a.75.75 0 00-.3-.071l-1.073.285c-.766.207-1.563-.14-1.933-.867l-.59-1.142a1.015 1.015 0 01.163-1.201l.893-.835c.004-.004.01-.016.01-.031a.482.482 0 00-.129-.291l-.648-.648a.25.25 0 010-.354l.648-.648a.482.482 0 00.129-.291c0-.015-.006-.027-.01-.031l-.893-.835a1.015 1.015 0 01-.163-1.201l.59-1.142c.37-.727 1.167-1.074 1.933-.867l1.073.285a.75.75 0 00.3-.071c.214-.143.437-.272.668-.386.133-.066.194-.158.212-.224L10.16 1.29C10.33.645 10.876.095 11.599.031A8.2 8.2 0 018 0zM5.028 4.076C5.16 4.025 5.4 4 5.75 4h4.5c.35 0 .59.025.722.076.065.024.11.054.142.085a.75.75 0 01.18.253l.35 1.05a2.246 2.246 0 00-.432-.392l-.35-.35a.75.75 0 01-.106-.975c.097-.097.224-.171.359-.232a2 2 0 00-.359-.232.75.75 0 01.106-.975l.35-.35a.75.75 0 01.975-.106c.135.061.262.135.359.232a2 2 0 00.359-.232.75.75 0 01.975.106l.35.35c.117.117.188.257.217.392l.35 1.05a.75.75 0 01-.18.253c-.032.031-.077.061-.142.085C10.25 6.975 10.01 7 9.66 7h-4.5a.75.75 0 01-.722-.565l-.35-1.05a.75.75 0 01.18-.253c.032-.031.077-.061.142-.085z"/></svg>
+            </div>
+            {showSettings && (
+              <div style={S.settingsOverlay}>
+                <div style={S.settingsTitle}>Configuraciones</div>
+                {githubUser && (
+                  <div style={S.settingsUser}>
+                    {githubUser.avatar_url && <img src={githubUser.avatar_url} style={S.settingsAvatar} alt="" />}
+                    <div>
+                      <div style={S.settingsName}>{githubUser.login || githubUser.name || 'GitHub'}</div>
+                      <div style={S.settingsLabel}>Conectado</div>
+                    </div>
                   </div>
                 )}
-                <div>
-                  <div style={{ fontSize: '14px', fontWeight: '600', color: '#1f2328' }}>{githubUser.name || githubUser.login}</div>
-                  <div style={{ fontSize: '12px', color: '#59636e' }}>@{githubUser.login}</div>
+                <div style={S.settingsHint}>
+                  <div style={{marginBottom:4}}><span style={{color:'#0FBF3E'}}>&#9679;</span> Busca repos en la barra de arriba</div>
+                  <div style={{marginBottom:4}}><span style={{color:'#0FBF3E'}}>&#9679;</span> Haz clic en repos para ver contenido</div>
+                  <div><span style={{color:'#0FBF3E'}}>&#9679;</span> Cada repo tiene su propio README.md</div>
+                </div>
+                <div style={{display:'flex',flexDirection:'column',gap:4}}>
+                  <button onClick={handleLogoutGithub} style={S.settingsBtn('#F85149')}>Desconectar GitHub</button>
+                  <button onClick={handleLogout} style={S.settingsBtn('#F85149')}>Cerrar sesion</button>
                 </div>
               </div>
             )}
-            <div style={{ padding: '8px' }}>
-              <div style={{ padding: '8px 12px', borderRadius: '6px', marginBottom: '4px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                  <GoogleSvg /> <span style={{ flex: 1, fontSize: '14px', fontWeight: '500', color: '#1f2328' }}>Google</span>
-                  <span style={{ fontSize: '12px', color: googleStatus ? '#1a7f37' : '#59636e', fontWeight: '500' }}>{googleStatus ? 'Conectado' : 'Desconectado'}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div style={S.main}>
+        {/* Top Bar */}
+        <div style={S.topBar}>
+          <div style={{flex:1, display:'flex', alignItems:'center', gap:10}}>
+            {tab==='chat' && (
+              <>
+                <div style={{width:28,height:28,borderRadius:6,background:'#0FBF3E',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                  <img src={B.hasEngine()?'../assets/x1-logo.png':'assets/x1-logo.png'} style={{width:16,height:16,objectFit:'contain'}} alt="X1" onError={e=>{e.target.style.display='none';}} />
                 </div>
-                <button onClick={googleStatus ? async () => { await B.logoutGoogle(); setGoogleStatus(false); } : async () => { const ok = await B.loginGoogle(); if (ok) setGoogleStatus(true); }}
-                  style={{ width: '100%', padding: '5px 12px', borderRadius: '6px', border: '1px solid #d0d7de', background: '#f6f8fa', fontSize: '12px', fontWeight: '500', cursor: 'pointer', color: '#24292f' }}>
-                  {googleStatus ? 'Desconectar' : 'Conectar'}
-                </button>
+                <div>
+                  <div style={S.topBarTitle}>System X1</div>
+                  <div style={S.topBarSubtitle}>Multiples agentes. Un solo sistema.</div>
+                </div>
+              </>
+            )}
+            {tab==='repo' && (
+              <>
+                <div style={{width:28,height:28,borderRadius:6,background:'#21262D',display:'flex',alignItems:'center',justifyContent:'center',color:'#E6EDF3'}}>
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M2 2.5A2.5 2.5 0 014.5 0h8.75a.75.75 0 01.75.75v12.5a.75.75 0 01-.75.75h-2.5a.75.75 0 110-1.5h1.75v-2h-8a1 1 0 00-.714 1.7.75.75 0 01-1.072 1.05A2.495 2.495 0 012 11.5v-9zm10.5-1h-8a1 1 0 00-1 1v6.708A2.486 2.486 0 014.5 9h8V1.5zM5 12.25v3.25a.25.25 0 00.4.2l1.45-1.087a.25.25 0 01.3 0L8.6 15.7a.25.25 0 00.4-.2v-3.25a.25.25 0 00-.25-.25h-3.5a.25.25 0 00-.25.25z"/></svg>
+                </div>
+                <div>
+                  <div style={S.topBarTitle}>{githubUser ? githubUser.login+'/' : ''}repositorios</div>
+                  <div style={S.topBarSubtitle}>Repositorios de agentes y datos locales</div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Content Area */}
+        <div style={S.content}>
+          {/* Conversations List */}
+          {tab==='chat' && (
+            <div style={S.convPanel}>
+              <div style={S.convHeader}>
+                <div style={S.convLabel}>Conversaciones</div>
+                <div onClick={handleNewConversation} style={S.convNew} title="Nueva conversacion">+</div>
               </div>
-              <div style={{ padding: '8px 12px', borderRadius: '6px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                  <OctocatSvg /> <span style={{ flex: 1, fontSize: '14px', fontWeight: '500', color: '#1f2328' }}>GitHub</span>
-                  <span style={{ fontSize: '12px', color: githubStatus ? '#1a7f37' : '#59636e', fontWeight: '500' }}>{githubStatus ? 'Conectado' : 'Desconectado'}</span>
-                </div>
-                <button onClick={githubStatus ? async () => { await B.logoutGithub(); setGithubStatus(false); } : function() {
-                  B.startGithubDeviceFlow().then(function(flow) {
-                    window.open(flow.verification_uri, 'github-device');
-                    return B.pollGithubToken(flow.device_code);
-                  }).then(function(token) {
-                    return B.fetchGithubUser(token);
-                  }).then(function(user) {
-                    if (user && user.login) setGithubStatus(true);
-                  }).catch(function(e) {
-                    console.error('[X1] GitHub connect error:', e);
-                  });
-                }}
-                  style={{ width: '100%', padding: '5px 12px', borderRadius: '6px', border: '1px solid #d0d7de', background: '#f6f8fa', fontSize: '12px', fontWeight: '500', cursor: 'pointer', color: '#24292f' }}>
-                  {githubStatus ? 'Desconectar' : 'Conectar'}
-                </button>
+              <div style={{flex:1,overflow:'auto',padding:8}}>
+                {conversations.map(c => (
+                  <div key={c.id} onClick={()=>setActiveConv(c.id)} style={S.convItem(activeConv===c.id)}>
+                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+                      <div style={S.convTitle(activeConv===c.id)}>{c.title}</div>
+                      <div style={S.convActions}>
+                        <div onClick={e=>{e.stopPropagation();setShowRenameConv({id:c.id,title:c.title})}} style={S.convAction()} title="Renombrar">&#9998;</div>
+                        <div onClick={e=>{e.stopPropagation();setShowDeleteConfirm(c.id)}} style={S.convAction('#F85149')} title="Eliminar">&#128465;</div>
+                      </div>
+                    </div>
+                    {showDeleteConfirm===c.id && (
+                      <div style={S.deleteConfirm}>
+                        <div style={S.deleteText}>Eliminar conversacion?</div>
+                        <div style={S.deleteBtns}>
+                          <button onClick={e=>{e.stopPropagation();handleDeleteConversation(c.id)}} style={S.deleteBtn('#F8514922','#F85149','#F8514966')}>Eliminar</button>
+                          <button onClick={e=>{e.stopPropagation();setShowDeleteConfirm(null)}} style={S.deleteBtn('transparent','#8B949E','#30363D')}>Cancelar</button>
+                        </div>
+                      </div>
+                    )}
+                    {showRenameConv?.id===c.id && (
+                      <div data-rename style={{position:'absolute',top:40,left:12,right:12,background:'#161B22',border:'1px solid #30363D',borderRadius:8,padding:12,zIndex:9999}}>
+                        <input defaultValue={showRenameConv.title} onKeyDown={e=>{if(e.key==='Enter')handleRenameConversation(c.id,e.target.value)}} autoFocus style={{width:'100%',padding:'6px 10px',borderRadius:'var(--radius)',border:'1px solid #30363D',background:'#0D1117',color:'#E6EDF3',fontSize:12,fontFamily:'inherit',outline:'none'}} />
+                      </div>
+                    )}
+                  </div>
+                ))}
+                {conversations.length===0 && <div style={{fontSize:12,color:'#484F58',textAlign:'center',padding:20}}>No hay conversaciones</div>}
               </div>
             </div>
+          )}
+
+          {/* Main Panel */}
+          <div style={{flex:1,display:'flex',flexDirection:'column',minWidth:0}}>
+            {tab==='chat' && <ChatView user={githubUser} conversations={conversations} setConversations={setConversations} activeConv={activeConv} setActiveConv={setActiveConv} onOpenRepo={handleOpenRepoFromChat} selectedAgent={selectedAgent} setSelectedAgent={setSelectedAgent} />}
+            {tab==='repo' && <RepoView user={githubUser} selectedRepoData={selectedRepoData} showRepoFromChat={showRepoFromChat} setShowRepoFromChat={setShowRepoFromChat} />}
           </div>
-        </>
-      )}
+        </div>
+      </div>
     </div>
   );
 }
