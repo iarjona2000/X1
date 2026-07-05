@@ -74,3 +74,51 @@ a{color:var(--gh-green);text-decoration:none}
 a:hover{text-decoration:underline}
 
 ::selection{background:rgba(15,191,62,0.25);color:var(--gh-text-primary)}
+
+/* ── Interlineado y espaciado global del sidepanel ── */
+/* Aire entre lineas de texto */
+#root{line-height:1.7}
+
+/* Espaciado entre bloques principales */
+.x1-block{padding:14px 18px;margin-bottom:10px}
+.x1-section{padding:16px 0}
+
+/* Mensajes del chat: mas aire entre lineas y entre burbujas */
+.x1-msg-user,.x1-msg-ai{
+  line-height:1.85 !important;
+  padding:14px 18px !important;
+  margin-bottom:6px;
+}
+
+/* Panel del juez (reasoning) mas espaciado */
+.x1-judge{
+  padding:14px 16px !important;
+  line-height:1.7;
+}
+
+/* Inputs y textareas con mas respiratory */
+textarea,input{
+  line-height:1.6;
+  padding:10px 14px;
+}
+
+/* Etiquetas y sub-textos no tan pegados */
+.x1-label{line-height:1.6;margin-bottom:6px}
+.x1-sub{line-height:1.5}
+
+/* Step cards del timeline con mas aire */
+.x1-step{padding:8px 12px;line-height:1.5}
+
+/* Header del chat mas espaciado */
+.x1-header{padding:14px 18px !important}
+
+/* Conversaciones sidebar items mas aire */
+.x1-conv-item{padding:14px 12px !important;margin-bottom:8px !important}
+
+/* Inputs bar con linea de aire */
+.x1-input-bar{padding:6px 20px 18px !important}
+
+/* Quick actions chips con mas padding */
+.x1-chip{padding:6px 14px !important;margin:4px !important}
+
+#root p,#root span,#root div{line-height:1.65}
