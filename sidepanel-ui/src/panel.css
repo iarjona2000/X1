@@ -75,10 +75,6 @@ a:hover{text-decoration:underline}
 
 ::selection{background:rgba(15,191,62,0.25);color:var(--gh-text-primary)}
 
-div[style*="flex-direction: column"]{
-  gap: 24px !important;
-}
-
 /* ── Interlineado y espaciado global del sidepanel ── */
 /* Aire entre lineas de texto */
 #root{line-height:1.7}

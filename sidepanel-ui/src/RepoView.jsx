@@ -180,24 +180,42 @@ export function RepoView({ conversations, githubUser }) {
               </div>
             </div>
 
-            {/* Filter chips */}
-            <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', flexWrap: 'wrap' }}>
+            {/* Filter chips — estilo GitHub Primer: UnderlineNav horizontal */}
+            <div role="nav" style={{
+              display: 'flex', gap: 0, marginBottom: 24, flexWrap: 'wrap',
+              borderBottom: '1px solid #d0d7de',
+              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif',
+            }}>
               {[
                 { id: 'all', label: 'Todo' },
                 { id: 'conversation', label: 'Conversaciones' },
                 { id: 'code', label: 'Codigo' },
                 { id: 'data', label: 'Datos' },
                 { id: 'note', label: 'Notas' },
-              ].map(cat => (
-                <button key={cat.id} onClick={() => setCategory(cat.id)} style={{
-                  padding: '6px 16px', borderRadius: '999px',
-                  border: '1px solid ' + (category === cat.id ? '#0969da' : '#d0d7de'),
-                  background: category === cat.id ? '#ddf4ff' : '#ffffff',
-                  color: category === cat.id ? '#0969da' : '#59636e',
-                  fontSize: '12px', fontWeight: '500', cursor: 'pointer',
-                  transition: 'all 80ms', lineHeight: '1.5',
-                }}>{cat.label}</button>
-              ))}
+              ].map(cat => {
+                var active = category === cat.id;
+                return (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => setCategory(cat.id)}
+                    aria-current={active ? 'page' : undefined}
+                    style={{
+                      padding: '8px 16px',
+                      background: 'transparent',
+                      border: 'none',
+                      borderBottom: active ? '2px solid #fd8c73' : '2px solid transparent',
+                      marginBottom: active ? '-1px' : 0,
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      fontWeight: active ? 600 : 400,
+                      color: active ? '#1f2328' : '#59636e',
+                      transition: 'color 80ms, border-bottom 80ms',
+                      fontFamily: 'inherit',
+                    }}
+                  >{cat.label}</button>
+                );
+              })}
             </div>
 
             {/* Items list */}
@@ -215,7 +233,7 @@ export function RepoView({ conversations, githubUser }) {
                 )}
               </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                 {items.map(item => {
                   const tc = TAG_COLORS[item.tags[0]] || TAG_COLORS.Nota;
                   return (
