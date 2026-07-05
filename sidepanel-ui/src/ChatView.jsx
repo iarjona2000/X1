@@ -18,7 +18,7 @@ function timeAgo(ts) {
 }
 
 const AGENTS = [
-  { id: 'auto',     name: 'X1',         ai: 'Mascota',     letter: 'X', color: '#0969da', aiIcon: 'dist/x1-mascot.png' },
+  { id: 'auto',     name: 'AUTO',      ai: 'Automatico',   letter: 'A', color: '#0969da', aiIcon: 'dist/x1-logo.png' },
   { id: 'research',  name: 'Research',  ai: 'Gemini',       letter: 'R', color: '#4285f4', aiIcon: '../assets/ai/googlegemini.svg' },
   { id: 'writer',    name: 'Writer',    ai: 'Claude',       letter: 'W', color: '#d97706', aiIcon: '../assets/ai/anthropic.svg' },
   { id: 'developer', name: 'Developer', ai: 'GPT-4o',       letter: 'D', color: '#10a37f', aiIcon: '../assets/ai/openai.svg' },
