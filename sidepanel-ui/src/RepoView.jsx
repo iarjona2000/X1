@@ -215,35 +215,35 @@ export function RepoView({ conversations, githubUser }) {
                 )}
               </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {items.map(item => {
                   const tc = TAG_COLORS[item.tags[0]] || TAG_COLORS.Nota;
                   return (
                     <div key={item.id} style={{
-                      padding: '18px 20px', background: '#ffffff',
+                      padding: '14px 18px', background: '#ffffff',
                       border: '1px solid #d0d7de', borderRadius: '8px',
-                      cursor: 'pointer', lineHeight: '1.8',
+                      cursor: 'pointer', lineHeight: '1.7',
                       transition: 'background 80ms, border-color 80ms',
                     }}
                       onMouseEnter={e => { e.currentTarget.style.background = '#f6f8fa'; e.currentTarget.style.borderColor = '#0969da'; }}
                       onMouseLeave={e => { e.currentTarget.style.background = '#ffffff'; e.currentTarget.style.borderColor = '#d0d7de'; }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', lineHeight: '1.6' }}>
                         <div style={{
-                          width: '18px', height: '18px', borderRadius: '3px',
+                          width: '16px', height: '16px', borderRadius: '3px',
                           background: item.tags[0] ? tc.bg : '#f3f4f6',
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
                           flexShrink: 0,
                         }}>
-                          <div style={{ width: '10px', height: '10px', borderRadius: '2px', background: item.tags[0] ? tc.fg : '#818b98' }} />
+                          <div style={{ width: '8px', height: '8px', borderRadius: '2px', background: item.tags[0] ? tc.fg : '#818b98' }} />
                         </div>
                         <span style={{ fontSize: '14px', fontWeight: '600', color: '#0969da', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: '1.6' }}>{item.title}</span>
                         <span style={{ fontSize: '12px', color: '#59636e', flexShrink: 0, lineHeight: '1.6' }}>{item.count} msg{item.count !== 1 ? 's' : ''}</span>
                         <span style={{ fontSize: '12px', color: '#818b98', flexShrink: 0, lineHeight: '1.6' }}>{timeAgo(item.updatedAt)}</span>
                       </div>
                       {item.preview && (
-                        <div style={{ fontSize: '13px', color: '#59636e', marginTop: '12px', marginLeft: '30px',
-                          lineHeight: '1.8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.preview}</div>
+                        <div style={{ fontSize: '13px', color: '#59636e', marginTop: '10px', marginLeft: '26px',
+                          lineHeight: '1.85', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.preview}</div>
                       )}
                     </div>
                   );
@@ -383,8 +383,8 @@ export function RepoView({ conversations, githubUser }) {
                 </div>
 
                 {/* Data flow */}
-                <div style={{ marginBottom: '24px' }}>
-                  <h3 style={{ fontSize: '14px', fontWeight: '600', color: '#1f2328', marginBottom: '12px', padding: '0 0 10px', borderBottom: '1px solid #d0d7de', lineHeight: '1.6' }}>
+                <div style={{ marginBottom: '20px' }}>
+                  <h3 style={{ fontSize: '14px', fontWeight: '600', color: '#1f2328', marginBottom: '10px', padding: '0 0 8px', borderBottom: '1px solid #d0d7de', lineHeight: '1.6' }}>
                     Flujo de datos
                   </h3>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -396,13 +396,13 @@ export function RepoView({ conversations, githubUser }) {
                       { step: '5', title: 'Almacenamiento', desc: 'La conversacion se guarda en tu repositorio local y GitHub', color: '#cf222e' },
                     ].map(function(item) {
                       return (
-                        <div key={item.step} style={{ display: 'flex', alignItems: 'flex-start', gap: '14px', padding: '14px 16px', border: '1px solid #d0d7de', borderRadius: '6px', background: '#ffffff', lineHeight: '1.7' }}>
-                          <div style={{ width: '32px', height: '32px', borderRadius: '6px', background: item.color + '15', border: '1px solid ' + item.color + '30', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: '13px', fontWeight: '700', color: item.color }}>
+                        <div key={item.step} style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '12px 14px', border: '1px solid #d0d7de', borderRadius: '6px', background: '#ffffff', lineHeight: '1.7' }}>
+                          <div style={{ width: '30px', height: '30px', borderRadius: '6px', background: item.color + '15', border: '1px solid ' + item.color + '30', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: '13px', fontWeight: '700', color: item.color }}>
                             {item.step}
                           </div>
-                          <div style={{ flex: 1, lineHeight: '1.7' }}>
-                            <div style={{ fontSize: '14px', fontWeight: '600', color: '#1f2328', marginBottom: '6px', lineHeight: '1.6' }}>{item.title}</div>
-                            <div style={{ fontSize: '13px', color: '#59636e', lineHeight: '1.9' }}>{item.desc}</div>
+                          <div style={{ flex: 1, lineHeight: '1.75' }}>
+                            <div style={{ fontSize: '14px', fontWeight: '600', color: '#1f2328', marginBottom: '4px', lineHeight: '1.5' }}>{item.title}</div>
+                            <div style={{ fontSize: '13px', color: '#59636e', lineHeight: '1.8' }}>{item.desc}</div>
                           </div>
                         </div>
                       );
