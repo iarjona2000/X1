@@ -53,6 +53,12 @@ export default function App({ githubUser }) {
   const createConversation = () => {
     const c = { id: convUid(), title: 'Nueva conversacion', messages: [], tags: [], createdAt: Date.now(), updatedAt: Date.now(), agent: 'research' };
     saveConvs([c, ...conversations]); setActiveConvId(c.id); setTab('chat');
+    return c;
+  };
+  const ensureConversation = () => {
+    const current = conversations.find(c => c.id === activeConvId);
+    if (current) return current;
+    return createConversation();
   };
   const updateConversation = (id, patch) => {
     setConversations(prev => { const list = prev.map(c => { if (c.id !== id) return c; var newMsgs = typeof patch.messages === 'function' ? patch.messages(c.messages || []) : patch.messages; return { ...c, ...patch, messages: newMsgs, updatedAt: Date.now() }; }); B.saveConversations(list); return list; });
@@ -106,7 +112,7 @@ export default function App({ githubUser }) {
       {/* Main */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden' }}>
         {tab === 'chat' ? (
-          <ChatView conversations={conversations} activeConv={activeConv} onSelectConv={setActiveConvId} onCreateConv={createConversation} onUpdateConv={updateConversation} onDeleteConv={deleteConversation} />
+          <ChatView conversations={conversations} activeConv={activeConv} onSelectConv={setActiveConvId} onCreateConv={createConversation} onEnsureConv={ensureConversation} onUpdateConv={updateConversation} onDeleteConv={deleteConversation} />
         ) : (
           <RepoView conversations={conversations} githubUser={githubUser} />
         )}

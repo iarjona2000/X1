@@ -25,8 +25,62 @@ export function getBestAgent(query) {
   if (/marketing|ventas|campana|seo/.test(t)) return 'marketing';
   if (/finanzas|inversion|budget|dinero|stock/.test(t)) return 'finance';
   if (/legal|contrato|ley/.test(t)) return 'legal';
-  if (/escribir|texto|articul|blog|contenido/.test(t)) return 'writer';
+  if (/escribir|texto|articul|blog|contenido|documento|\bdoc\b|informe|carta|resume|resumen|ensayo|guion|guión|presentacion|presentación|slide|crea|genera|redacta/.test(t)) return 'writer';
   return 'research';
+}
+
+var SECTOR_BY_AGENT = {
+  developer: 'Desarrollo',
+  email:     'Comunicacion',
+  meeting:   'Reuniones',
+  marketing: 'Marketing',
+  finance:   'Finanzas',
+  legal:     'Legal',
+  writer:    'Redaccion',
+  research:  'Investigacion'
+};
+
+export function detectSector(query) {
+  return SECTOR_BY_AGENT[getBestAgent(query)] || 'Investigacion';
+}
+
+export function sectorForAgent(agentId) {
+  return SECTOR_BY_AGENT[agentId] || 'Investigacion';
+}
+
+export function getJudgeReason(query, agentId) {
+  var t = query.toLowerCase();
+  var agent = AGENTS.find(function(a) { return a.id === agentId; });
+  var name = agent ? agent.name : agentId;
+  var sector = sectorForAgent(agentId);
+  var prefix = 'Sector detectado: ' + sector + '. ';
+  return prefix + getJudgeReasonBody(t, name);
+}
+
+function getJudgeReasonBody(t, name) {
+
+  if (/codigo|code|programa|funcion|componente|react|debug|script|api|html|css|bug|error/.test(t)) {
+    return 'Detecte terminos de programacion y desarrollo. Selecciono ' + name + ' porque GPT-4o es el mas fuerte en generacion y analisis de codigo. Herramientas: busqueda en GitHub y npm para encontrar repos y paquetes relevantes.';
+  }
+  if (/email|correo|gmail|mensaje|redacta/.test(t)) {
+    return 'Detecte intencion de comunicacion por correo. Selecciono ' + name + ' porque Llama esta optimizado para redaccion de emails profesionales. Herramientas: acceso a Gmail para contexto de mensajes anteriores.';
+  }
+  if (/reunion|meeting|calendario|agenda/.test(t)) {
+    return 'Detecte contexto de reunion o calendario. Selecciono ' + name + ' porque Gemini tiene mejor integracion con Google Calendar. Herramientas: lectura de calendario y preparacion de agenda.';
+  }
+  if (/marketing|ventas|campana|seo/.test(t)) {
+    return 'Detecte terminos de marketing y ventas. Selecciono ' + name + ' porque Gemini analiza tendencias de mercado. Herramientas: busqueda web para datos de mercado y competencia.';
+  }
+  if (/finanzas|inversion|budget|dinero|stock/.test(t)) {
+    return 'Detecte contexto financiero. Selecciono ' + name + ' porque Claude analiza datos numericos con precision. Herramientas: busqueda de datos financieros y cotizaciones.';
+  }
+  if (/legal|contrato|ley/.test(t)) {
+    return 'Detecte terminos legales. Selecciono ' + name + ' porque Mistral interpreta documentos juridicos. Herramientas: busqueda de regulaciones y precedent legal.';
+  }
+  if (/escribir|texto|articul|blog|contenido|documento|\bdoc\b|informe|carta|resume|resumen|ensayo|guion|guión|presentacion|presentación|slide|crea|genera|redacta/.test(t)) {
+    return 'Detecte intencion de redaccion o creacion de contenido. Selecciono ' + name + ' porque Claude genera documentos y textos de alta calidad. Herramientas: analisis de tono, estructura y estilo.';
+  }
+  return 'Consulta general sin keywords especificos. Selecciono ' + name + ' como investigador por defecto. Gemini sintetiza informacion de multiples fuentes: GitHub, npm y Stack Overflow.';
 }
 
 function summarizeRepos(repos) {
@@ -115,14 +169,71 @@ function buildSmartResponse(query, results) {
   return parts.join('\n');
 }
 
+// Un intento de enviar la consulta al SW. Resuelve {text} o {woke:true} si el
+// puerto se cerro (SW dormido) para poder reintentar, o null si falla de verdad.
+function engineAttempt(query) {
+  return new Promise(function(resolve) {
+    if (typeof chrome === 'undefined' || !chrome.runtime || !chrome.runtime.sendMessage) {
+      resolve({ text: null }); return;
+    }
+    var settled = false;
+    var timer = setTimeout(function() {
+      if (settled) return; settled = true; resolve({ text: null });
+    }, 24000);
+    try {
+      chrome.runtime.sendMessage({ type: 'VOICE_COMMAND_EXEC', command: query, wantsText: true }, function(resp) {
+        if (settled) return; settled = true; clearTimeout(timer);
+        if (chrome.runtime.lastError) { resolve({ text: null, woke: true }); return; }
+        var text = resp && (resp.text || resp.error);
+        resolve({ text: text ? String(text) : null });
+      });
+    } catch (e) {
+      if (!settled) { settled = true; clearTimeout(timer); resolve({ text: null, woke: true }); }
+    }
+  });
+}
+
+// Envia la consulta al motor real (service-worker via VOICE_COMMAND_EXEC).
+// Reintenta una vez si el primer intento fallo por SW dormido (puerto cerrado).
+export async function sendToEngine(query) {
+  var first = await engineAttempt(query);
+  if (first.text) return first.text;
+  if (first.woke) {
+    await new Promise(function(r) { setTimeout(r, 500); });
+    var second = await engineAttempt(query);
+    if (second.text) return second.text;
+  }
+  return null;
+}
+
 export async function smartQuery(query, agentId) {
   T.addMemory('user', query);
+  var sector = sectorForAgent(agentId);
+
   if (isGreeting(query)) {
     var hour = new Date().getHours();
     var saludo = hour < 12 ? 'Buenos dias' : hour < 20 ? 'Buenas tardes' : 'Buenas noches';
-    var response = saludo + '! Soy X1, tu asistente de IA. Puedo ayudarte a buscar repositorios en GitHub, paquetes npm, soluciones en Stack Overflow y mas. En que puedo ayudarte?';
-    T.addMemory('assistant', response);
-    return { response: response, tools: [] };
+    var greet = saludo + '! Soy X1, tu asistente de IA. Puedo ayudarte a buscar repositorios en GitHub, paquetes npm, soluciones en Stack Overflow y mas. En que puedo ayudarte?';
+    T.addMemory('assistant', greet);
+    return { response: greet, tools: [], judgeReason: null, sector: sector };
+  }
+
+  var judgeReason = getJudgeReason(query, agentId);
+
+  // 1) Motor real (cascada de IA + juez del backend).
+  var engineText = await sendToEngine(query);
+  if (engineText && engineText.trim()) {
+    T.addMemory('assistant', engineText);
+    return { response: engineText, tools: [], judgeReason: judgeReason, sector: sector };
+  }
+
+  // 2) Fallback local: solo si la consulta es claramente de busqueda (github/npm/SO).
+  //    Para peticiones de accion/creacion no tiene sentido volcar resultados de herramientas.
+  var searchTools = T.detectTools(query);
+  if (searchTools.length === 0) {
+    var offline = 'Ahora mismo no puedo conectar con el motor de X1. Reintentalo en unos segundos.';
+    T.addMemory('assistant', offline);
+    return { response: offline, tools: [], judgeReason: judgeReason, sector: sector };
   }
   var toolResults = await T.executeTools(query);
   var response = buildSmartResponse(query, toolResults);
@@ -134,7 +245,7 @@ export async function smartQuery(query, agentId) {
     if (k === 'stackoverflow' && toolResults.stackoverflow && toolResults.stackoverflow.length > 0) return true;
     return false;
   });
-  return { response: response, tools: toolsUsed };
+  return { response: response, tools: toolsUsed, judgeReason: judgeReason, sector: sector };
 }
 
 export function getMemoryContext() { return T.getMemoryContext(); }

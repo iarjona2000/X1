@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>X1</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    /* ═══════════════════════════════════════════════════════
+       X1 — v0-faithful redesign
+       Paleta: blanco y negro puro. Acento: #2563eb solo para links.
+       Tipografía: Inter, geometría idéntica a v0/Vercel.
+       ═══════════════════════════════════════════════════════ */
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:           #f5f5f5;
+      --surface:      #ffffff;
+      --surface-2:    #fafafa;
+      --border:       #e5e5e5;
+      --border-2:     #d4d4d4;
+      --border-3:     #a3a3a3;
+      --ink:          #0a0a0a;
+      --ink-2:        #171717;
+      --ink-3:        #404040;
+      --gray:         #525252;
+      --gray-2:       #737373;
+      --gray-3:       #a3a3a3;
+      --link:         #2563eb;
+
+      --r-sm: 6px;
+      --r-md: 8px;
+      --r-lg: 12px;
+      --r-xl: 16px;
+      --r-pill: 999px;
+
+      --t-fast: 120ms cubic-bezier(.2,.8,.2,1);
+    }
+
+    html, body { height: 100%; }
+    body {
+      background: var(--bg);
+      color: var(--ink);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      letter-spacing: -0.005em;
+      overflow: hidden;
+    }
+
+    /* ─── App shell ─── */
+    .app {
+      display: flex; flex-direction: column;
+      height: 100%;
+    }
+
+    /* ─── Top nav (Community / Community Templates / Your Templates) ─── */
+    .nav {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 10px 16px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      height: 44px;
+    }
+    .nav-brand {
+      display: flex; align-items: center;
+      font-weight: 800;
+      font-size: 15px;
+      letter-spacing: -0.04em;
+      margin-right: 12px;
+      color: var(--ink);
+    }
+    .nav-brand-mark {
+      width: 22px; height: 22px;
+      background: var(--ink);
+      border-radius: 5px;
+      display: grid; place-items: center;
+      color: #fff;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      margin-right: 8px;
+    }
+    .nav-link {
+      padding: 5px 10px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--gray);
+      border-radius: var(--r-sm);
+      cursor: pointer;
+      transition: color var(--t-fast), background var(--t-fast);
+      user-select: none;
+    }
+    .nav-link:hover { color: var(--ink); }
+    .nav-link.active {
+      color: var(--ink);
+      font-weight: 700;
+    }
+    .nav-link.pill {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      color: var(--ink);
+      font-weight: 600;
+    }
+    .nav-link.pill:hover { background: var(--bg); }
+    .nav-spacer { flex: 1; }
+    .nav-link.muted { color: var(--gray-2); }
+
+    /* ─── Content area (hero OR chat) ─── */
+    .content {
+      flex: 1;
+      overflow-y: auto;
+      background: var(--bg);
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       HERO (empty state) — "What do you want to create?"
+       ═══════════════════════════════════════════════════════ */
+    .hero {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 80px 24px 60px;
+    }
+    .hero-title {
+      font-size: 48px;
+      font-weight: 800;
+      letter-spacing: -0.04em;
+      line-height: 1.05;
+      color: var(--ink);
+      text-align: center;
+      margin-bottom: 32px;
+    }
+    @media (max-width: 520px) {
+      .hero-title { font-size: 36px; }
+    }
+
+    .prompt {
+      width: 100%;
+      max-width: 720px;
+      background: var(--surface);
+      border: 1px solid var(--border-2);
+      border-radius: var(--r-xl);
+      padding: 16px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+      transition: border-color var(--t-fast), box-shadow var(--t-fast);
+    }
+    .prompt:focus-within {
+      border-color: var(--gray-3);
+      box-shadow: 0 0 0 3px rgba(0,0,0,0.05);
+    }
+    .prompt-input {
+      width: 100%;
+      min-height: 56px;
+      max-height: 240px;
+      border: none;
+      outline: none;
+      background: transparent;
+      font-family: inherit;
+      font-size: 16px;
+      line-height: 1.5;
+      color: var(--ink);
+      resize: none;
+    }
+    .prompt-input::placeholder {
+      color: var(--gray-3);
+    }
+
+    .prompt-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 10px;
+      flex-wrap: wrap;
+    }
+    .prompt-bar .left, .prompt-bar .right {
+      display: flex; align-items: center; gap: 8px;
+    }
+    .prompt-bar .right { margin-left: auto; }
+
+    .icon-btn {
+      width: 28px; height: 28px;
+      display: grid; place-items: center;
+      border: none; background: transparent;
+      color: var(--gray-2);
+      border-radius: var(--r-sm);
+      cursor: pointer;
+      transition: background var(--t-fast), color var(--t-fast);
+    }
+    .icon-btn:hover { background: var(--surface-2); color: var(--ink); }
+
+    .tier {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 4px 10px 4px 6px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--r-pill);
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--ink);
+      cursor: pointer;
+      transition: background var(--t-fast);
+    }
+    .tier:hover { background: var(--bg); }
+    .tier-mark {
+      width: 16px; height: 16px;
+      background: var(--ink);
+      border-radius: 4px;
+      display: grid; place-items: center;
+      color: #fff;
+      font-size: 8px;
+      font-weight: 800;
+      letter-spacing: -0.3px;
+    }
+    .tier-caret {
+      color: var(--gray-3);
+      font-size: 10px;
+      margin-left: 2px;
+    }
+
+    .project-pick {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 5px 10px;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--gray);
+      border-radius: var(--r-sm);
+      cursor: pointer;
+      user-select: none;
+    }
+    .project-pick:hover { color: var(--ink); }
+    .project-pick .caret { color: var(--gray-3); font-size: 10px; }
+
+    .btn-upgrade {
+      padding: 7px 14px;
+      background: var(--ink);
+      color: #fff;
+      border: none;
+      border-radius: var(--r-md);
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: -0.005em;
+      cursor: pointer;
+      transition: background var(--t-fast);
+    }
+    .btn-upgrade:hover { background: var(--ink-2); }
+
+    /* ─── Banner debajo del prompt (out of credits / hints) ─── */
+    .banner {
+      width: 100%;
+      max-width: 720px;
+      margin-top: 14px;
+      padding: 10px 14px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--r-pill);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--gray);
+    }
+    .banner-link {
+      margin-left: auto;
+      color: var(--link);
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .banner-link:hover { text-decoration: underline; }
+
+    /* ─── Sugerencias rápidas (chips) ─── */
+    .chips {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: center;
+      max-width: 720px;
+      margin-top: 18px;
+    }
+    .chip {
+      padding: 7px 14px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r-pill);
+      font-size: 12.5px;
+      font-weight: 500;
+      color: var(--gray-2);
+      cursor: pointer;
+      transition: background var(--t-fast), color var(--t-fast), border-color var(--t-fast);
+    }
+    .chip:hover {
+      background: var(--surface-2);
+      color: var(--ink);
+      border-color: var(--border-2);
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       CHAT (active state) — prompt docks at bottom
+       ═══════════════════════════════════════════════════════ */
+    .chat {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 24px 24px 0;
+      max-width: 760px;
+      width: 100%;
+      margin: 0 auto;
+    }
+    .thread {
+      flex: 1;
+      display: flex; flex-direction: column;
+      gap: 20px;
+      padding: 16px 0 24px;
+    }
+    .msg { display: flex; gap: 12px; max-width: 100%; }
+    .msg-user { justify-content: flex-end; }
+    .msg-avatar {
+      width: 28px; height: 28px;
+      flex-shrink: 0;
+      background: var(--ink);
+      color: #fff;
+      border-radius: 6px;
+      display: grid; place-items: center;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: -0.3px;
+    }
+    .msg-user .msg-avatar {
+      background: var(--surface);
+      color: var(--ink);
+      border: 1px solid var(--border);
+    }
+    .msg-bubble {
+      padding: 12px 16px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      font-size: 14px;
+      line-height: 1.55;
+      color: var(--ink);
+      max-width: 540px;
+    }
+    .msg-user .msg-bubble {
+      background: var(--ink);
+      color: #fff;
+      border-color: var(--ink);
+    }
+    .msg-content { white-space: pre-wrap; word-wrap: break-word; }
+
+    /* Step flow (pipeline) — B&W pills con conectores */
+    .flow {
+      display: flex; align-items: center; gap: 0;
+      margin-top: 10px; padding: 12px 0 4px;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .flow::-webkit-scrollbar { display: none; }
+    .step {
+      display: flex; flex-direction: column; align-items: center; gap: 4px;
+      flex-shrink: 0;
+      opacity: 0.3;
+      transition: opacity 200ms;
+    }
+    .step.active { opacity: 1; }
+    .step.done { opacity: 1; }
+    .step-icon {
+      width: 26px; height: 26px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      display: grid; place-items: center;
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--gray-2);
+    }
+    .step.active .step-icon {
+      background: var(--ink);
+      color: #fff;
+      border-color: var(--ink);
+    }
+    .step.done .step-icon {
+      background: var(--ink);
+      color: #fff;
+      border-color: var(--ink);
+    }
+    .step-label {
+      font-size: 10px;
+      color: var(--gray);
+      max-width: 60px;
+      text-align: center;
+      line-height: 1.2;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .step-arrow { color: var(--gray-3); margin: 0 4px 14px; opacity: 0.5; }
+    .step.done + .step-arrow { opacity: 1; color: var(--ink); }
+    .step.active + .step-arrow { opacity: 1; color: var(--ink); }
+
+    /* ─── Docked prompt (chat state) ─── */
+    .dock {
+      flex-shrink: 0;
+      padding: 16px 0 20px;
+      background: var(--bg);
+    }
+    .dock .prompt { box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+
+    /* ─── Thinking dots ─── */
+    .thinking {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 0 4px;
+      color: var(--gray);
+      font-size: 13px;
+    }
+    .dots { display: flex; gap: 4px; }
+    .dots span {
+      width: 5px; height: 5px; border-radius: 50%;
+      background: var(--gray-3);
+      animation: dotBounce 1.4s ease-in-out infinite;
+    }
+    .dots span:nth-child(2) { animation-delay: 0.16s; }
+    .dots span:nth-child(3) { animation-delay: 0.32s; }
+    @keyframes dotBounce {
+      0%, 80%, 100% { transform: scale(1); opacity: 0.4; }
+      40% { transform: scale(1.4); opacity: 1; }
+    }
+
+    /* ─── Scrollbar (minimal) ─── */
+    .content::-webkit-scrollbar { width: 6px; }
+    .content::-webkit-scrollbar-track { background: transparent; }
+    .content::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 6px; }
+    .content::-webkit-scrollbar-thumb:hover { background: var(--gray-3); }
+
+    /* ─── State toggle ─── */
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- ═══ Top nav (Community / Community Templates / Your Templates) ═══ -->
+  <nav class="nav">
+    <div class="nav-brand">
+      <div class="nav-brand-mark">X1</div>
+      X1
+    </div>
+    <div class="nav-link active" data-view="chat">Chat</div>
+    <div class="nav-link pill" data-view="templates">Plantillas</div>
+    <div class="nav-link muted" data-view="agents">Agentes</div>
+    <div class="nav-link muted" data-view="memory">Memoria</div>
+    <div class="nav-spacer"></div>
+    <div class="nav-link muted" data-view="settings">Ajustes</div>
+  </nav>
+
+  <!-- ═══ Main content (hero OR chat) ═══ -->
+  <div class="content" id="content">
+
+    <!-- ─── HERO (empty state) ─── -->
+    <div id="view-hero" class="hero">
+      <h1 class="hero-title">What do you want to create?</h1>
+
+      <div class="prompt">
+        <textarea id="prompt-hero" class="prompt-input" rows="2" placeholder="Ask X1 to..." autofocus></textarea>
+
+        <div class="prompt-bar">
+          <div class="left">
+            <button class="icon-btn" title="Adjuntar">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+              </svg>
+            </button>
+            <div class="tier">
+              <div class="tier-mark">X1</div>
+              <span>X1 Pro</span>
+              <span class="tier-caret">▾</span>
+            </div>
+          </div>
+          <div class="right">
+            <div class="project-pick">
+              Workspace
+              <span class="caret">▾</span>
+            </div>
+            <button class="btn-upgrade">Upgrade</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="banner">
+        <span>3 conversaciones hoy</span>
+        <a href="#" class="banner-link">Ver historial</a>
+      </div>
+
+      <div class="chips">
+        <button class="chip">Resume esta página</button>
+        <button class="chip">Navega a Google Calendar</button>
+        <button class="chip">Redacta un email a Tomás</button>
+        <button class="chip">Investiga X1 en GitHub</button>
+        <button class="chip">Crea un documento nuevo</button>
+      </div>
+    </div>
+
+    <!-- ─── CHAT (active state) ─── -->
+    <div id="view-chat" class="chat hidden">
+      <div class="thread" id="thread">
+        <!-- mensajes dinámicos -->
+      </div>
+
+      <div class="dock">
+        <div class="prompt">
+          <textarea id="prompt-chat" class="prompt-input" rows="1" placeholder="Ask X1 anything..."></textarea>
+          <div class="prompt-bar">
+            <div class="left">
+              <button class="icon-btn" title="Adjuntar">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+              </button>
+              <div class="tier">
+                <div class="tier-mark">X1</div>
+                <span>X1 Pro</span>
+                <span class="tier-caret">▾</span>
+              </div>
+            </div>
+            <div class="right">
+              <div class="project-pick">
+                Workspace
+                <span class="caret">▾</span>
+              </div>
+              <button class="btn-upgrade">Upgrade</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  // ─── Vista hero ↔ chat (demo) ───
+  var viewHero = document.getElementById('view-hero');
+  var viewChat = document.getElementById('view-chat');
+  var thread   = document.getElementById('thread');
+  var promptHero = document.getElementById('prompt-hero');
+  var promptChat = document.getElementById('prompt-chat');
+
+  function showChat(text) {
+    viewHero.classList.add('hidden');
+    viewChat.classList.remove('hidden');
+    addMsg('user', text);
+    addThinking();
+    // Demo response
+    setTimeout(function() {
+      removeThinking();
+      addMsg('bot', 'Hecho. He navegado a Gmail y listado los 3 correos sin leer:\n\n• Iván Arjona — Propuesta partner\n• Linear — Daily standup\n• Stripe — Payout programado\n\n¿Quieres que resuma alguno?');
+      addFlow([
+        {label: 'leer', done: true},
+        {label: 'resumir', active: true},
+        {label: 'responder', done: false}
+      ]);
+    }, 1400);
+  }
+
+  function sendPrompt(input) {
+    var txt = (input.value || '').trim();
+    if (!txt) return;
+    input.value = '';
+    showChat(txt);
+  }
+
+  promptHero.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendPrompt(promptHero);
+    }
+  });
+  promptChat.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendPrompt(promptChat);
+    }
+  });
+
+  // Chips → rellenan el prompt
+  document.querySelectorAll('.chip').forEach(function(c) {
+    c.addEventListener('click', function() {
+      promptHero.value = c.textContent;
+      promptHero.focus();
+    });
+  });
+
+  // Nav state
+  document.querySelectorAll('.nav-link[data-view]').forEach(function(el) {
+    el.addEventListener('click', function() {
+      document.querySelectorAll('.nav-link').forEach(function(e) { e.classList.remove('active'); });
+      el.classList.add('active');
+    });
+  });
+
+  // ─── Render mensajes ───
+  function addMsg(role, text) {
+    var div = document.createElement('div');
+    div.className = 'msg ' + (role === 'user' ? 'msg-user' : 'msg-bot');
+    div.innerHTML =
+      '<div class="msg-avatar">' + (role === 'user' ? 'T' : 'X1') + '</div>' +
+      '<div class="msg-bubble"><div class="msg-content"></div></div>';
+    div.querySelector('.msg-content').textContent = text;
+    thread.appendChild(div);
+    scrollThread();
+  }
+
+  function addThinking() {
+    var div = document.createElement('div');
+    div.className = 'thinking';
+    div.id = 'thinking';
+    div.innerHTML = '<div class="dots"><span></span><span></span><span></span></div><span>X1 está trabajando…</span>';
+    thread.appendChild(div);
+    scrollThread();
+  }
+
+  function removeThinking() {
+    var t = document.getElementById('thinking');
+    if (t) t.remove();
+  }
+
+  function addFlow(steps) {
+    var div = document.createElement('div');
+    div.className = 'flow';
+    var html = '';
+    steps.forEach(function(s, i) {
+      var cls = s.done ? 'done' : (s.active ? 'active' : '');
+      html += '<div class="step ' + cls + '"><div class="step-icon">' + (s.label[0] || '').toUpperCase() + '</div><div class="step-label">' + s.label + '</div></div>';
+      if (i < steps.length - 1) html += '<span class="step-arrow">→</span>';
+    });
+    div.innerHTML = html;
+    thread.appendChild(div);
+    scrollThread();
+  }
+
+  function scrollThread() {
+    document.getElementById('content').scrollTop = document.getElementById('content').scrollHeight;
+  }
+</script>
+
+</body>
+</html>

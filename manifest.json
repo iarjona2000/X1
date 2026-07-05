@@ -101,8 +101,14 @@
     },
     {
       "matches": ["https://*/*", "http://*/*"],
-      "js": ["background/protocol.js", "content/voice-bridge.js"],
+      "js": ["background/protocol.js"],
       "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://*/*", "http://*/*"],
+      "js": ["content/voice-bridge.js"],
+      "run_at": "document_idle",
+      "world": "ISOLATED"
     },
     {
       "matches": ["https://drive.google.com/*"],

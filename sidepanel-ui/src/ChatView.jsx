@@ -18,7 +18,7 @@ function timeAgo(ts) {
 }
 
 const AGENTS = [
-  { id: 'auto',     name: 'X1',       ai: 'Automatico',   letter: 'X', color: '#0969da', aiIcon: 'dist/x1-logo.png' },
+  { id: 'auto',     name: 'AUTO',      ai: 'Automatico',   letter: 'A', color: '#0969da', aiIcon: 'dist/x1-logo.png' },
   { id: 'research',  name: 'Research',  ai: 'Gemini',       letter: 'R', color: '#4285f4', aiIcon: '../assets/ai/googlegemini.svg' },
   { id: 'writer',    name: 'Writer',    ai: 'Claude',       letter: 'W', color: '#d97706', aiIcon: '../assets/ai/anthropic.svg' },
   { id: 'developer', name: 'Developer', ai: 'GPT-4o',       letter: 'D', color: '#10a37f', aiIcon: '../assets/ai/openai.svg' },
@@ -69,14 +69,16 @@ const QUICK = [
   { label: 'Email', prompt: 'Redacta un email profesional' },
 ];
 
-export function ChatView({ conversations, activeConv, onSelectConv, onCreateConv, onUpdateConv }) {
+export function ChatView({ conversations, activeConv, onSelectConv, onCreateConv, onEnsureConv, onUpdateConv }) {
   const [text, setText] = React.useState('');
-  const textRef = React.useState('');
+  const textRef = React.useRef('');
   const [busy, setBusy] = React.useState(false);
   const [activeAgent, setActiveAgent] = React.useState('auto');
   const [agentMenu, setAgentMenu] = React.useState(false);
+  const [procSteps, setProcSteps] = React.useState([]);
   const logRef = React.useRef(null);
   const safetyRef = React.useRef(null);
+  const clearProcRef = React.useRef(null);
   const busyRef = React.useRef(false);
 
   React.useEffect(function() { busyRef.current = busy; }, [busy]);
@@ -88,32 +90,67 @@ export function ChatView({ conversations, activeConv, onSelectConv, onCreateConv
     }});
   }
 
+  function setStep(id, status) {
+    setProcSteps(function(prev) {
+      return prev.map(function(s) { return s.id === id ? Object.assign({}, s, { status: status }) : s; });
+    });
+  }
+
   function send(input) {
     var q = (input || textRef.current).trim();
-    if (!q || busyRef.current || !activeConv) return;
+    if (!q || busyRef.current) return;
+    var conv = activeConv || (onEnsureConv && onEnsureConv());
+    if (!conv) return;
     setBusy(true); setText(''); textRef.current = '';
+    if (clearProcRef.current) clearTimeout(clearProcRef.current);
+
     var agentId = activeAgent === 'auto' ? B.getBestAgent(q) : activeAgent;
-    var title = activeConv.messages.length === 0 ? q.slice(0, 40) : activeConv.title;
+    var judgeReason = B.getJudgeReason(q, agentId);
+    var sector = B.detectSector(q);
+    var pickedAgent = agentById(agentId);
+
+    // Proceso de seleccion visible (juez): sector -> IA -> consulta -> respuesta.
+    var aiIcon = pickedAgent.aiIcon;
+    setProcSteps([
+      { id: 1, iconSrc: aiIcon, description: 'Sector: ' + sector, status: 'active' },
+      { id: 2, iconSrc: aiIcon, description: 'IA: ' + pickedAgent.ai, status: 'pending' },
+      { id: 3, iconSrc: aiIcon, description: 'Consultando ' + pickedAgent.ai, status: 'pending' },
+      { id: 4, iconSrc: aiIcon, description: 'Respuesta', status: 'pending' },
+    ]);
+    setTimeout(function() { setStep(1, 'done'); setStep(2, 'active'); }, 200);
+    setTimeout(function() { setStep(2, 'done'); setStep(3, 'active'); }, 450);
+
+    var title = conv.messages.length === 0 ? q.slice(0, 40) : conv.title;
     var userMsg = { id: Date.now(), role: 'user', content: q, timestamp: Date.now() };
-    var aiMsg = { id: Date.now() + 1, role: 'assistant', content: '', status: 'thinking', agent: agentId, toolsUsed: [] };
-    var newMessages = activeConv.messages.concat([userMsg, aiMsg]);
-    onUpdateConv(activeConv.id, { messages: newMessages, title: title, agent: agentId });
+    var aiMsg = { id: Date.now() + 1, role: 'assistant', content: '', status: 'thinking', agent: agentId, toolsUsed: [], judgeReason: judgeReason, sector: sector };
+    var newMessages = conv.messages.concat([userMsg, aiMsg]);
+    onUpdateConv(conv.id, { messages: newMessages, title: title, agent: agentId });
+
+    function finishProc(ok) {
+      setStep(3, 'done'); setStep(4, ok ? 'done' : 'error');
+      if (clearProcRef.current) clearTimeout(clearProcRef.current);
+      clearProcRef.current = setTimeout(function() { setProcSteps([]); }, 1400);
+    }
 
     safetyRef.current = setTimeout(function() {
       if (busyRef.current) {
-        patchMsg(activeConv.id, aiMsg.id, { content: 'Tiempo de espera agotado.', status: 'done' });
+        patchMsg(conv.id, aiMsg.id, { content: 'Tiempo de espera agotado.', status: 'done' });
+        finishProc(false);
         setBusy(false);
       }
-    }, 20000);
+    }, 24000);
 
     B.smartQuery(q, agentId).then(function(result) {
       if (safetyRef.current) clearTimeout(safetyRef.current);
-      if (result) patchMsg(activeConv.id, aiMsg.id, { content: result.response || 'Completado.', status: 'done', toolsUsed: result.tools || [] });
-      else patchMsg(activeConv.id, aiMsg.id, { content: 'No pude procesar eso.', status: 'done' });
+      setStep(3, 'done'); setStep(4, 'active');
+      if (result) patchMsg(conv.id, aiMsg.id, { content: result.response || 'Completado.', status: 'done', toolsUsed: result.tools || [], judgeReason: result.judgeReason || judgeReason, sector: result.sector || sector });
+      else patchMsg(conv.id, aiMsg.id, { content: 'No pude procesar eso.', status: 'done' });
+      finishProc(true);
       setBusy(false);
     }).catch(function() {
       if (safetyRef.current) clearTimeout(safetyRef.current);
-      patchMsg(activeConv.id, aiMsg.id, { content: 'Error de conexion.', status: 'done' });
+      patchMsg(conv.id, aiMsg.id, { content: 'Error de conexion.', status: 'done' });
+      finishProc(false);
       setBusy(false);
     });
   }
@@ -124,36 +161,53 @@ export function ChatView({ conversations, activeConv, onSelectConv, onCreateConv
   return React.createElement('div', { style: { display: 'flex', flex: 1, overflow: 'hidden', fontFamily: F } },
 
     // Sidebar conversaciones
-    React.createElement('div', { style: { width: '220px', borderRight: '1px solid #d0d7de', display: 'flex', flexDirection: 'column', background: '#f6f8fa' } },
+    React.createElement('div', { style: { width: '260px', borderRight: '1px solid #d0d7de', display: 'flex', flexDirection: 'column', background: '#f6f8fa' } },
       React.createElement('div', { style: { padding: '12px', borderBottom: '1px solid #d0d7de' } },
         React.createElement('button', {
           onClick: onCreateConv,
           style: {
-            width: '100%', padding: '5px 12px', borderRadius: '6px',
+            width: '100%', padding: '6px 12px', borderRadius: '6px',
             border: '1px solid rgba(27,31,36,0.15)', background: '#2da44e', color: '#ffffff',
             fontSize: '12px', fontWeight: '600', cursor: 'pointer',
             boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.25)',
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
           }
-        }, '+ Nueva')
+        }, '+ Nueva conversacion')
       ),
-      React.createElement('div', { style: { flex: 1, overflow: 'auto', padding: '4px 8px' } },
+      React.createElement('div', { style: { flex: 1, overflow: 'auto', padding: '6px 8px' } },
         conversations.map(function(c) {
           var isActive = activeConv && activeConv.id === c.id;
+          var msgCount = c.messages ? c.messages.length : 0;
+          var lastMsg = c.messages && c.messages.length > 0 ? c.messages[c.messages.length - 1] : null;
+          var preview = lastMsg ? (lastMsg.content || '').slice(0, 60) : 'Sin mensajes';
           return React.createElement('div', {
             key: c.id, onClick: function() { onSelectConv(c.id); },
             style: {
-              padding: '8px 10px', borderRadius: '6px', cursor: 'pointer', marginBottom: '2px',
+              padding: '12px', borderRadius: '6px', cursor: 'pointer', marginBottom: '6px',
               background: isActive ? '#ddf4ff' : 'transparent',
-              transition: 'background 80ms',
+              border: isActive ? '1px solid rgba(9,105,218,0.2)' : '1px solid transparent',
+              transition: 'all 80ms',
             },
             onMouseEnter: function(e) { if (!isActive) e.currentTarget.style.background = '#eaeef2'; },
             onMouseLeave: function(e) { if (!isActive) e.currentTarget.style.background = 'transparent'; },
           },
-            React.createElement('div', { style: { fontSize: '13px', fontWeight: isActive ? '600' : '400', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: isActive ? '#1f2328' : '#24292f' } }, c.title || 'Nueva'),
-            React.createElement('div', { style: { fontSize: '11px', color: '#59636e', marginTop: '2px' } }, timeAgo(c.updatedAt || c.createdAt))
+            React.createElement('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' } },
+              React.createElement('div', { style: { fontSize: '13px', fontWeight: isActive ? '600' : '500', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: isActive ? '#1f2328' : '#24292f', flex: 1 } }, c.title || 'Nueva conversacion'),
+              React.createElement('span', { style: { fontSize: '11px', color: '#818b98', flexShrink: 0, marginLeft: '6px' } }, timeAgo(c.updatedAt || c.createdAt))
+            ),
+            React.createElement('div', { style: { fontSize: '12px', color: '#59636e', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: '1.6' } }, preview),
+            React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '6px', marginTop: '8px' } },
+              React.createElement('span', { style: { fontSize: '11px', color: '#818b98' } }, msgCount + ' mensaje' + (msgCount !== 1 ? 's' : '')),
+              c.agent && React.createElement('span', { style: { fontSize: '10px', padding: '1px 6px', borderRadius: '999px', background: '#ddf4ff', color: '#0969da', fontWeight: '500' } }, c.agent)
+            )
           );
-        })
+        }),
+        conversations.length === 0 && React.createElement('div', { style: { padding: '24px 16px', textAlign: 'center', color: '#818b98', fontSize: '12px' } },
+          React.createElement('svg', { viewBox: '0 0 16 16', width: '22', height: '22', fill: '#afb8c1', style: { marginBottom: '8px' } },
+            React.createElement('path', { d: 'M1.75 1h8.5c.966 0 1.75.784 1.75 1.75v5.5A1.75 1.75 0 0 1 10.25 10H7.061l-2.574 2.573A1.458 1.458 0 0 1 2 11.543V10h-.25A1.75 1.75 0 0 1 0 8.25v-5.5C0 1.784.784 1 1.75 1ZM1.5 2.75v5.5c0 .138.112.25.25.25h1a.75.75 0 0 1 .75.75v2.19l2.72-2.72a.749.749 0 0 1 .53-.22h3.5a.25.25 0 0 0 .25-.25v-5.5a.25.25 0 0 0-.25-.25h-8.5a.25.25 0 0 0-.25.25Z' })
+          ),
+          React.createElement('div', null, 'No hay conversaciones')
+        )
       )
     ),
 
@@ -161,7 +215,7 @@ export function ChatView({ conversations, activeConv, onSelectConv, onCreateConv
     React.createElement('div', { style: { flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 } },
 
       // Header
-      React.createElement('div', { style: { padding: '8px 16px', borderBottom: '1px solid #d0d7de', display: 'flex', alignItems: 'center', gap: '10px', background: '#ffffff' } },
+      React.createElement('div', { style: { padding: '10px 16px', borderBottom: '1px solid #d0d7de', display: 'flex', alignItems: 'center', gap: '12px', background: '#ffffff' } },
         React.createElement('div', { style: { position: 'relative' } },
           React.createElement('button', {
             onClick: function() { setAgentMenu(function(v) { return !v; }); },
@@ -217,6 +271,9 @@ export function ChatView({ conversations, activeConv, onSelectConv, onCreateConv
         React.createElement('span', { style: { fontSize: '12px', color: '#818b98', fontWeight: '500' } }, 'System X1')
       ),
 
+      // Proceso de seleccion (juez) visible en vivo
+      procSteps.length > 0 ? React.createElement(ProcessTimeline, { steps: procSteps }) : null,
+
       // Messages
       React.createElement('div', { ref: logRef, style: { flex: 1, overflow: 'auto', padding: '24px 20px' } },
         msgs.length === 0 ?
@@ -227,7 +284,7 @@ export function ChatView({ conversations, activeConv, onSelectConv, onCreateConv
               )
             ),
             React.createElement('div', { style: { fontSize: '16px', fontWeight: '600', color: '#1f2328' } }, 'System X1'),
-            React.createElement('div', { style: { fontSize: '14px', color: '#59636e', maxWidth: '260px', textAlign: 'center', lineHeight: '1.5' } }, 'Escribe tu consulta. Puedo buscar en GitHub, npm, Stack Overflow y mas.')
+            React.createElement('div', { style: { fontSize: '14px', color: '#59636e', maxWidth: '280px', textAlign: 'center', lineHeight: '1.7' } }, 'Escribe tu consulta. Puedo buscar en GitHub, npm, Stack Overflow y mas.')
           )
         :
           React.createElement('div', { style: { maxWidth: '680px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '24px' } },
@@ -237,8 +294,8 @@ export function ChatView({ conversations, activeConv, onSelectConv, onCreateConv
                   React.createElement('div', { style: { display: 'flex', justifyContent: 'flex-end' } },
                     React.createElement('div', {
                       style: {
-                        maxWidth: '70%', padding: '10px 14px', borderRadius: '16px 16px 4px 16px',
-                        background: '#ddf4ff', fontSize: '14px', lineHeight: '1.6', color: '#1f2328',
+                        maxWidth: '70%', padding: '12px 16px', borderRadius: '16px 16px 4px 16px',
+                        background: '#ddf4ff', fontSize: '14px', lineHeight: '1.8', color: '#1f2328',
                       }
                     }, m.content)
                   )
@@ -258,12 +315,26 @@ export function ChatView({ conversations, activeConv, onSelectConv, onCreateConv
                         )
                       :
                       m.status === 'done' && m.content ?
-                        React.createElement('div', { style: { fontSize: '14px', lineHeight: '1.7', color: '#1f2328' } },
+                        React.createElement('div', { style: { fontSize: '14px', lineHeight: '1.8', color: '#1f2328' } },
+                          m.judgeReason && React.createElement('div', {
+                            style: {
+                              padding: '12px 16px', borderRadius: '6px', marginBottom: '12px',
+                              background: '#f6f8fa', border: '1px solid #d0d7de',
+                              fontSize: '12px', color: '#59636e', lineHeight: '1.7',
+                            }
+                          },
+                            React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' } },
+                              React.createElement('span', { style: { fontWeight: '600', color: '#1f2328', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px' } }, 'Sistema juez'),
+                              m.sector && React.createElement('span', { style: { fontSize: '10px', padding: '1px 8px', borderRadius: '999px', background: '#ddf4ff', color: '#0969da', fontWeight: '600' } }, m.sector)
+                            ),
+                            React.createElement('div', null, m.judgeReason)
+                          ),
                           React.createElement('div', {
                             style: {
-                              padding: '12px 16px', borderRadius: '4px',
+                              padding: '4px 0', borderRadius: '4px',
                               whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-                              borderLeft: '2px solid #d0d7de', paddingLeft: '14px',
+                              borderLeft: '2px solid #d0d7de', paddingLeft: '16px',
+                              lineHeight: '1.85',
                             }
                           }, m.content),
                           m.toolsUsed && m.toolsUsed.length > 0 ?
@@ -293,7 +364,7 @@ export function ChatView({ conversations, activeConv, onSelectConv, onCreateConv
       ),
 
       // Quick actions
-      React.createElement('div', { style: { padding: '0 20px 8px', display: 'flex', gap: '6px', flexWrap: 'wrap' } },
+      React.createElement('div', { style: { padding: '4px 20px 10px', display: 'flex', gap: '8px', flexWrap: 'wrap' } },
         QUICK.map(function(q) {
           return React.createElement('button', {
             key: q.label,
@@ -313,9 +384,9 @@ export function ChatView({ conversations, activeConv, onSelectConv, onCreateConv
       React.createElement('div', { style: { padding: '0 20px 16px' } },
         React.createElement('div', {
           style: {
-            display: 'flex', alignItems: 'flex-end', gap: '8px',
+            display: 'flex', alignItems: 'flex-end', gap: '10px',
             background: '#ffffff', border: '1px solid #d0d7de', borderRadius: '6px',
-            padding: '8px 12px',
+            padding: '10px 12px',
             transition: 'border-color 80ms',
           },
           onFocus: function(e) { e.currentTarget.style.borderColor = '#0969da'; },
@@ -346,7 +417,7 @@ export function ChatView({ conversations, activeConv, onSelectConv, onCreateConv
             }
           },
             React.createElement('svg', { viewBox: '0 0 16 16', width: '14', height: '14', fill: 'currentColor' },
-              React.createElement('path', { d: '.156 1.763a.75.75 0 011.028-.319l13.25 7.25a.75.75 0 010 1.314l-13.25 7.25a.75.75 0 01-1.028-.319.75.75 0 01-.003-.722L3.237 8 .153 2.485a.75.75 0 01.003-.722z' })
+              React.createElement('path', { d: 'M.989 8 .064 2.68a1.342 1.342 0 0 1 1.85-1.462l13.402 5.744a1.13 1.13 0 0 1 0 2.076L1.913 14.782a1.343 1.343 0 0 1-1.85-1.463L.99 8Zm.603-5.288L2.38 7.25h4.87a.75.75 0 0 1 0 1.5H2.38l-.788 4.538L13.929 8Z' })
             )
           )
         )

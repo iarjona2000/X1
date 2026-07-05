@@ -102,7 +102,6 @@ export function detectTools(query) {
   if (/npm|paquete|package|dependencia/.test(t)) tools.push('npm');
   if (/stack.?overflow|solucion|error|bug/.test(t)) tools.push('stackoverflow');
   if (/recuerda|memory|memoria|guarda|recuerdo/.test(t)) tools.push('memory');
-  if (tools.length === 0) tools.push('github', 'npm');
   return tools;
 }
 
