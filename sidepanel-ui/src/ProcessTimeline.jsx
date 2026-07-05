@@ -1,108 +1,85 @@
 import * as React from 'react';
-import { StepIcon, metaFor } from './icons.jsx';
 
-const style = {
-  root: {
-    display: 'flex', flexDirection: 'column',
-    paddingTop: '6px', paddingBottom: '4px'
-  },
-  row: {
-    display: 'grid',
-    gridTemplateColumns: '22px 1fr',
-    gap: '12px',
-    minHeight: '42px',
-    transition: 'opacity 0.45s cubic-bezier(0.22, 1, 0.36, 1), transform 0.45s cubic-bezier(0.22, 1, 0.36, 1)'
-  },
-  rail: {
-    display: 'flex', flexDirection: 'column', alignItems: 'center',
-    transform: 'translateY(1px)'
-  },
-  line: {
-    width: '2px', flexGrow: 1, minHeight: '16px',
-    backgroundColor: '#e8e8e8', borderRadius: '1px',
-    transition: 'background 0.4s ease'
-  },
-  lineActive: {
-    background: 'linear-gradient(180deg, #4b3ac9 0%, #c4b5fd 100%)'
-  },
-  title: {
-    fontSize: '14px', fontWeight: 590, color: '#1c1c1e',
-    lineHeight: '22px', letterSpacing: '-0.1px'
-  },
-  sub: {
-    fontSize: '13px', color: '#8e8e93',
-    lineHeight: '18px', marginTop: '1px'
-  },
-  hidden: { opacity: 0, transform: 'translateY(8px)' },
-  shown: { opacity: 1, transform: 'none' },
-  pulse: {
-    animationName: {
-      '0%, 100%': { opacity: 1, transform: 'scale(1)' },
-      '50%': { opacity: 0.4, transform: 'scale(1.12)' }
-    },
-    animationDuration: '1.4s',
-    animationIterationCount: 'infinite',
-    animationTimingFunction: 'ease-in-out'
-  }
+const S = {
+  border: '#d0d7de', bgSubtle: '#f6f8fa', bgDefault: '#ffffff',
+  fgDefault: '#1f2328', fgMuted: '#59636e', fgSubtle: '#818b98', fgAccent: '#0969da',
+  fgSuccess: '#1a7f37', fgDanger: '#d1242f',
+  font: "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif",
 };
 
-export function ProcessTimeline({ steps, onComplete }) {
-  const [revealed, setRevealed] = React.useState(0);
-  const list = steps?.length ? steps : [];
+const APP_ICONS = {
+  github: { letter: 'G', bg: '#1f2328', fg: '#fff' },
+  npm: { letter: 'N', bg: '#cb3837', fg: '#fff' },
+  stackoverflow: { letter: 'S', bg: '#f48024', fg: '#fff' },
+  web: { letter: 'W', bg: '#de5833', fg: '#fff' },
+  google: { letter: 'G', bg: '#4285f4', fg: '#fff' },
+  gmail: { letter: 'M', bg: '#ea4335', fg: '#fff' },
+  calendar: { letter: 'C', bg: '#4285f4', fg: '#fff' },
+  sheets: { letter: 'S', bg: '#34a853', fg: '#fff' },
+  drive: { letter: 'D', bg: '#fbbc05', fg: '#fff' },
+  docs: { letter: 'D', bg: '#4285f4', fg: '#fff' },
+  default: { letter: 'X', bg: '#656d76', fg: '#fff' },
+};
 
-  React.useEffect(() => {
-    setRevealed(0);
-    if (!list.length) { onComplete?.(); return; }
-    let i = 0;
-    const t = setTimeout(() => {
-      const tick = () => {
-        i += 1;
-        setRevealed(i);
-        if (i < list.length) {
-          setTimeout(tick, 420);
-        } else {
-          setTimeout(() => onComplete?.(), 350);
-        }
-      };
-      tick();
-    }, 250);
-    return () => clearTimeout(t);
-  }, [list.length, onComplete]);
+function getIcon(tool) {
+  return APP_ICONS[tool] || APP_ICONS.default;
+}
 
-  if (!list.length) return null;
-
-  const running = revealed < list.length;
+function StepCard({ step, index, total }) {
+  const icon = getIcon(step.app || 'default');
+  const isActive = step.status === 'active';
+  const isDone = step.status === 'done';
+  const isError = step.status === 'error';
 
   return (
-    <div style={style.root}>
-      {list.map((step, i) => {
-        const meta = metaFor(step.app);
-        const isShown = i < revealed;
-        const isActive = i === revealed - 1 && running;
-        const isLast = i === list.length - 1;
-        return (
-          <div key={i}
-            style={{
-              ...style.row,
-              ...style.hidden,
-              ...(isShown ? style.shown : {}),
-              transitionDelay: isShown ? '0ms' : `${i * 40}ms`
-            }}>
-            <div style={style.rail}>
-              <div style={isActive ? style.pulse : { display: 'flex', alignItems: 'center' }}>
-                <StepIcon app={step.app} size={22} />
-              </div>
-              {!isLast && (
-                <div style={{ ...style.line, ...(isActive ? style.lineActive : {}) }} />
-              )}
-            </div>
-            <div style={{ paddingBottom: '16px', transform: 'translateY(0)' }}>
-              <div style={style.title}>{meta.title || step.app}</div>
-              <div style={style.sub}>{step.label || meta.title}</div>
-            </div>
-          </div>
-        );
-      })}
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: '6px',
+      padding: '4px 10px', borderRadius: '6px',
+      background: isActive ? '#ddf4ff' : S.bgDefault,
+      border: '1px solid ' + (isActive ? 'rgba(9,105,218,0.3)' : S.border),
+      fontSize: '11px', whiteSpace: 'nowrap',
+      animation: 'slideIn 0.2s ease',
+      minWidth: '60px',
+    }}>
+      {/* App icon */}
+      <div style={{
+        width: '16px', height: '16px', borderRadius: '4px',
+        background: icon.bg, color: icon.fg,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: '8px', fontWeight: '700', flexShrink: 0,
+      }}>{icon.letter}</div>
+
+      {/* Status dot */}
+      {isActive && <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: S.fgAccent, animation: 'pulse 1s infinite', flexShrink: 0 }} />}
+      {isDone && <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: S.fgSuccess, flexShrink: 0 }} />}
+      {isError && <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: S.fgDanger, flexShrink: 0 }} />}
+
+      {/* Description */}
+      <span style={{ color: S.fgMuted, overflow: 'hidden', textOverflow: 'ellipsis' }}>{step.description || step.app || 'Procesando...'}</span>
+    </div>
+  );
+}
+
+export function ProcessTimeline({ steps = [] }) {
+  if (!steps.length) return null;
+
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: '6px',
+      padding: '8px 16px', borderBottom: '1px solid ' + S.border,
+      background: S.bgSubtle, overflowX: 'auto',
+      scrollbarWidth: 'thin',
+    }}>
+      {steps.map((step, i) => (
+        <React.Fragment key={step.id || i}>
+          <StepCard step={step} index={i} total={steps.length} />
+          {i < steps.length - 1 && (
+            <svg viewBox="0 0 16 16" width="8" height="8" fill={S.fgSubtle} style={{ flexShrink: 0 }}>
+              <path d="M4.427 7.427l3.396 3.396a.25.25 0 00.354 0l3.396-3.396A.25.25 0 0011.396 7H4.604a.25.25 0 00-.177.427z"/>
+            </svg>
+          )}
+        </React.Fragment>
+      ))}
     </div>
   );
 }

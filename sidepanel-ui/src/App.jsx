@@ -1,396 +1,170 @@
 import * as React from 'react';
-import { makeStyles, shorthands, Body1, Textarea, Caption1 } from '@fluentui/react-components';
-import { Sparkle28Filled, Send24Filled, ArrowRight16Regular, ChevronDown12Regular, CheckmarkCircle24Filled, Delete24Regular, Circle24Filled } from '@fluentui/react-icons';
-import { ProcessTimeline } from './ProcessTimeline.jsx';
 import * as B from './backend.js';
+import { ChatView } from './ChatView.jsx';
+import { RepoView } from './RepoView.jsx';
 
-const useStyles = makeStyles({
-  bg: {
-    position: 'fixed', inset: 0, zIndex: 0,
-    background: 'linear-gradient(160deg, #f8f6ff 0%, #ede8fe 30%, #e0d8f5 60%, #f5eefb 100%)',
-    overflow: 'hidden'
-  },
-  orb1: {
-    position: 'absolute', top: '-80px', right: '-60px',
-    width: '280px', height: '280px', borderRadius: '50%',
-    background: 'radial-gradient(circle, rgba(139,92,246,0.15) 0%, rgba(139,92,246,0) 70%)',
-    filter: 'blur(40px)'
-  },
-  orb2: {
-    position: 'absolute', bottom: '20%', left: '-40px',
-    width: '200px', height: '200px', borderRadius: '50%',
-    background: 'radial-gradient(circle, rgba(99,102,241,0.12) 0%, rgba(99,102,241,0) 70%)',
-    filter: 'blur(50px)'
-  },
-  orb3: {
-    position: 'absolute', top: '40%', right: '-20px',
-    width: '180px', height: '180px', borderRadius: '50%',
-    background: 'radial-gradient(circle, rgba(192,132,252,0.1) 0%, rgba(192,132,252,0) 70%)',
-    filter: 'blur(60px)'
-  },
-  orb4: {
-    position: 'absolute', bottom: '-40px', right: '20%',
-    width: '240px', height: '240px', borderRadius: '50%',
-    background: 'radial-gradient(circle, rgba(167,139,250,0.1) 0%, rgba(167,139,250,0) 70%)',
-    filter: 'blur(50px)'
-  },
-  app: {
-    position: 'relative', zIndex: 1,
-    display: 'flex', flexDirection: 'column', height: '100vh',
-    color: '#1c1c1e',
-    fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', 'Segoe UI', sans-serif"
-  },
-  nav: {
-    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    margin: '10px 10px 0 10px', padding: '10px 14px',
-    backgroundColor: 'rgba(255,255,255,0.35)',
-    backdropFilter: 'blur(40px) saturate(200%)',
-    WebkitBackdropFilter: 'blur(40px) saturate(200%)',
-    borderRadius: '20px',
-    border: '1px solid rgba(255,255,255,0.6)',
-    boxShadow: '0 1px 3px rgba(0,0,0,0.02), 0 8px 32px rgba(75,58,201,0.05), inset 0 1px 0 rgba(255,255,255,0.7)',
-    position: 'sticky', top: '10px', zIndex: 10,
-    userSelect: 'none'
-  },
-  navLeft: { display: 'flex', alignItems: 'center', gap: '8px' },
-  logo: {
-    width: '26px', height: '26px', borderRadius: '8px',
-    display: 'block', flexShrink: 0,
-    boxShadow: '0 1px 4px rgba(0,0,0,0.04)'
-  },
-  pickerWrap: { position: 'relative' },
-  picker: {
-    display: 'inline-flex', alignItems: 'center', gap: '5px',
-    padding: '4px 8px 4px 4px', borderRadius: '8px',
-    cursor: 'pointer', border: 'none', outline: 'none',
-    fontFamily: 'inherit', fontSize: '14px', fontWeight: 600, color: '#1c1c1e',
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    transition: 'all 0.15s ease',
-    ':hover': { backgroundColor: 'rgba(255,255,255,0.35)' }
-  },
-  pickerIcon: { width: '18px', height: '18px', borderRadius: '5px', display: 'block', flexShrink: 0 },
-  pickerArrow: { fontSize: '10px', color: '#8e8e93', transition: 'transform 0.25s ease' },
-  pickerArrowOpen: { transform: 'rotate(180deg)' },
-  navPill: {
-    fontSize: '10px', fontWeight: 700, color: 'rgba(255,255,255,0.7)',
-    backgroundColor: 'rgba(0,0,0,0.15)',
-    padding: '4px 10px', borderRadius: '20px',
-    letterSpacing: '0.5px', textTransform: 'uppercase',
-    backdropFilter: 'blur(10px)',
-    WebkitBackdropFilter: 'blur(10px)',
-    border: '1px solid rgba(255,255,255,0.1)'
-  },
-  menu: {
-    position: 'absolute', top: 'calc(100% + 8px)', left: '0', zIndex: 100,
-    backgroundColor: 'rgba(255,255,255,0.5)',
-    backdropFilter: 'blur(50px) saturate(200%)',
-    WebkitBackdropFilter: 'blur(50px) saturate(200%)',
-    border: '1px solid rgba(255,255,255,0.7)',
-    borderRadius: '18px',
-    boxShadow: '0 8px 48px rgba(0,0,0,0.06), 0 2px 12px rgba(0,0,0,0.03), inset 0 1px 0 rgba(255,255,255,0.6)',
-    minWidth: '224px', overflow: 'hidden',
-    opacity: 0, transform: 'scale(0.9) translateY(-8px)',
-    transformOrigin: 'top left',
-    transition: 'opacity 0.2s ease, transform 0.25s cubic-bezier(0.22, 1, 0.36, 1)',
-    pointerEvents: 'none'
-  },
-  menuOpen: { opacity: 1, transform: 'scale(1) translateY(0)', pointerEvents: 'auto' },
-  menuItem: {
-    display: 'flex', alignItems: 'center', gap: '10px', width: '100%',
-    padding: '10px 14px', border: 'none', background: 'transparent',
-    fontFamily: 'inherit', fontSize: '14px', color: '#1c1c1e',
-    cursor: 'pointer', textAlign: 'left',
-    transition: 'background 0.08s ease',
-    ':hover': { backgroundColor: 'rgba(255,255,255,0.3)' }
-  },
-  menuDivider: { height: '1px', backgroundColor: 'rgba(0,0,0,0.04)', margin: '4px 12px' },
-  menuCheck: { marginLeft: 'auto', color: '#4b3ac9', fontSize: '16px' },
-  content: {
-    flexGrow: 1, overflowY: 'auto',
-    padding: '16px 12px 8px',
-    display: 'flex', flexDirection: 'column', gap: '16px',
-    '::-webkit-scrollbar': { width: '4px' },
-    '::-webkit-scrollbar-thumb': { backgroundColor: 'rgba(0,0,0,0.06)', borderRadius: '3px' }
-  },
-  empty: {
-    margin: 'auto', textAlign: 'center', maxWidth: '280px',
-    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px',
-    paddingTop: '80px'
-  },
-  emptyIconWrap: {
-    width: '84px', height: '84px', borderRadius: '26px',
+const S = {
+  border: '#d0d7de', borderLight: '#d8dee4', bgSubtle: '#f6f8fa', bgDefault: '#ffffff',
+  fgDefault: '#1f2328', fgMuted: '#59636e', fgSubtle: '#818b98', fgAccent: '#0969da',
+  fgSuccess: '#1a7f37', fgDanger: '#d1242f',
+  font: "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif",
+};
+
+const OctocatSvg = ({ w = 16, h = 16, fill = S.fgDefault }) => (
+  <svg viewBox="0 0 98 96" width={w} height={h} fill={fill}>
+    <path d="M48.854 0C21.839 0 0 22 0 49.217c0 21.756 13.993 40.172 33.405 46.69 2.427.49 3.316-1.059 3.316-2.362 0-1.141-.08-5.052-.08-9.127-13.59 2.934-16.42-5.867-16.42-5.867-2.184-5.704-5.42-7.17-5.42-7.17-4.448-3.015.324-3.015.324-3.015 4.934.326 7.523 5.052 7.523 5.052 4.367 7.496 11.404 5.378 14.235 4.074.404-3.178 1.699-5.378 3.074-6.6-10.839-1.141-22.243-5.378-22.243-24.283 0-5.378 1.94-9.778 5.014-13.2-.485-1.222-2.184-6.275.486-13.038 0 0 4.125-1.304 13.426 5.052a46.97 46.97 0 0 1 12.214-1.63c4.125 0 8.33.571 12.213 1.63 9.302-6.356 13.427-5.052 13.427-5.052 2.67 6.763.97 11.816.485 13.038 3.155 3.422 5.015 7.822 5.015 13.2 0 18.905-11.404 23.06-22.324 24.283 1.78 1.548 3.316 4.481 3.316 9.126 0 6.6-.08 11.897-.08 13.526 0 1.304.89 2.853 3.316 2.364 19.412-6.52 33.405-24.935 33.405-46.691C97.707 22 75.788 0 48.854 0z"/>
+  </svg>
+);
+
+const GoogleSvg = ({ w = 16, h = 16 }) => (
+  <svg viewBox="0 0 24 24" width={w} height={h}>
+    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
+    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+  </svg>
+);
+
+const ChatIcon = ({ active }) => <svg viewBox="0 0 16 16" width="16" height="16" fill={active ? S.fgAccent : S.fgMuted}><path d="M1.5 2.75a.25.25 0 01.25-.25h8.5a.25.25 0 01.25.25v5.5a.25.25 0 01-.25.25h-3.5a.75.75 0 00-.53.22L3.5 11.44V9.25a.75.75 0 00-.75-.75h-1a.25.25 0 01-.25-.25v-5.5zM1.75 1A1.75 1.75 0 000 2.75v5.5C0 9.216.784 10 1.75 10H2v1.543a1.457 1.457 0 002.487 1.03L7.061 10h3.189A1.75 1.75 0 0012 8.25v-5.5A1.75 1.75 0 0010.25 1h-8.5z"/></svg>;
+
+const RepoIcon = ({ active }) => <svg viewBox="0 0 16 16" width="16" height="16" fill={active ? S.fgAccent : S.fgMuted}><path d="M2 2.5A2.5 2.5 0 014.5 0h8.75a.75.75 0 01.75.75v12.5a.75.75 0 01-.75.75h-2.5a.75.75 0 110-1.5h1.75v-2h-8a1 1 0 00-.714 1.7.75.75 0 01-1.072 1.05A2.495 2.495 0 012 11.5v-9zm10.5-1h-8a1 1 0 00-1 1v6.708A2.486 2.486 0 014.5 9h8V1.5z"/></svg>;
+
+let convSeq = 0;
+const convUid = () => ++convSeq;
+
+export default function App({ githubUser }) {
+  const [tab, setTab] = React.useState('chat');
+  const [conversations, setConversations] = React.useState([]);
+  const [activeConvId, setActiveConvId] = React.useState(null);
+  const [settingsOpen, setSettingsOpen] = React.useState(false);
+  const [googleStatus, setGoogleStatus] = React.useState(null);
+  const [githubStatus, setGithubStatus] = React.useState(null);
+  const settingsRef = React.useRef(null);
+
+  React.useEffect(() => {
+    const saved = B.loadConversations();
+    if (saved?.length) { setConversations(saved); setActiveConvId(saved[0].id); }
+    if (B.hasEngine()) { B.checkGoogleAuth().then(setGoogleStatus); B.checkGithubAuth().then(setGithubStatus); }
+  }, []);
+
+  React.useEffect(() => {
+    if (!settingsOpen) return;
+    const h = e => { if (settingsRef.current && !settingsRef.current.contains(e.target)) setSettingsOpen(false); };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, [settingsOpen]);
+
+  const saveConvs = list => { setConversations(list); B.saveConversations(list); };
+  const createConversation = () => {
+    const c = { id: convUid(), title: 'Nueva conversacion', messages: [], tags: [], createdAt: Date.now(), updatedAt: Date.now(), agent: 'research' };
+    saveConvs([c, ...conversations]); setActiveConvId(c.id); setTab('chat');
+  };
+  const updateConversation = (id, patch) => {
+    setConversations(prev => { const list = prev.map(c => { if (c.id !== id) return c; var newMsgs = typeof patch.messages === 'function' ? patch.messages(c.messages || []) : patch.messages; return { ...c, ...patch, messages: newMsgs, updatedAt: Date.now() }; }); B.saveConversations(list); return list; });
+  };
+  const deleteConversation = id => {
+    const list = conversations.filter(c => c.id !== id); saveConvs(list);
+    if (activeConvId === id) setActiveConvId(list[0]?.id || null);
+  };
+
+  const activeConv = conversations.find(c => c.id === activeConvId);
+
+  const sidebarBtn = isActive => ({
+    width: '32px', height: '32px', borderRadius: '6px', border: 'none',
+    background: isActive ? '#ddf4ff' : 'transparent', cursor: 'pointer',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.25)',
-    backdropFilter: 'blur(20px) saturate(180%)',
-    WebkitBackdropFilter: 'blur(20px) saturate(180%)',
-    border: '1px solid rgba(255,255,255,0.5)',
-    boxShadow: '0 4px 24px rgba(75,58,201,0.04), inset 0 1px 0 rgba(255,255,255,0.6)',
-    marginBottom: '2px'
-  },
-  emptyTitle: { fontSize: '20px', fontWeight: 700, color: '#1c1c1e', letterSpacing: '-0.3px' },
-  emptyDesc: { fontSize: '14px', color: '#8e8e93', lineHeight: '1.5', marginTop: '-2px' },
-  chips: { display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center', marginTop: '8px' },
-  chip: {
-    display: 'inline-flex', alignItems: 'center', gap: '5px',
-    padding: '8px 14px', borderRadius: '14px',
-    fontSize: '13px', fontWeight: 500, color: '#555',
-    backgroundColor: 'rgba(255,255,255,0.3)',
-    backdropFilter: 'blur(12px) saturate(180%)',
-    WebkitBackdropFilter: 'blur(12px) saturate(180%)',
-    border: '1px solid rgba(255,255,255,0.5)',
-    cursor: 'pointer', fontFamily: 'inherit',
-    transition: 'all 0.15s ease',
-    ':hover': {
-      backgroundColor: 'rgba(255,255,255,0.5)',
-      borderColor: 'rgba(255,255,255,0.7)',
-      transform: 'translateY(-2px)',
-      boxShadow: '0 4px 16px rgba(75,58,201,0.05)'
-    }
-  },
-  userRow: { display: 'flex', justifyContent: 'flex-end', paddingRight: '2px' },
-  bubble: {
-    maxWidth: '78%', padding: '11px 17px',
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    backdropFilter: 'blur(24px) saturate(180%)',
-    WebkitBackdropFilter: 'blur(24px) saturate(180%)',
-    color: '#1c1c1e',
-    borderRadius: '22px', borderBottomRightRadius: '6px',
-    fontSize: '15px', lineHeight: '1.55',
-    whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-    border: '1px solid rgba(255,255,255,0.4)',
-    boxShadow: '0 2px 12px rgba(0,0,0,0.02)'
-  },
-  glass: {
-    padding: '18px',
-    backgroundColor: 'rgba(255,255,255,0.25)',
-    backdropFilter: 'blur(30px) saturate(200%)',
-    WebkitBackdropFilter: 'blur(30px) saturate(200%)',
-    borderRadius: '22px',
-    border: '1px solid rgba(255,255,255,0.45)',
-    boxShadow: '0 1px 3px rgba(0,0,0,0.01), 0 8px 32px rgba(75,58,201,0.03), inset 0 1px 0 rgba(255,255,255,0.5)',
-    transition: 'all 0.2s ease',
-    ':hover': {
-      backgroundColor: 'rgba(255,255,255,0.3)',
-      boxShadow: '0 1px 3px rgba(0,0,0,0.01), 0 12px 40px rgba(75,58,201,0.04), inset 0 1px 0 rgba(255,255,255,0.6)',
-      transform: 'translateY(-1px)'
-    }
-  },
-  cardHead: {
-    display: 'flex', alignItems: 'center', gap: '10px',
-    marginBottom: '12px', paddingBottom: '10px',
-    borderBottom: '1px solid rgba(255,255,255,0.25)'
-  },
-  cardAgentIcon: { width: '22px', height: '22px', borderRadius: '6px', display: 'block', flexShrink: 0 },
-  cardAgentName: { fontSize: '14px', fontWeight: 600, color: '#1c1c1e', lineHeight: '1.3' },
-  cardTime: { fontSize: '12px', color: 'rgba(0,0,0,0.25)', lineHeight: '1.2', marginTop: '1px' },
-  response: {
-    fontSize: '15px', lineHeight: '1.7', color: '#333',
-    whiteSpace: 'pre-wrap', wordBreak: 'break-word'
-  },
-  thinking: {
-    display: 'flex', alignItems: 'center', gap: '10px',
-    padding: '12px 16px',
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    borderRadius: '14px',
-    border: '1px solid rgba(255,255,255,0.2)',
-    color: '#666', fontSize: '14px'
-  },
-  dot: {
-    width: '6px', height: '6px', borderRadius: '50%',
-    backgroundColor: '#4b3ac9',
-    animationName: {
-      '0%, 80%, 100%': { transform: 'translateY(0)', opacity: 0.25 },
-      '40%': { transform: 'translateY(-5px)', opacity: 0.7 }
-    },
-    animationDuration: '1.2s', animationIterationCount: 'infinite',
-    animationTimingFunction: 'ease-in-out'
-  },
-  inputBar: {
-    padding: '8px 12px 16px',
-    background: 'transparent'
-  },
-  inputRow: {
-    display: 'flex', alignItems: 'flex-end', gap: '8px',
-    padding: '6px 6px 6px 18px',
-    borderRadius: '28px',
-    backgroundColor: 'rgba(255,255,255,0.25)',
-    backdropFilter: 'blur(30px) saturate(200%)',
-    WebkitBackdropFilter: 'blur(30px) saturate(200%)',
-    border: '1px solid rgba(255,255,255,0.45)',
-    boxShadow: '0 1px 3px rgba(0,0,0,0.01), 0 4px 24px rgba(75,58,201,0.03), inset 0 1px 0 rgba(255,255,255,0.5)',
-    transition: 'all 0.2s ease',
-    ':focus-within': {
-      backgroundColor: 'rgba(255,255,255,0.35)',
-      borderColor: 'rgba(255,255,255,0.6)',
-      boxShadow: '0 1px 3px rgba(0,0,0,0.01), 0 8px 32px rgba(75,58,201,0.04), inset 0 1px 0 rgba(255,255,255,0.6)'
-    }
-  },
-  input: {
-    flexGrow: 1, backgroundColor: 'transparent',
-    fontSize: '16px', lineHeight: '1.5',
-    '> textarea': {
-      '::placeholder': { color: 'rgba(0,0,0,0.2)' },
-      background: 'transparent',
-      '::-webkit-scrollbar': { width: '0' }
-    }
-  },
-  sendBtn: {
-    width: '36px', height: '36px', minWidth: '36px',
-    borderRadius: '18px', outline: 'none',
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    cursor: 'pointer', border: '1px solid rgba(255,255,255,0.3)',
-    backgroundColor: 'rgba(75,58,201,0.7)',
-    backdropFilter: 'blur(10px)',
-    WebkitBackdropFilter: 'blur(10px)',
-    transition: 'all 0.15s ease',
-    ':hover': { transform: 'scale(1.06)', backgroundColor: 'rgba(75,58,201,0.85)', boxShadow: '0 4px 20px rgba(75,58,201,0.15)' },
-    ':active': { transform: 'scale(0.9)' },
-    ':disabled': { opacity: 0.2, cursor: 'default', transform: 'none', boxShadow: 'none' }
-  },
-  hint: {
-    display: 'block', textAlign: 'center', marginTop: '10px',
-    fontSize: '11px', color: 'rgba(0,0,0,0.15)'
-  }
-});
-
-let seq = 0;
-const uid = () => ++seq;
-
-const SUGGESTIONS = [
-  'Investiga las ultimas tendencias en IA',
-  'Crea un documento sobre...',
-  'Revisa mis emails importantes',
-  'Escribe un componente React'
-];
-
-export default function App() {
-  const s = useStyles();
-  const [active, setActive] = React.useState('research');
-  const [msgs, setMsgs] = React.useState([]);
-  const [text, setText] = React.useState('');
-  const [busy, setBusy] = React.useState(false);
-  const [menu, setMenu] = React.useState(false);
-  const log = React.useRef(null);
-  const menuRef = React.useRef(null);
-
-  React.useEffect(() => { B.warm(); const d = B.loadMem(); if (d) { if (d.active) setActive(d.active); if (d.mid) seq = d.mid; if (d.messages?.length) setMsgs(d.messages.map(m => ({ id: uid(), role: m.role, text: m.content, agent: d.active, steps: [], response: m.content, phase: 'done', time: Date.now() }))); } }, []);
-  React.useEffect(() => { if (log.current) log.current.scrollTop = log.current.scrollHeight; }, [msgs]);
-
-  const persist = (list) => { const mem = list.filter(m => m.role === 'user' || m.phase === 'done').map(m => ({ role: m.role, content: m.role === 'user' ? m.text : m.response })); B.saveMem({ messages: mem, active, mid: seq }); };
-  const patch = (id, p) => setMsgs(prev => prev.map(m => m.id === id ? { ...m, ...p } : m));
-
-  function pickAgent(id) { setActive(id); setMenu(false); B.saveMem({ messages: [], active: id, mid: 0 }); setMsgs([]); setText(''); }
-
-  function send(input) {
-    const q = input.trim();
-    if (!q || busy) return;
-    setBusy(true); setText('');
-    const now = Date.now();
-    const user = { id: uid(), role: 'user', text: q, time: now };
-    const agent = { id: uid(), role: 'agent', agent: active, phase: 'planning', steps: [], response: '', time: now };
-    setMsgs(prev => [...prev, user, agent]);
-    B.planSteps(q, active).then(plan => { if (!plan) { patch(agent.id, { phase: 'done', response: 'No he podido procesar eso ahora mismo.' }); setBusy(false); return; } patch(agent.id, { phase: 'running', steps: plan.steps || [], response: plan.response || '' }); }).catch(() => { patch(agent.id, { phase: 'done', steps: [], response: 'Ha ocurrido un error.' }); setBusy(false); });
-  }
-
-  function onStepsDone(id) { patch(id, { phase: 'done' }); setBusy(false); setMsgs(prev => { persist(prev); return prev; }); }
-
-  React.useEffect(() => { if (!menu) return; const handler = (e) => { if (menuRef.current && !menuRef.current.contains(e.target)) setMenu(false); }; document.addEventListener('mousedown', handler); return () => document.removeEventListener('mousedown', handler); }, [menu]);
-
-  const agent = B.agentById(active);
+  });
 
   return (
-    <div style={{ position: 'relative', height: '100vh' }}>
-      <div className={s.bg}>
-        <div className={s.orb1} />
-        <div className={s.orb2} />
-        <div className={s.orb3} />
-        <div className={s.orb4} />
+    <div style={{ display: 'flex', height: '100vh', width: '100%', minWidth: '420px', fontFamily: S.font, overflow: 'hidden' }}>
+      {/* Sidebar */}
+      <div style={{ width: '48px', flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '8px 0', gap: '2px', borderRight: '1px solid ' + S.border, background: S.bgSubtle }}>
+        <div style={{ width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '8px' }}>
+          <img src="../dist/x1-logo.png" alt="X1" style={{ height: '22px', width: 'auto', objectFit: 'contain' }} onError={e => e.currentTarget.style.display='none'} />
+        </div>
+        <button onClick={() => setTab('chat')} title="Chat" style={sidebarBtn(tab === 'chat')}><ChatIcon active={tab === 'chat'} /></button>
+        <button onClick={() => setTab('repo')} title="Repositorio" style={sidebarBtn(tab === 'repo')}><RepoIcon active={tab === 'repo'} /></button>
+        <div style={{ marginTop: 'auto' }} />
+        {githubUser?.avatar_url ? (
+          <img src={githubUser.avatar_url} alt={githubUser.login}
+            style={{ width: '28px', height: '28px', borderRadius: '50%', border: '1px solid ' + S.border, cursor: 'pointer', marginBottom: '4px' }}
+            onClick={() => setSettingsOpen(v => !v)} title={githubUser.login} />
+        ) : (
+          <button onClick={() => setSettingsOpen(v => !v)} title="Cuenta" style={{ ...sidebarBtn(false), marginBottom: '4px' }}>
+            <svg viewBox="0 0 16 16" width="16" height="16" fill={S.fgMuted}><path d="M10.561 8.073a6.005 6.005 0 013.432 5.142.75.75 0 11-1.498.07 4.5 4.5 0 00-8.99 0 .75.75 0 11-1.498-.07 6.004 6.004 0 013.431-5.142 3.999 3.999 0 115.123 0zM10.5 5a2.5 2.5 0 10-5 0 2.5 2.5 0 005 0z"/></svg>
+          </button>
+        )}
       </div>
-      <div className={s.app}>
-        <div className={s.nav}>
-          <div className={s.navLeft}>
-            <img className={s.logo} src="../assets/x1-logo-square.png" alt="" onError={e => e.currentTarget.style.display = 'none'} />
-            <div className={s.pickerWrap} ref={menuRef}>
-              <button className={s.picker} onClick={e => { e.stopPropagation(); setMenu(v => !v); }} aria-haspopup="true" aria-expanded={menu}>
-                <img className={s.pickerIcon} src={agent.aiIcon} alt="" onError={e => e.currentTarget.style.display = 'none'} />
-                {agent.name}
-                <ChevronDown12Regular className={`${s.pickerArrow} ${menu ? s.pickerArrowOpen : ''}`} />
-              </button>
-              <div className={`${s.menu} ${menu ? s.menuOpen : ''}`} onClick={e => e.stopPropagation()}>
-                {B.AGENTS.map(a => (
-                  <button key={a.id} className={s.menuItem} onClick={() => pickAgent(a.id)}>
-                    <img src={a.aiIcon} alt="" style={{ width: '18px', height: '18px', borderRadius: '5px' }} onError={e => e.currentTarget.style.display = 'none'} />
-                    <span style={{ flexGrow: 1 }}>{a.name}</span>
-                    <span style={{ fontSize: '12px', color: '#8e8e93' }}>{a.ai}</span>
-                    {a.id === active && <CheckmarkCircle24Filled className={s.menuCheck} />}
-                  </button>
-                ))}
-                <div className={s.menuDivider} />
-                <button className={s.menuItem} onClick={() => { B.clearMem(); setMsgs([]); setMenu(false); }}>
-                  <Delete24Regular style={{ fontSize: '18px', color: '#8e8e93' }} /> Limpiar historial
+
+      {/* Main */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden' }}>
+        {tab === 'chat' ? (
+          <ChatView conversations={conversations} activeConv={activeConv} onSelectConv={setActiveConvId} onCreateConv={createConversation} onUpdateConv={updateConversation} onDeleteConv={deleteConversation} />
+        ) : (
+          <RepoView conversations={conversations} githubUser={githubUser} />
+        )}
+      </div>
+
+      {/* Settings */}
+      {settingsOpen && (
+        <>
+          <div style={{ position: 'fixed', inset: 0, zIndex: 99 }} onClick={() => setSettingsOpen(false)} />
+          <div ref={settingsRef} style={{
+            position: 'fixed', bottom: '48px', right: '12px', zIndex: 100,
+            width: '300px', background: S.bgDefault, border: '1px solid ' + S.border, borderRadius: '12px',
+            boxShadow: '0 8px 24px rgba(140,149,159,0.2)', overflow: 'hidden',
+          }}>
+            {githubUser && (
+              <div style={{ padding: '12px', borderBottom: '1px solid ' + S.border, display: 'flex', alignItems: 'center', gap: '10px' }}>
+                {githubUser.avatar_url ? (
+                  <img src={githubUser.avatar_url} alt="" style={{ width: '40px', height: '40px', borderRadius: '50%', border: '1px solid ' + S.border }} />
+                ) : (
+                  <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: S.bgSubtle, border: '1px solid ' + S.border, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <svg viewBox="0 0 16 16" width="16" height="16" fill={S.fgMuted}><path d="M10.561 8.073a6.005 6.005 0 013.432 5.142.75.75 0 11-1.498.07 4.5 4.5 0 00-8.99 0 .75.75 0 11-1.498-.07 6.004 6.004 0 013.431-5.142 3.999 3.999 0 115.123 0zM10.5 5a2.5 2.5 0 10-5 0 2.5 2.5 0 005 0z"/></svg>
+                  </div>
+                )}
+                <div>
+                  <div style={{ fontSize: '14px', fontWeight: '600' }}>{githubUser.name || githubUser.login}</div>
+                  <div style={{ fontSize: '12px', color: S.fgMuted }}>@{githubUser.login}</div>
+                </div>
+              </div>
+            )}
+            <div style={{ padding: '8px' }}>
+              <div style={{ padding: '8px 12px', borderRadius: '6px', marginBottom: '4px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                  <GoogleSvg /> <span style={{ flex: 1, fontSize: '14px', fontWeight: '500' }}>Google</span>
+                  <span style={{ fontSize: '12px', color: googleStatus ? S.fgSuccess : S.fgMuted }}>{googleStatus ? 'Conectado' : 'Desconectado'}</span>
+                </div>
+                <button onClick={googleStatus ? async () => { await B.logoutGoogle(); setGoogleStatus(false); } : async () => { const ok = await B.loginGoogle(); if (ok) setGoogleStatus(true); }}
+                  style={{ width: '100%', padding: '5px 12px', borderRadius: '6px', border: '1px solid ' + S.border, background: S.bgSubtle, fontSize: '12px', fontWeight: '500', cursor: 'pointer' }}>
+                  {googleStatus ? 'Desconectar' : 'Conectar'}
+                </button>
+              </div>
+              <div style={{ padding: '8px 12px', borderRadius: '6px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                  <OctocatSvg /> <span style={{ flex: 1, fontSize: '14px', fontWeight: '500' }}>GitHub</span>
+                  <span style={{ fontSize: '12px', color: githubStatus ? S.fgSuccess : S.fgMuted }}>{githubStatus ? 'Conectado' : 'Desconectado'}</span>
+                </div>
+                <button onClick={githubStatus ? async () => { await B.logoutGithub(); setGithubStatus(false); } : function() {
+                  B.startGithubDeviceFlow().then(function(flow) {
+                    window.open(flow.verification_uri, 'github-device');
+                    return B.pollGithubToken(flow.device_code);
+                  }).then(function(token) {
+                    return B.fetchGithubUser(token);
+                  }).then(function(user) {
+                    if (user && user.login) setGithubStatus(true);
+                  }).catch(function(e) {
+                    console.error('[X1] GitHub connect error:', e);
+                  });
+                }}
+                  style={{ width: '100%', padding: '5px 12px', borderRadius: '6px', border: '1px solid ' + S.border, background: S.bgSubtle, fontSize: '12px', fontWeight: '500', cursor: 'pointer' }}>
+                  {githubStatus ? 'Desconectar' : 'Conectar'}
                 </button>
               </div>
             </div>
           </div>
-          <span className={s.navPill}>{agent.ai}</span>
-        </div>
-
-        <div className={s.content} ref={log}>
-          {msgs.length === 0 ? (
-            <div className={s.empty}>
-              <div className={s.emptyIconWrap}><Sparkle28Filled style={{ color: '#4b3ac9', fontSize: '34px' }} /></div>
-              <div className={s.emptyTitle}>En que puedo ayudarte?</div>
-              <div className={s.emptyDesc}><strong>{agent.name}</strong> &middot; {agent.ai}</div>
-              <div className={s.chips}>
-                {SUGGESTIONS.map((t, i) => (
-                  <button key={i} className={s.chip} onClick={() => send(t)}>
-                    {t} <ArrowRight16Regular style={{ fontSize: '12px', color: '#aaa' }} />
-                  </button>
-                ))}
-              </div>
-            </div>
-          ) : msgs.map(m => m.role === 'user' ? (
-            <div key={m.id} className={s.userRow}>
-              <div className={s.bubble}>{m.text}</div>
-            </div>
-          ) : (
-            <div key={m.id} className={s.glass}>
-              <div className={s.cardHead}>
-                <img className={s.cardAgentIcon} src={B.agentById(m.agent).aiIcon} alt="" onError={e => e.currentTarget.style.display = 'none'} />
-                <div>
-                  <div className={s.cardAgentName}>{B.agentById(m.agent).name} &middot; {B.agentById(m.agent).ai}</div>
-                  <div className={s.cardTime}>{m.time ? new Date(m.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}</div>
-                </div>
-              </div>
-              {m.phase === 'planning' && (
-                <div className={s.thinking}>
-                  <span className={s.dot} style={{ animationDelay: '0s' }} />
-                  <span className={s.dot} style={{ animationDelay: '0.2s' }} />
-                  <span className={s.dot} style={{ animationDelay: '0.4s' }} />
-                  <span style={{ marginLeft: '6px', fontWeight: 500, color: '#4b3ac9' }}>Pensando...</span>
-                </div>
-              )}
-              {(m.phase === 'running' || m.phase === 'done') && m.steps?.length > 0 && (
-                <ProcessTimeline steps={m.steps} onComplete={m.phase === 'running' ? () => onStepsDone(m.id) : undefined} />
-              )}
-              {m.phase === 'done' && m.response && <Body1 className={s.response}>{m.response}</Body1>}
-            </div>
-          ))}
-        </div>
-
-        <div className={s.inputBar}>
-          <div className={s.inputRow}>
-            <Textarea className={s.input} appearance="filled-lighter" resize="none"
-              value={text} placeholder="Preguntame lo que quieras..."
-              onChange={(_, d) => setText(d.value)}
-              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(text); } }} />
-            <button className={s.sendBtn} disabled={!text.trim() || busy} onClick={() => send(text)} aria-label="Enviar">
-              <Send24Filled style={{ color: 'white', fontSize: '16px' }} />
-            </button>
-          </div>
-          <Caption1 className={s.hint}>X1 puede cometer errores. Verifica la informacion importante.</Caption1>
-        </div>
-      </div>
+        </>
+      )}
     </div>
   );
 }

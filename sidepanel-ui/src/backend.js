@@ -1,154 +1,400 @@
-export const CLOUD = 'https://x1-proxy.baosx1.workers.dev';
-export const SECRET = '9ff4b7dda5f7defd5f7fb7c32c133428bc87e8efeb8550d3ce1e5838c1d3b850';
+import * as T from './tools.js';
 
-const MEM_KEY = 'x1_mem';
-const VOTE_KEY = 'x1_votes';
-const MAX_MEM = 24;
 const AI = '../assets/ai/';
 
 export const AGENTS = [
-  { id: 'research',   name: 'Research',   ai: 'Gemini',  aiIcon: AI + 'googlegemini.svg' },
-  { id: 'writer',     name: 'Writer',     ai: 'Claude',  aiIcon: AI + 'anthropic.svg' },
-  { id: 'developer',  name: 'Developer',  ai: 'GPT-4o',  aiIcon: AI + 'openai.svg' },
-  { id: 'marketing',  name: 'Marketing',  ai: 'Gemini',  aiIcon: AI + 'googlegemini.svg' },
-  { id: 'finance',    name: 'Finance',    ai: 'Claude',  aiIcon: AI + 'anthropic.svg' },
-  { id: 'legal',      name: 'Legal',      ai: 'Mistral', aiIcon: AI + 'mistralai.svg' },
-  { id: 'email',      name: 'Email',      ai: 'Llama',   aiIcon: AI + 'meta.svg' },
-  { id: 'meeting',    name: 'Meeting',    ai: 'Gemini',  aiIcon: AI + 'googlegemini.svg' }
+  { id: 'research',   name: 'Research',   ai: 'Gemini',  aiIcon: AI + 'googlegemini.svg',  color: '#4285f4' },
+  { id: 'writer',     name: 'Writer',     ai: 'Claude',  aiIcon: AI + 'anthropic.svg',     color: '#d97706' },
+  { id: 'developer',  name: 'Developer',  ai: 'GPT-4o',  aiIcon: AI + 'openai.svg',         color: '#10a37f' },
+  { id: 'marketing',  name: 'Marketing',  ai: 'Gemini',  aiIcon: AI + 'googlegemini.svg',  color: '#4285f4' },
+  { id: 'finance',    name: 'Finance',    ai: 'Claude',  aiIcon: AI + 'anthropic.svg',     color: '#d97706' },
+  { id: 'legal',      name: 'Legal',      ai: 'Mistral', aiIcon: AI + 'mistralai.svg',     color: '#ff7000' },
+  { id: 'email',      name: 'Email',      ai: 'Llama',   aiIcon: AI + 'meta.svg',          color: '#0668e1' },
+  { id: 'meeting',    name: 'Meeting',    ai: 'Gemini',  aiIcon: AI + 'googlegemini.svg',  color: '#4285f4' }
 ];
 
 export function agentById(id) {
   return AGENTS.find(a => a.id === id) || AGENTS[0];
 }
 
-const AGENT_STYLES = {
-  research:  'Eres un investigador. Busca, analiza, sintetiza. Responde en el idioma del usuario.',
-  writer:    'Eres un escritor profesional. Texto claro, conciso, bien estructurado. Responde en el idioma del usuario.',
-  developer: 'Eres un programador senior. Codigo limpio, explicaciones breves. Responde en el idioma del usuario.',
-  marketing: 'Eres un estratega de marketing. Analiza audiencias, posicionamiento, canales. Responde en el idioma del usuario.',
-  finance:   'Eres un analista financiero. Preciso con numeros, identifica tendencias. Responde en el idioma del usuario.',
-  legal:     'Eres un asesor legal. Preciso, referencia conceptos, identifica riesgos. Responde en el idioma del usuario.',
-  email:     'Eres un asistente de email. Profesional, claro, eficiente. Responde en el idioma del usuario.',
-  meeting:   'Eres un secretario de reunion. Extrae decisiones y accionables. Responde en el idioma del usuario.'
-};
+export function getBestAgent(query) {
+  const t = query.toLowerCase();
+  if (/codigo|code|programa|funcion|componente|react|debug|script|api|html|css|bug|error/.test(t)) return 'developer';
+  if (/email|correo|gmail|mensaje|redacta/.test(t)) return 'email';
+  if (/reunion|meeting|calendario|agenda/.test(t)) return 'meeting';
+  if (/marketing|ventas|campana|seo/.test(t)) return 'marketing';
+  if (/finanzas|inversion|budget|dinero|stock/.test(t)) return 'finance';
+  if (/legal|contrato|ley/.test(t)) return 'legal';
+  if (/escribir|texto|articul|blog|contenido/.test(t)) return 'writer';
+  return 'research';
+}
 
-const GREETINGS = [
-  /^hola/i, /^buenas/i, /^hey/i, /^hello/i, /^hi\b/i, /^heyy/i,
-  /^qu[eé] tal/i, /^c[oó]mo est[áa]s/i, /^buen[oa]s/i,
-  /^gracias/i, /^thanks/i, /^thank you/i,
-  /^s[ií]$/i, /^no$/i, /^ok$/i, /^vale/i, /^bien$/i, /^jaja/i, /^lol/i
-];
+function summarizeRepos(repos) {
+  if (!repos || repos.length === 0) return '';
+  return repos.map(r =>
+    r.name + ' (' + (r.language || 'N/A') + ', ' + formatNumber(r.stars) + ' stars)' +
+    (r.description ? '\n  ' + r.description : '')
+  ).join('\n');
+}
 
-export function isSimple(text) {
-  const t = text.trim();
-  if (t.length < 3) return true;
-  for (const g of GREETINGS) {
-    if (g.test(t)) {
-      const rest = t.replace(g, '').trim();
-      if (rest.length <= 5) return true;
-    }
+function summarizeCode(code) {
+  if (!code || code.length === 0) return '';
+  return code.map(c => c.repo + '/' + c.path).join('\n');
+}
+
+function summarizePkgs(pkgs) {
+  if (!pkgs || pkgs.length === 0) return '';
+  return pkgs.map(p => p.name + ' v' + p.version + (p.description ? ' - ' + p.description : '')).join('\n');
+}
+
+function summarizeSO(so) {
+  if (!so || so.length === 0) return '';
+  return so.map(q => q.title + ' (' + q.answers + ' respuestas)').join('\n');
+}
+
+function formatNumber(n) {
+  if (n >= 1000) return (n / 1000).toFixed(1) + 'k';
+  return n;
+}
+
+const GREETINGS = /^(hola|buenas|hey|hi|hello|que tal|como estas|buen[ao]s|saludos|gracias|ok|vale|perfecto|chao|adios|bye|buenos dias|buenas tardes|buenas noches|que onda|que hay|que pas|whats up|sup|hey|xup|yep|nope|si|no|dale|vamos|genial|increible|bien|mal|regular|mas o menos|asi asi|comprendo|entendido|entiendo|perfecto|excelente|genial|fantastico|maravilloso|ok then|cool|nice|good|bad|fine|great|awesome|amazing|hello there|good morning|good afternoon|good evening)$/i;
+
+function isGreeting(q) {
+  return GREETINGS.test(q.trim());
+}
+
+function buildSmartResponse(query, results) {
+  var t = query.toLowerCase();
+
+  if (isGreeting(query)) {
+    var hour = new Date().getHours();
+    var saludo = hour < 12 ? 'Buenos dias' : hour < 20 ? 'Buenas tardes' : 'Buenas noches';
+    return saludo + '! Soy X1, tu asistente de IA. Puedo ayudarte a buscar repositorios en GitHub, paquetes npm, soluciones en Stack Overflow y mas. En que puedo ayudarte?';
   }
-  return false;
+
+  var parts = [];
+  var hasGithub = results.github && results.github.length > 0;
+  var hasCode = results.code && results.code.length > 0;
+  var hasNpm = results.npm && results.npm.length > 0;
+  var hasSO = results.stackoverflow && results.stackoverflow.length > 0;
+
+  if (hasGithub) {
+    parts.push('Encontre ' + results.github.length + ' repositorios en GitHub:\n');
+    results.github.forEach(function(r, i) {
+      parts.push((i + 1) + '. ' + r.name);
+      if (r.description) parts.push('   ' + r.description);
+      parts.push('   ' + formatNumber(r.stars) + ' stars | ' + (r.language || 'N/A') + '\n');
+    });
+  }
+
+  if (hasCode) {
+    parts.push('Codigo relevante encontrado:');
+    results.code.forEach(function(c) {
+      parts.push('  ' + c.repo + '/' + c.path);
+    });
+  }
+
+  if (hasNpm) {
+    parts.push('Paquetes npm:');
+    results.npm.forEach(function(p) {
+      parts.push('  ' + p.name + ' v' + p.version + (p.description ? ': ' + p.description : ''));
+    });
+  }
+
+  if (hasSO) {
+    parts.push('Soluciones en Stack Overflow:');
+    results.stackoverflow.forEach(function(q) {
+      parts.push('  ' + q.title + ' (' + q.answers + ' respuestas)');
+    });
+  }
+
+  if (parts.length === 0) {
+    return 'No encontre resultados para "' + query + '". Intenta con otros terminos o revisa la ortografia.';
+  }
+
+  return parts.join('\n');
 }
 
-function api(messages, opts = {}) {
-  return fetch(CLOUD + '/v1/chat/completions', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-X1-Auth': SECRET },
-    body: JSON.stringify({ messages, max_tokens: opts.max_tokens || 600, temperature: opts.temperature || 0.3 }),
-    signal: AbortSignal.timeout(opts.timeout || 15000)
-  }).then(r => r.ok ? r.json() : null).then(d => {
-    if (!d) return null;
-    const content = d.choices?.[0]?.message?.content;
-    return content ? content.trim() : null;
-  }).catch(() => null);
+export async function smartQuery(query, agentId) {
+  T.addMemory('user', query);
+  if (isGreeting(query)) {
+    var hour = new Date().getHours();
+    var saludo = hour < 12 ? 'Buenos dias' : hour < 20 ? 'Buenas tardes' : 'Buenas noches';
+    var response = saludo + '! Soy X1, tu asistente de IA. Puedo ayudarte a buscar repositorios en GitHub, paquetes npm, soluciones en Stack Overflow y mas. En que puedo ayudarte?';
+    T.addMemory('assistant', response);
+    return { response: response, tools: [] };
+  }
+  var toolResults = await T.executeTools(query);
+  var response = buildSmartResponse(query, toolResults);
+  T.addMemory('assistant', response);
+  var toolsUsed = Object.keys(toolResults).filter(function(k) {
+    if (k === 'github' && toolResults.github && toolResults.github.length > 0) return true;
+    if (k === 'code' && toolResults.code && toolResults.code.length > 0) return true;
+    if (k === 'npm' && toolResults.npm && toolResults.npm.length > 0) return true;
+    if (k === 'stackoverflow' && toolResults.stackoverflow && toolResults.stackoverflow.length > 0) return true;
+    return false;
+  });
+  return { response: response, tools: toolsUsed };
 }
 
-function systemPrompt(agentId) {
-  return 'Eres X1, un agente de navegador.\n\n' + (AGENT_STYLES[agentId] || AGENT_STYLES.research);
-}
+export function getMemoryContext() { return T.getMemoryContext(); }
+export function addMemory(role, content) { T.addMemory(role, content); }
+export function clearMemory() { T.clearMemory(); }
+export function loadMemory() { return T.loadMemory(); }
 
-export function planSteps(query, agentId) {
-  const a = agentById(agentId);
-  const msgs = [
-    { role: 'system', content: systemPrompt(agentId) + '\n\nPlanifica los pasos para cumplir la solicitud. Devuelve SOLO JSON valido: {"steps":[{"app":"App","label":"Accion"}],"response":"Respuesta"}' },
-    { role: 'user', content: 'Agente: ' + a.name + '\n\n' + query }
-  ];
-  return api(msgs, { max_tokens: 600, temperature: 0.3 }).then(text => {
-    if (!text) return null;
-    try { const j = JSON.parse(text); if (j.steps && j.response) return j; } catch (e) {}
-    const m = text.match(/\{[\s\S]*\}/);
-    if (m) { try { const j = JSON.parse(m[0]); if (j.steps && j.response) return j; } catch (e) {} }
-    return { steps: [{ app: 'Done', label: 'Completado' }], response: text };
+export function checkGoogleAuth() {
+  return new Promise(resolve => {
+    if (typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) { resolve(false); return; }
+    chrome.runtime.sendMessage({ type: 'X1_AUTH_CHECK_GOOGLE' }, resp => {
+      if (chrome.runtime.lastError) { resolve(false); return; }
+      resolve(resp?.logged ?? false);
+    });
   });
 }
 
-export function simpleAnswer(text, agentId) {
-  const msgs = [
-    { role: 'system', content: systemPrompt(agentId) + '\nResponde breve y naturalmente.' },
-    { role: 'user', content: text }
-  ];
-  return api(msgs, { max_tokens: 150, temperature: 0.5, timeout: 8000 });
+export function loginGoogle() {
+  return new Promise(resolve => {
+    if (typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) { resolve(false); return; }
+    chrome.runtime.sendMessage({ type: 'X1_AUTH_LOGIN_GOOGLE' }, resp => {
+      if (chrome.runtime.lastError) { resolve(false); return; }
+      resolve(resp?.ok ?? false);
+    });
+  });
 }
 
-export function warm() {
-  api([{ role: 'user', content: 'ping' }], { max_tokens: 1, timeout: 5000 }).catch(() => {});
+export function logoutGoogle() {
+  return new Promise(resolve => {
+    if (typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) { resolve(false); return; }
+    chrome.runtime.sendMessage({ type: 'X1_AUTH_LOGOUT_GOOGLE' }, resp => {
+      if (chrome.runtime.lastError) { resolve(false); return; }
+      resolve(resp?.ok ?? false);
+    });
+  });
 }
 
-export function loadMem() {
-  try {
-    const raw = localStorage.getItem(MEM_KEY);
-    if (raw) { const d = JSON.parse(raw); if (d?.messages) return d; }
-  } catch (e) {}
-  return null;
+export function checkGithubAuth() {
+  return new Promise(resolve => {
+    try {
+      if (typeof chrome === 'undefined' || !chrome.storage?.local) { resolve(false); return; }
+      chrome.storage.local.get('github_user', r => resolve(!!(r?.github_user?.login)));
+    } catch (e) { resolve(false); }
+  });
 }
 
-export function saveMem(state) {
-  try {
-    localStorage.setItem(MEM_KEY, JSON.stringify({
-      messages: (state.messages || []).slice(-MAX_MEM),
-      active: state.active, mid: state.mid || 0
+export function loginGithub() {
+  return new Promise(function(resolve, reject) {
+    if (typeof chrome === 'undefined' || !chrome.identity) {
+      reject(new Error('chrome.identity no disponible'));
+      return;
+    }
+    var clientId = 'Ov23limUz0ywpxqoPJXo';
+    var redirectUrl = chrome.identity.getRedirectURL();
+    var authUrl = 'https://github.com/login/oauth/authorize?client_id=' + clientId +
+      '&redirect_uri=' + encodeURIComponent(redirectUrl) +
+      '&scope=read:user+user:email';
+    var timedOut = false;
+    var timer = setTimeout(function() {
+      timedOut = true;
+      reject(new Error('Tiempo de espera agotado. Revisa que la URL de callback este registrada en tu GitHub App.'));
+    }, 30000);
+    chrome.identity.launchWebAuthFlow({ url: authUrl, interactive: true }, function(redirectUrl) {
+      if (timedOut) return;
+      clearTimeout(timer);
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message));
+        return;
+      }
+      if (!redirectUrl) { reject(new Error('Cancelado por el usuario')); return; }
+      try {
+        var urlObj = new URL(redirectUrl);
+        var code = urlObj.searchParams.get('code');
+        if (!code) { reject(new Error('No se obtuvo codigo de autorizacion')); return; }
+        resolve({ code: code });
+      } catch (e) { reject(new Error('URL de respuesta invalida')); }
+    });
+  });
+}
+
+export function startGithubDeviceFlow() {
+  return fetch('https://github.com/login/device/code', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+    body: JSON.stringify({
+      client_id: 'Ov23limUz0ywpxqoPJXo',
+      scope: 'read:user user:email'
+    })
+  }).then(function(r) {
+    if (!r.ok) {
+      return r.json().then(function(data) {
+        throw new Error(data.error_description || 'Error HTTP ' + r.status);
+      }, function() {
+        throw new Error('Error HTTP ' + r.status + ' al contactar GitHub');
+      });
+    }
+    return r.json();
+  }).then(function(data) {
+    if (data.error) throw new Error(data.error_description || data.error);
+    return {
+      device_code: data.device_code,
+      user_code: data.user_code,
+      verification_uri: data.verification_uri || 'https://github.com/login/device',
+      interval: data.interval || 5
+    };
+  });
+}
+
+export function pollGithubToken(device_code) {
+  return new Promise(function(resolve, reject) {
+    var attempts = 0;
+    var maxAttempts = 60;
+    function poll() {
+      if (attempts >= maxAttempts) { reject(new Error('Tiempo de espera agotado')); return; }
+      attempts++;
+      fetch('https://github.com/login/oauth/access_token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({
+          client_id: 'Ov23limUz0ywpxqoPJXo',
+          client_secret: '7997bfe3d604dfbc9f6c65bbb46620d44cfe26c8',
+          device_code: device_code,
+          grant_type: 'urn:ietf:params:oauth:grant-type:device_code'
+        })
+      }).then(function(r) { return r.json(); }).then(function(data) {
+        if (data.access_token) { resolve(data.access_token); return; }
+        if (data.error === 'authorization_pending') { setTimeout(poll, 5000); return; }
+        if (data.error === 'slow_down') { setTimeout(poll, 8000); return; }
+        if (data.error === 'expired_token') { reject(new Error('El codigo ha expirado. Intenta de nuevo.')); return; }
+        if (data.error === 'access_denied') { reject(new Error('Autorizacion denegada.')); return; }
+        setTimeout(poll, 5000);
+      }).catch(function() { setTimeout(poll, 5000); });
+    }
+    poll();
+  });
+}
+
+
+export function exchangeGithubCode(code) {
+  return fetch('https://github.com/login/oauth/access_token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+    body: JSON.stringify({ client_id: 'Ov23limUz0ywpxqoPJXo', client_secret: '7997bfe3d604dfbc9f6c65bbb46620d44cfe26c8', code })
+  }).then(r => r.json()).then(data => {
+    if (data.error) throw new Error(data.error_description || data.error);
+    if (!data.access_token) throw new Error('No token');
+    return data.access_token;
+  });
+}
+
+export function fetchGithubUser(token) {
+  return fetch('https://api.github.com/user', {
+    headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/vnd.github+json' }
+  }).then(r => r.json()).then(info => {
+    if (info.message) throw new Error(info.message);
+    const user = { login: info.login, name: info.name, avatar_url: info.avatar_url, email: info.email };
+    try { chrome.storage.local.set({ github_token: token, github_user: user }); } catch (e) {}
+    return user;
+  });
+}
+
+export function fetchGithubRepos(token) {
+  return fetch('https://api.github.com/user/repos?sort=updated&per_page=10', {
+    headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/vnd.github+json' }
+  }).then(r => r.json()).then(repos => {
+    if (!Array.isArray(repos)) return [];
+    return repos.map(r => ({
+      name: r.full_name,
+      description: r.description || '',
+      language: r.language,
+      stars: r.stargazers_count,
+      updated: r.updated_at,
+      url: r.html_url,
+      private: r.private,
     }));
-  } catch (e) {}
+  }).catch(() => []);
 }
 
-export function clearMem() {
-  try { localStorage.removeItem(MEM_KEY); } catch (e) {}
+export function fetchGithubStarred(token) {
+  return fetch('https://api.github.com/user/starred?sort=updated&per_page=10', {
+    headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/vnd.github+json' }
+  }).then(r => r.json()).then(repos => {
+    if (!Array.isArray(repos)) return [];
+    return repos.map(r => ({
+      name: r.full_name,
+      description: r.description || '',
+      language: r.language,
+      stars: r.stargazers_count,
+      url: r.html_url,
+    }));
+  }).catch(() => []);
+}
+
+export function fetchGithubIssues(token) {
+  return fetch('https://api.github.com/user/issues?sort=updated&per_page=10&state=open', {
+    headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/vnd.github+json' }
+  }).then(r => r.json()).then(issues => {
+    if (!Array.isArray(issues)) return [];
+    return issues.map(i => ({
+      title: i.title,
+      repo: i.repository_url?.split('/').slice(-2).join('/'),
+      state: i.state,
+      url: i.html_url,
+      created: i.created_at,
+    }));
+  }).catch(() => []);
+}
+
+export function logoutGithub() {
+  return new Promise(resolve => {
+    try {
+      if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+        chrome.storage.local.remove(['github_token', 'github_user'], () => resolve(true));
+      } else { resolve(false); }
+    } catch (e) { resolve(false); }
+  });
+}
+
+export function getGithubUser() {
+  return new Promise(resolve => {
+    try {
+      if (typeof chrome === 'undefined' || !chrome.storage?.local) { resolve(null); return; }
+      chrome.storage.local.get('github_user', r => resolve(r?.github_user || null));
+    } catch (e) { resolve(null); }
+  });
+}
+
+export function getGithubToken() {
+  return new Promise(resolve => {
+    try {
+      if (typeof chrome === 'undefined' || !chrome.storage?.local) { resolve(null); return; }
+      chrome.storage.local.get('github_token', r => resolve(r?.github_token || null));
+    } catch (e) { resolve(null); }
+  });
 }
 
 export function hasEngine() {
   return typeof chrome !== 'undefined' && !!(chrome.runtime?.sendMessage);
 }
 
-export function execInX1(command) {
-  return new Promise(resolve => {
-    if (!hasEngine()) { resolve(null); return; }
-    let done = false;
-    const finish = v => { if (!done) { done = true; resolve(v); } };
-    try {
-      chrome.runtime.sendMessage({ type: 'VOICE_COMMAND_EXEC', command, wantsText: true }, resp => {
-        if (chrome.runtime.lastError) { finish(null); return; }
-        finish(resp?.text?.trim() || null);
-      });
-    } catch (e) { finish(null); }
-    setTimeout(() => finish(null), 25000);
-  });
+export function loadConversations() {
+  try {
+    const raw = localStorage.getItem('x1_conversations');
+    if (raw) { const d = JSON.parse(raw); if (Array.isArray(d)) return d; }
+  } catch (e) {}
+  return [];
 }
 
-export function loadVotes() {
-  try { const r = localStorage.getItem(VOTE_KEY); return r ? JSON.parse(r) : []; } catch (e) { return []; }
+export function saveConversations(list) {
+  try { localStorage.setItem('x1_conversations', JSON.stringify(list.slice(0, 100))); } catch (e) {}
 }
 
-export function recordVote(vote) {
-  const votes = loadVotes();
-  votes.push({ ...vote, timestamp: Date.now() });
-  try { localStorage.setItem(VOTE_KEY, JSON.stringify(votes.slice(-100))); } catch (e) {}
+export function getUser() {
+  try {
+    const raw = localStorage.getItem('x1_user');
+    if (raw) return JSON.parse(raw);
+  } catch (e) {}
+  return null;
 }
 
-export function getPreferences() {
-  const votes = loadVotes();
-  if (!votes.length) return {};
-  const counts = {};
-  for (const v of votes) counts[v.winner] = (counts[v.winner] || 0) + 1;
-  return counts;
+export function saveUser(user) {
+  try { localStorage.setItem('x1_user', JSON.stringify(user)); } catch (e) {}
 }
