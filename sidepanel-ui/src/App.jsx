@@ -78,7 +78,7 @@ export default function App({ githubUser }) {
         padding: '8px 0', gap: '2px', borderRight: '1px solid #d0d7de', background: '#f6f8fa',
       }}>
         <div style={{ width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '8px' }}>
-          <img src="../dist/x1-logo.png" alt="X1" style={{ height: '24px', width: 'auto', objectFit: 'contain' }} onError={e => e.currentTarget.style.display='none'} />
+          <img src="../dist/x1-mascot.png" alt="X1" style={{ height: '28px', width: '28px', borderRadius: '50%', objectFit: 'cover' }} onError={e => e.currentTarget.style.display='none'} />
         </div>
         <button onClick={() => setTab('chat')} title="Chat" style={{
           width: '32px', height: '32px', borderRadius: '6px', border: 'none',
