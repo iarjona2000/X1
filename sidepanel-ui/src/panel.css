@@ -75,12 +75,8 @@ a:hover{text-decoration:underline}
 
 ::selection{background:rgba(15,191,62,0.25);color:var(--gh-text-primary)}
 
-/* Items Codigo/Datos/Notas: line-height y gap amplios */
-div[style*="border-radius: 6px"][style*="background: #ffffff"][style*="cursor: pointer"]{
-  line-height: 1.95 !important;
-  padding-top: 16px !important;
-  padding-bottom: 16px !important;
-  margin-bottom: 14px !important;
+div[style*="flex-direction: column"]{
+  gap: 24px !important;
 }
 
 /* ── Interlineado y espaciado global del sidepanel ── */
