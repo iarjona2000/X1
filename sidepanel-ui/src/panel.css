@@ -76,53 +76,49 @@ a:hover{text-decoration:underline}
 ::selection{background:rgba(15,191,62,0.25);color:var(--gh-text-primary)}
 
 /* ── Interlineado y espaciado global del sidepanel ── */
+/* Aire entre lineas de texto */
+#root{line-height:1.7}
 
-/* Forzar interlineado amplio en TODO el contenido (gana a inline styles) */
-#root, #root *{line-height:1.9!important}
+/* Espaciado entre bloques principales */
+.x1-block{padding:14px 18px;margin-bottom:10px}
+.x1-section{padding:16px 0}
 
-/* Bloque base */
-.x1-block{padding:18px 22px;margin-bottom:14px}
+/* Mensajes del chat: mas aire entre lineas y entre burbujas */
+.x1-msg-user,.x1-msg-ai{
+  line-height:1.85 !important;
+  padding:14px 18px !important;
+  margin-bottom:6px;
+}
+
+/* Panel del juez (reasoning) mas espaciado */
+.x1-judge{
+  padding:14px 16px !important;
+  line-height:1.7;
+}
+
+/* Inputs y textareas con mas respiratory */
+textarea,input{
+  line-height:1.6;
+  padding:10px 14px;
+}
+
+/* Etiquetas y sub-textos no tan pegados */
+.x1-label{line-height:1.6;margin-bottom:6px}
+.x1-sub{line-height:1.5}
+
+/* Step cards del timeline con mas aire */
+.x1-step{padding:8px 12px;line-height:1.5}
+
+/* Header del chat mas espaciado */
+.x1-header{padding:14px 18px !important}
 
 /* Conversaciones sidebar items mas aire */
-.x1-conv-item{padding:18px 14px!important;margin-bottom:10px!important;line-height:1.9!important}
+.x1-conv-item{padding:14px 12px !important;margin-bottom:8px !important}
 
-/* Items de Mi Repositorio/Codigo/Datos/Notas */
-.x1-repo-item,.x1-github-item{
-  padding:18px 20px!important;
-  margin-bottom:14px!important;
-  line-height:1.9!important;
-}
+/* Inputs bar con linea de aire */
+.x1-input-bar{padding:6px 20px 18px !important}
 
-/* Mensajes del chat */
-.x1-msg-user,.x1-msg-ai{
-  line-height:2!important;
-  padding:16px 20px!important;
-  margin-bottom:8px!important;
-}
+/* Quick actions chips con mas padding */
+.x1-chip{padding:6px 14px !important;margin:4px !important}
 
-/* Panel del juez (reasoning) */
-.x1-judge{
-  padding:18px 20px!important;
-  line-height:1.9!important;
-}
-
-/* Quick actions / chips */
-.x1-chip{padding:8px 18px!important;margin:6px!important;line-height:1.6!important;gap:8px!important}
-
-/* Botones con mas aire */
-button{padding:8px 18px!important;line-height:1.6!important}
-
-/* Inputs con mas respiratory */
-textarea,input{
-  line-height:1.7!important;
-  padding:12px 16px!important;
-}
-
-/* Headers */
-h1,h2,h3,.x1-header{padding:16px 20px!important;line-height:1.6!important;margin-bottom:12px!important}
-
-/* Items dentro de listas */
-.x1-item{padding:14px 16px!important;margin-bottom:10px!important;line-height:1.85!important}
-
-/* Gap generoso en todos los flex */
-[style*="display: flex"]{gap:10px!important}
+#root p,#root span,#root div{line-height:1.65}
