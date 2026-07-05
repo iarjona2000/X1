@@ -250,11 +250,6 @@ export function RepoView({ conversations, githubUser }) {
                 })}
               </div>
             )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
           </div>
         )}
 
