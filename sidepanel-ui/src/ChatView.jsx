@@ -112,13 +112,13 @@ export function ChatView({ conversations, activeConv, onSelectConv, onCreateConv
     // Proceso de seleccion visible (juez): sector -> IA -> consulta -> respuesta.
     var aiIcon = pickedAgent.aiIcon;
     setProcSteps([
-      { id: 1, iconSrc: aiIcon, description: 'Sector: ' + sector, status: 'active' },
-      { id: 2, iconSrc: aiIcon, description: 'IA: ' + pickedAgent.ai, status: 'pending' },
-      { id: 3, iconSrc: aiIcon, description: 'Consultando ' + pickedAgent.ai, status: 'pending' },
-      { id: 4, iconSrc: aiIcon, description: 'Respuesta', status: 'pending' },
+      { id: 1, iconSrc: aiIcon, description: 'Sector: ' + sector, sub: 'Identificando', status: 'active' },
+      { id: 2, iconSrc: aiIcon, description: 'IA: ' + pickedAgent.ai, sub: 'Seleccionada', status: 'pending' },
+      { id: 3, iconSrc: aiIcon, description: pickedAgent.ai, sub: 'Consultando motor', status: 'pending' },
+      { id: 4, iconSrc: aiIcon, description: 'Respuesta', sub: 'Listando', status: 'pending' },
     ]);
-    setTimeout(function() { setStep(1, 'done'); setStep(2, 'active'); }, 200);
-    setTimeout(function() { setStep(2, 'done'); setStep(3, 'active'); }, 450);
+    setTimeout(function() { setStep(1, 'done'); setStep(2, 'active'); }, 250);
+    setTimeout(function() { setStep(2, 'done'); setStep(3, 'active'); }, 550);
 
     var title = conv.messages.length === 0 ? q.slice(0, 40) : conv.title;
     var userMsg = { id: Date.now(), role: 'user', content: q, timestamp: Date.now() };

@@ -181,7 +181,7 @@ export function RepoView({ conversations, githubUser }) {
             </div>
 
             {/* Filter chips */}
-            <div style={{ display: 'flex', gap: '4px', marginBottom: '12px' }}>
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
               {[
                 { id: 'all', label: 'Todo' },
                 { id: 'conversation', label: 'Conversaciones' },
@@ -190,7 +190,7 @@ export function RepoView({ conversations, githubUser }) {
                 { id: 'note', label: 'Notas' },
               ].map(cat => (
                 <button key={cat.id} onClick={() => setCategory(cat.id)} style={{
-                  padding: '3px 12px', borderRadius: '999px',
+                  padding: '5px 14px', borderRadius: '999px',
                   border: '1px solid ' + (category === cat.id ? '#0969da' : '#d0d7de'),
                   background: category === cat.id ? '#ddf4ff' : '#ffffff',
                   color: category === cat.id ? '#0969da' : '#59636e',
@@ -215,20 +215,20 @@ export function RepoView({ conversations, githubUser }) {
                 )}
               </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 {items.map(item => {
                   const tc = TAG_COLORS[item.tags[0]] || TAG_COLORS.Nota;
                   return (
                     <div key={item.id} style={{
-                      padding: '14px 16px', background: '#ffffff',
-                      border: '1px solid #d0d7de', borderRadius: '6px',
-                      marginBottom: '-1px', cursor: 'pointer',
-                      transition: 'background 80ms',
+                      padding: '16px', background: '#ffffff',
+                      border: '1px solid #d0d7de', borderRadius: '8px',
+                      cursor: 'pointer',
+                      transition: 'background 80ms, border-color 80ms',
                     }}
-                      onMouseEnter={e => e.currentTarget.style.background = '#f6f8fa'}
-                      onMouseLeave={e => e.currentTarget.style.background = '#ffffff'}
+                      onMouseEnter={e => { e.currentTarget.style.background = '#f6f8fa'; e.currentTarget.style.borderColor = '#0969da'; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = '#ffffff'; e.currentTarget.style.borderColor = '#d0d7de'; }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', lineHeight: '1.5' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <div style={{
                           width: '16px', height: '16px', borderRadius: '3px',
                           background: item.tags[0] ? tc.bg : '#f3f4f6',
@@ -237,13 +237,13 @@ export function RepoView({ conversations, githubUser }) {
                         }}>
                           <div style={{ width: '8px', height: '8px', borderRadius: '2px', background: item.tags[0] ? tc.fg : '#818b98' }} />
                         </div>
-                        <span style={{ fontSize: '14px', fontWeight: '600', color: '#0969da', flex: 1 }}>{item.title}</span>
-                        <span style={{ fontSize: '12px', color: '#59636e' }}>{item.count} msg{item.count !== 1 ? 's' : ''}</span>
-                        <span style={{ fontSize: '12px', color: '#818b98' }}>{timeAgo(item.updatedAt)}</span>
+                        <span style={{ fontSize: '14px', fontWeight: '600', color: '#0969da', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</span>
+                        <span style={{ fontSize: '12px', color: '#59636e', flexShrink: 0 }}>{item.count} msg{item.count !== 1 ? 's' : ''}</span>
+                        <span style={{ fontSize: '12px', color: '#818b98', flexShrink: 0 }}>{timeAgo(item.updatedAt)}</span>
                       </div>
                       {item.preview && (
-                        <div style={{ fontSize: '12px', color: '#59636e', marginTop: '8px', marginLeft: '24px',
-                          lineHeight: '1.6', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.preview}</div>
+                        <div style={{ fontSize: '12px', color: '#59636e', marginTop: '10px', marginLeft: '26px',
+                          lineHeight: '1.7', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.preview}</div>
                       )}
                     </div>
                   );

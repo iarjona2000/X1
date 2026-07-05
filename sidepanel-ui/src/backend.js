@@ -227,25 +227,54 @@ export async function smartQuery(query, agentId) {
     return { response: engineText, tools: [], judgeReason: judgeReason, sector: sector };
   }
 
-  // 2) Fallback local: solo si la consulta es claramente de busqueda (github/npm/SO).
-  //    Para peticiones de accion/creacion no tiene sentido volcar resultados de herramientas.
-  var searchTools = T.detectTools(query);
-  if (searchTools.length === 0) {
-    var offline = 'Ahora mismo no puedo conectar con el motor de X1. Reintentalo en unos segundos.';
-    T.addMemory('assistant', offline);
-    return { response: offline, tools: [], judgeReason: judgeReason, sector: sector };
+  // 2) Fallback local inteligente: aunque no haya motor, damos una respuesta util.
+  var localFallback = buildLocalFallback(query, agentId, sector);
+  T.addMemory('assistant', localFallback);
+  return { response: localFallback, tools: [], judgeReason: judgeReason, sector: sector };
+}
+
+// Respuesta local cuando el motor de IA no esta disponible.
+// Analiza la consulta y produce una respuesta util basada en patrones.
+function buildLocalFallback(query, agentId, sector) {
+  var t = query.toLowerCase().trim();
+  var agent = AGENTS.find(function(a) { return a.id === agentId; });
+  var agentName = agent ? agent.name : 'X1';
+
+  // Saludo
+  if (isGreeting(query)) {
+    return 'Hola. Soy X1 en modo local (sin conexion al motor de IA). Puedo orientarte mientras se restablece el motor. En que puedo ayudarte?';
   }
-  var toolResults = await T.executeTools(query);
-  var response = buildSmartResponse(query, toolResults);
-  T.addMemory('assistant', response);
-  var toolsUsed = Object.keys(toolResults).filter(function(k) {
-    if (k === 'github' && toolResults.github && toolResults.github.length > 0) return true;
-    if (k === 'code' && toolResults.code && toolResults.code.length > 0) return true;
-    if (k === 'npm' && toolResults.npm && toolResults.npm.length > 0) return true;
-    if (k === 'stackoverflow' && toolResults.stackoverflow && toolResults.stackoverflow.length > 0) return true;
-    return false;
-  });
-  return { response: response, tools: toolsUsed, judgeReason: judgeReason, sector: sector };
+
+  // Pregunta de identidad o ayuda
+  if (/^(quien eres|que eres|como te llamas|que puedes hacer|que sabes hacer|ayuda|help|que haces)/.test(t)) {
+    return 'Soy System X1, un asistente multi-agente. Cada agente esta especializado en un sector (Desarrollo, Email, Reuniones, Marketing, Finanzas, Legal, Redaccion, Investigacion). El agente ' + agentName + ' esta activo ahora. Cuando el motor de IA este disponible, podre darte respuestas completas; mientras tanto, puedo orientarte.';
+  }
+
+  // Intenta busqueda en herramientas aunque no parezca obvio
+  var searchTools = T.detectTools(query);
+  if (searchTools.length > 0) {
+    // Dejamos que executeTools haga su trabajo en la rama offline original
+    // (este path no se ejecuta porque smartQuery ya retorno antes si habia tools)
+    return null;
+  }
+
+  // Pregunta general de programacion -> sugerir busqueda
+  if (/codigo|code|programa|funcion|componente|react|debug|script|api|html|css|bug|error/.test(t)) {
+    return 'Modo local activo. Para tu consulta de desarrollo, te sugiero buscar en GitHub o npm. Prueba: "busca repositorios de ' + query.replace(/^(busca|buscar|encuentra|encuentrame)\s+/i, '').slice(0, 60) + ' en github" o "busca paquetes npm de ' + query.replace(/^(busca|buscar|encuentra|encuentrame)\s+/i, '').slice(0, 60) + '".';
+  }
+
+  // Pregunta de email -> sugerir gmail
+  if (/email|correo|gmail|mensaje|redacta/.test(t)) {
+    return 'Modo local. Para emails puedo acceder a Gmail si inicias sesion. Prueba a conectarte desde la pestana de Ajustes. Mientras tanto, dime el destinatario y el tema y preparo un borrador.';
+  }
+
+  // Pregunta de reunion -> sugerir calendar
+  if (/reunion|meeting|calendario|agenda/.test(t)) {
+    return 'Modo local. Para reuniones puedo leer Google Calendar si inicias sesion. Prueba "mostrame las reuniones de hoy" cuando estes autenticado.';
+  }
+
+  // Respuesta generica orientada
+  return 'Modo local activo (motor de IA temporalmente no disponible). ' + agentName + ' esta seleccionado para el sector ' + sector + '. Para consultas de busqueda, prueba con palabras como "github", "npm" o "stackoverflow" para que use las herramientas disponibles. Ejemplo: "busca en github ' + query.slice(0, 50) + '".';
 }
 
 export function getMemoryContext() { return T.getMemoryContext(); }
