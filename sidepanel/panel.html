@@ -12,6 +12,10 @@
     @media (prefers-color-scheme: dark) { body { background: #292929; } }
     @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
     @keyframes slideIn { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; transform: translateX(0); } }
+
+    /* === Inline style overrides: interlineado aplicado AL FINAL para no fallar === */
+    div[style*="border: 1px solid #d0d7de"][style*="border-radius: 8px"] { line-height: 2.2 !important; padding-top: 16px !important; padding-bottom: 16px !important; }
+    div[style*="border: 1px solid #d0d7de"][style*="border-radius: 6px"][style*="background: #ffffff"] > div > div { line-height: 2 !important; }
   </style>
 </head>
 <body>
