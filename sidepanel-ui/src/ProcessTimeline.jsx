@@ -1,6 +1,12 @@
 import * as React from 'react';
+import {
+  XIcon, SyncIcon, DotFillIcon, FileIcon, SearchIcon,
+  GitBranchIcon, GitPullRequestIcon, LinkIcon, CommentDiscussionIcon,
+  PencilIcon, AlertIcon,
+} from '@primer/octicons-react';
 
 const F = "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif";
+const MONO = "'SF Mono', 'Cascadia Code', Consolas, monospace";
 
 // Iconos originales de las apps por las que pasa el proceso.
 const APP_ICON_SRC = {
@@ -120,40 +126,31 @@ export function ProcessTimeline({ steps = [] }) {
   );
 }
 
-// ── ProcessLog: registro vertical y detallado del proceso (analisis de repo,
-// automatizacion). A diferencia de ProcessTimeline (fila horizontal compacta
-// para el chat), aqui cada paso lleva titulo + detalle/razon + linea vertical
-// conectora, al estilo del log de un GitHub Actions run. ──
-function LogDot({ status }) {
-  var isActive = status === 'active';
-  var isDone = status === 'done';
-  var isError = status === 'error';
+// ── ProcessLog: registro compacto del proceso (analisis de repo,
+// automatizacion), inspirado en como Claude Code muestra sus llamadas a
+// herramientas — una linea por paso, icono pequeno (Octicons), sin circulos
+// grandes ni ticks que ocupen espacio. Cada paso: [icono] titulo · detalle. ──
 
-  var bg = '#f6f8fa', border = '#d0d7de';
-  if (isActive) { bg = '#0969da'; border = '#0969da'; }
-  if (isDone)   { bg = '#1a7f37'; border = '#1a7f37'; }
-  if (isError)  { bg = '#d1242f'; border = '#d1242f'; }
-
-  return React.createElement('div', {
-    style: {
-      width: '22px', height: '22px', borderRadius: '50%', flexShrink: 0,
-      background: bg, border: '2px solid ' + border,
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      boxShadow: isActive ? '0 0 0 3px rgba(9,105,218,0.15)' : 'none',
-      animation: isActive ? 'breathe 1.2s ease-in-out infinite' : 'none',
-      transition: 'all 200ms ease',
-    }
-  },
-    isDone ? React.createElement(Tick, null)
-    : isError ? React.createElement(ErrorCross, null)
-    : isActive ? React.createElement(Spinner, null)
-    : React.createElement('div', { style: { width: '6px', height: '6px', borderRadius: '50%', background: '#818b98' } })
-  );
+// Icono por tipo de accion, deducido del id del paso (ver github-agent.js:
+// 'read:*'/'tree' = fichero, 'ai'/'plan'/'generate' = consulta a IA,
+// 'search:*' = busqueda, 'url' = lectura de pagina, 'branch' = git,
+// 'commit:*' = escritura, 'pr' = pull request).
+function actionIcon(id) {
+  var s = String(id || '');
+  if (/^(t\d+:)?search:/.test(s)) return SearchIcon;
+  if (/^(t\d+:)?url$/.test(s)) return LinkIcon;
+  if (/^(t\d+:)?(read|tree|nokeys|read-existing)/.test(s)) return FileIcon;
+  if (/^(t\d+:)?(ai|plan|generate)$/.test(s)) return CommentDiscussionIcon;
+  if (s === 'branch') return GitBranchIcon;
+  if (/^commit:/.test(s)) return PencilIcon;
+  if (s === 'pr') return GitPullRequestIcon;
+  if (s === 'fatal') return AlertIcon;
+  return DotFillIcon;
 }
 
 // Contador de tiempo en vivo mientras un paso esta 'active' — asi nunca
-// "parece colgado": aunque una consulta a la IA tarde 60s, el usuario ve los
-// segundos correr y sabe que sigue trabajando.
+// "parece colgado": aunque una consulta a la IA tarde 30-60s, el usuario ve
+// los segundos correr y sabe que sigue trabajando.
 function LiveElapsed({ startedAt }) {
   var [now, setNow] = React.useState(Date.now());
   React.useEffect(function () {
@@ -163,33 +160,41 @@ function LiveElapsed({ startedAt }) {
   }, [startedAt]);
   if (!startedAt) return null;
   var secs = Math.max(0, Math.round((now - startedAt) / 1000));
-  return React.createElement('span', { style: { color: '#0969da', fontWeight: '600' } }, ' · ' + secs + 's');
+  return React.createElement('span', { style: { color: '#0969da' } }, ' (' + secs + 's)');
 }
 
-function LogStep({ step, index, total }) {
-  var isActive = step.status === 'active';
-  var isDone = step.status === 'done';
-  var isError = step.status === 'error';
-  var titleColor = isError ? '#d1242f' : isActive ? '#0969da' : '#1f2328';
+// Un solo icono por linea (no dos): en pending/done es el icono de la
+// accion (fichero, busqueda, IA...); en active se sustituye por un SyncIcon
+// girando; en error, por una XIcon. Done no lleva ningun check — solo se
+// atenua el icono de accion, para no repetir el mismo "tick verde" en cada
+// linea.
+function StepIcon({ step }) {
+  var status = step.status;
+  if (status === 'active') return React.createElement(SyncIcon, { size: 12, fill: '#0969da', style: { animation: 'spin 1s linear infinite' } });
+  if (status === 'error') return React.createElement(XIcon, { size: 12, fill: '#d1242f' });
+  var Icon = actionIcon(step.id);
+  return React.createElement(Icon, { size: 12, fill: status === 'done' ? '#1a7f37' : '#818b98' });
+}
 
-  return React.createElement('div', { style: { display: 'flex', gap: '10px' } },
-    React.createElement('div', { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 } },
-      React.createElement(LogDot, { status: step.status }),
-      index < total - 1 ? React.createElement('div', {
-        style: { width: '2px', flex: 1, minHeight: '14px', background: isDone ? '#1a7f37' : '#d0d7de', margin: '2px 0', transition: 'background 200ms' }
-      }) : null
-    ),
-    React.createElement('div', { style: { paddingBottom: index < total - 1 ? '14px' : '2px', minWidth: 0, flex: 1 } },
-      React.createElement('div', { style: { fontSize: '13px', fontWeight: isActive || isDone ? '600' : '500', color: titleColor, lineHeight: '1.4' } },
-        step.title,
-        isActive ? React.createElement(LiveElapsed, { startedAt: step.startedAt }) : null
-      ),
-      step.detail ? React.createElement('div', {
-        style: { fontSize: '12px', color: '#59636e', lineHeight: '1.5', marginTop: '2px', wordBreak: 'break-word' }
-      }, step.detail) : null,
-      step.why ? React.createElement('div', {
-        style: { fontSize: '11px', color: '#818b98', lineHeight: '1.5', marginTop: '3px', fontStyle: 'italic' }
-      }, step.why) : null
+function LogStep({ step }) {
+  var isActive = step.status === 'active';
+  var isError = step.status === 'error';
+  var isDone = step.status === 'done';
+  var titleColor = isError ? '#d1242f' : isActive ? '#0969da' : isDone ? '#1f2328' : '#59636e';
+
+  return React.createElement('div', { style: { padding: '2px 0' } },
+    React.createElement('div', { style: { display: 'flex', alignItems: 'flex-start', gap: '6px' } },
+      React.createElement('span', { style: { flexShrink: 0, marginTop: '2px' } }, React.createElement(StepIcon, { step: step })),
+      React.createElement('div', { style: { minWidth: 0, flex: 1 } },
+        React.createElement('span', { style: { fontSize: '12px', fontFamily: MONO, color: titleColor, lineHeight: '1.5' } },
+          step.title,
+          step.detail ? React.createElement('span', { style: { color: '#818b98', fontFamily: F } }, ' — ' + step.detail) : null,
+          isActive ? React.createElement(LiveElapsed, { startedAt: step.startedAt }) : null
+        ),
+        step.why ? React.createElement('div', {
+          style: { fontSize: '11px', color: '#818b98', lineHeight: '1.4', marginTop: '1px', marginLeft: '2px' }
+        }, step.why) : null
+      )
     )
   );
 }
@@ -198,15 +203,15 @@ export function ProcessLog({ steps = [], title }) {
   if (!steps.length) return null;
   return React.createElement('div', {
     style: {
-      padding: '14px 16px', border: '1px solid #d0d7de', borderRadius: '6px',
-      background: '#ffffff', fontFamily: F,
+      padding: '10px 12px', border: '1px solid #d0d7de', borderRadius: '6px',
+      background: '#f6f8fa', fontFamily: F,
     }
   },
     title ? React.createElement('div', {
-      style: { fontSize: '12px', fontWeight: '600', color: '#59636e', textTransform: 'uppercase', letterSpacing: '0.02em', marginBottom: '12px' }
+      style: { fontSize: '10px', fontWeight: '600', color: '#818b98', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '6px' }
     }, title) : null,
     steps.map(function(step, i) {
-      return React.createElement(LogStep, { key: step.id || i, step: step, index: i, total: steps.length });
+      return React.createElement(LogStep, { key: step.id || i, step: step });
     })
   );
 }

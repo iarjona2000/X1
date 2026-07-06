@@ -196,7 +196,9 @@ export function ChatView({ conversations, activeConv, onSelectConv, onCreateConv
   var agent = agentById(activeAgent);
   var msgs = (activeConv && activeConv.messages) || [];
   var [googleOk, setGoogleOk] = React.useState(null);
-  React.useEffect(function() { if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) { chrome.runtime.sendMessage({ type: 'X1_AUTH_CHECK_GOOGLE' }, function(r) { if (!chrome.runtime.lastError) setGoogleOk(r && r.logged); }); } }, []);
+  var [googleUser, setGoogleUser] = React.useState(null);
+  var [showGoogleMenu, setShowGoogleMenu] = React.useState(false);
+  React.useEffect(function() { if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) { chrome.runtime.sendMessage({ type: 'X1_AUTH_CHECK_GOOGLE' }, function(r) { if (!chrome.runtime.lastError && r) { setGoogleOk(r.logged); if (r.user) setGoogleUser(r.user); } }); } }, []);
 
   // Panel de razonamiento del juez (estilo "Thinking" de Claude/o1).
   function ReasoningPanel({ msg }) {
@@ -368,17 +370,76 @@ export function ChatView({ conversations, activeConv, onSelectConv, onCreateConv
         ),
         React.createElement('div', { style: { flex: 1 } }),
         React.createElement('span', { style: { fontSize: '12px', color: '#818b98', fontWeight: '500' } }, 'System X1'),
-        React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '4px', marginLeft: '8px', cursor: googleOk === false ? 'pointer' : 'default' },
-          onClick: googleOk === false ? async function() { var ok = await B.loginGoogle(); if (ok) setGoogleOk(true); } : undefined,
-          title: googleOk === true ? 'Google conectado' : googleOk === false ? 'Conectar Google' : '...'
-        },
-          React.createElement('svg', { viewBox: '0 0 16 16', width: '14', height: '14', fill: googleOk === true ? '#1a7f37' : googleOk === false ? '#818b98' : '#d0d7de' },
-            React.createElement('path', { d: 'M15.98 7.62c0-.95-.08-1.63-.26-2.3H8.19v4.18h4.44c-.09 1.13-.57 2.1-1.22 2.74v2.29h2.48c1.14-1.05 2.09-2.62 2.09-4.91z' }),
-            React.createElement('path', { d: 'M8.19 16c1.9 0 3.5-.63 4.67-1.7l-2.48-2.3c-.66.46-1.54.77-2.6.77-2 0-3.69-1.36-4.3-3.17H.36v2.38A7.99 7.99 0 008.19 16z' }),
-            React.createElement('path', { d: 'M3.9 9.6c-.1-.28-.17-.57-.17-.6 0-.2.07-.4.17-.53V6.09H.36a8.01 8.01 0 000 7.2l3.53-2.69z' }),
-            React.createElement('path', { d: 'M8.19 3.36c1.41 0 2.36.6 2.9 1.12l2.1-2.06C11.7.59 10.09 0 8.19 0A8 8 0 00.36 2.38L3.9 5.06c.61-1.78 2.3-3.17 4.3-3.17z' })
+        React.createElement('div', { style: { position: 'relative' } },
+          React.createElement('div', {
+            style: {
+              display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', padding: '2px 6px',
+              borderRadius: '6px', background: googleOk ? '#f0fff4' : 'transparent',
+              border: '1px solid', borderColor: googleOk ? '#b7e1c0' : 'transparent',
+              transition: 'all 80ms',
+            },
+            onClick: googleOk ? function() { setShowGoogleMenu(function(v) { return !v; }); } : async function() { var r = await B.loginGoogle(); if (r) { setGoogleOk(true); setGoogleUser({email:r.email,name:r.name,picture:r.picture}); } },
+            title: googleOk && googleUser ? googleUser.email : 'Conectar Google',
+            onMouseEnter: function(e) { e.currentTarget.style.borderColor = googleOk ? '#b7e1c0' : '#d0d7de'; },
+            onMouseLeave: function(e) { e.currentTarget.style.borderColor = googleOk ? '#b7e1c0' : 'transparent'; },
+          },
+            googleOk && googleUser && googleUser.picture ?
+              React.createElement('img', { src: googleUser.picture, alt: '', style: { width: '18px', height: '18px', borderRadius: '50%' }, onError: function(e) { e.currentTarget.style.display = 'none'; } })
+            :
+              React.createElement('svg', { viewBox: '0 0 24 24', width: '16', height: '16', fill: googleOk === true ? '#1a7f37' : googleOk === false ? '#818b98' : '#d0d7de' },
+                React.createElement('path', { d: 'M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z', fill: googleOk === true ? '#34A853' : '#818b98' }),
+                React.createElement('path', { d: 'M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z', fill: googleOk === true ? '#4285F4' : '#818b98' }),
+                React.createElement('path', { d: 'M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z', fill: googleOk === true ? '#FBBC05' : '#818b98' }),
+                React.createElement('path', { d: 'M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z', fill: googleOk === true ? '#EA4335' : '#818b98' })
+              ),
+            googleOk && googleUser && React.createElement('span', { style: { fontSize: '11px', color: '#1a7f37', fontWeight: 500, maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, googleUser.name || googleUser.email),
+            googleOk && React.createElement('svg', { viewBox: '0 0 16 16', width: '10', height: '10', fill: '#1a7f37' },
+              React.createElement('path', { d: 'M4.427 7.427l3.396 3.396a.25.25 0 00.354 0l3.396-3.396A.25.25 0 0011.396 7H4.604a.25.25 0 00-.177.427z' })
+            )
           ),
-          googleOk === true ? React.createElement('span', { style: { fontSize: '10px', color: '#1a7f37', fontWeight: 500 } }, 'Google') : null
+          showGoogleMenu && googleOk && React.createElement('div', {
+            style: {
+              position: 'absolute', top: '100%', right: 0, zIndex: 30, marginTop: '4px',
+              width: '220px', background: '#ffffff', border: '1px solid #d0d7de',
+              borderRadius: '6px', boxShadow: '0 8px 24px rgba(140,149,159,0.2)', padding: '8px',
+            }
+          },
+            googleUser && React.createElement('div', { style: { padding: '6px 8px', borderBottom: '1px solid #d8dee4', marginBottom: '6px' } },
+              googleUser.picture && React.createElement('img', { src: googleUser.picture, alt: '', style: { width: '32px', height: '32px', borderRadius: '50%', marginBottom: '4px' }, onError: function(e) { e.currentTarget.style.display = 'none'; } }),
+              React.createElement('div', { style: { fontSize: '13px', fontWeight: '600', color: '#1f2328' } }, googleUser.name || 'Google'),
+              React.createElement('div', { style: { fontSize: '11px', color: '#59636e' } }, googleUser.email)
+            ),
+            React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '4px' } },
+              React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 8px', fontSize: '12px', color: '#1f2328' } },
+                React.createElement('svg', { viewBox: '0 0 16 16', width: '14', height: '14', fill: '#1a7f37' }, React.createElement('path', { d: 'M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z' })),
+                React.createElement('span', { style: { flex: 1 } }, 'Gmail'),
+                React.createElement('span', { style: { color: '#1a7f37', fontWeight: 500 } }, 'Conectado')
+              ),
+              React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 8px', fontSize: '12px', color: '#1f2328' } },
+                React.createElement('svg', { viewBox: '0 0 16 16', width: '14', height: '14', fill: '#1a7f37' }, React.createElement('path', { d: 'M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z' })),
+                React.createElement('span', { style: { flex: 1 } }, 'Calendar'),
+                React.createElement('span', { style: { color: '#1a7f37', fontWeight: 500 } }, 'Conectado')
+              ),
+              React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 8px', fontSize: '12px', color: '#1f2328' } },
+                React.createElement('svg', { viewBox: '0 0 16 16', width: '14', height: '14', fill: '#1a7f37' }, React.createElement('path', { d: 'M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z' })),
+                React.createElement('span', { style: { flex: 1 } }, 'Sheets'),
+                React.createElement('span', { style: { color: '#1a7f37', fontWeight: 500 } }, 'Conectado')
+              ),
+              React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 8px', fontSize: '12px', color: '#1f2328' } },
+                React.createElement('svg', { viewBox: '0 0 16 16', width: '14', height: '14', fill: '#1a7f37' }, React.createElement('path', { d: 'M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z' })),
+                React.createElement('span', { style: { flex: 1 } }, 'Docs'),
+                React.createElement('span', { style: { color: '#1a7f37', fontWeight: 500 } }, 'Conectado')
+              )
+            ),
+            React.createElement('div', { style: { borderTop: '1px solid #d8dee4', marginTop: '8px', paddingTop: '6px' } },
+              React.createElement('button', {
+                onClick: async function() { await B.logoutGoogle(); setGoogleOk(false); setGoogleUser(null); setShowGoogleMenu(false); },
+                style: { width: '100%', padding: '4px 8px', border: 'none', background: 'transparent', fontSize: '12px', color: '#d1242f', cursor: 'pointer', textAlign: 'left', borderRadius: '4px' },
+                onMouseEnter: function(e) { e.currentTarget.style.background = '#f6f8fa'; },
+                onMouseLeave: function(e) { e.currentTarget.style.background = 'transparent'; },
+              }, 'Desconectar Google')
+            )
+          )
         )
       ),
 

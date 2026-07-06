@@ -36,13 +36,14 @@ export default function App({ githubUser }) {
   const [activeConvId, setActiveConvId] = React.useState(null);
   const [settingsOpen, setSettingsOpen] = React.useState(false);
   const [googleStatus, setGoogleStatus] = React.useState(null);
+  const [googleUser, setGoogleUser] = React.useState(null);
   const [githubStatus, setGithubStatus] = React.useState(null);
   const settingsRef = React.useRef(null);
 
   React.useEffect(() => {
     const saved = B.loadConversations();
     if (saved?.length) { setConversations(saved); setActiveConvId(saved[0].id); }
-    if (B.hasEngine()) { B.checkGoogleAuth().then(setGoogleStatus); B.checkGithubAuth().then(setGithubStatus); }
+    if (B.hasEngine()) { B.checkGoogleAuth().then(function(r) { setGoogleStatus(r && r.logged); if (r && r.user) setGoogleUser(r.user); }); B.checkGithubAuth().then(setGithubStatus); }
   }, []);
 
   React.useEffect(() => {
@@ -159,8 +160,17 @@ export default function App({ githubUser }) {
                   <GoogleSvg /> <span style={{ flex: 1, fontSize: '14px', fontWeight: '500', color: '#1f2328' }}>Google</span>
                   <span style={{ fontSize: '12px', color: googleStatus ? '#1a7f37' : '#59636e', fontWeight: '500' }}>{googleStatus ? 'Conectado' : 'Desconectado'}</span>
                 </div>
-                <button onClick={googleStatus ? async () => { await B.logoutGoogle(); setGoogleStatus(false); } : async () => { const ok = await B.loginGoogle(); if (ok) setGoogleStatus(true); }}
-                  style={{ width: '100%', padding: '5px 12px', borderRadius: '6px', border: '1px solid #d0d7de', background: '#f6f8fa', fontSize: '12px', fontWeight: '500', cursor: 'pointer', color: '#24292f' }}>
+                {googleUser && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', padding: '6px 8px', background: '#f6f8fa', borderRadius: '6px' }}>
+                    {googleUser.picture ? (
+                      <img src={googleUser.picture} alt="" style={{ width: '24px', height: '24px', borderRadius: '50%' }} onError={e => e.currentTarget.style.display='none'} />
+                    ) : (
+                      <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: '#eaeef2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', color: '#59636e', fontWeight: '600' }}>{googleUser.email?.charAt(0).toUpperCase()}</div>
+                    )}
+                    <div style={{ flex: 1, fontSize: '12px', color: '#1f2328', overflow: 'hidden', textOverflow: 'ellipsis' }}>{googleUser.name || googleUser.email}</div>
+                  </div>
+                )}
+                <button onClick={googleStatus ? async () => { await B.logoutGoogle(); setGoogleStatus(false); setGoogleUser(null); } : async () => { const r = await B.loginGoogle(); if (r) { setGoogleStatus(true); setGoogleUser({email:r.email, name:r.name, picture:r.picture}); } }} style={{ width: '100%', padding: '5px 12px', borderRadius: '6px', border: '1px solid #d0d7de', background: '#f6f8fa', fontSize: '12px', fontWeight: '500', cursor: 'pointer', color: '#24292f' }}>
                   {googleStatus ? 'Desconectar' : 'Conectar'}
                 </button>
               </div>

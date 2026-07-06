@@ -495,7 +495,10 @@ function proposeChanges(goal, tarea, research, repoCtx, onStep, taskIdx) {
       if (!ok) return { titulo_pr: null, descripcion_pr: null, archivos: [], error: true };
       var withSha = proposal.archivos.map(function (f) {
         var match = filesWithState.find(function (e) { return e.path === f.path; });
-        return Object.assign({}, f, { sha: match ? match.sha : null, exists: match ? match.exists : false, motivo: match ? match.motivo : '' });
+        return Object.assign({}, f, {
+          sha: match ? match.sha : null, exists: match ? match.exists : false, motivo: match ? match.motivo : '',
+          current: match ? match.current : '',
+        });
       });
       return { titulo_pr: proposal.titulo_pr || tarea.titulo, descripcion_pr: proposal.descripcion_pr || tarea.motivo, archivos: withSha };
     });

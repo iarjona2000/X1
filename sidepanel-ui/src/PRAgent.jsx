@@ -5,6 +5,8 @@ import {
   loadRepoAnalysis, runAutoBuild, publishAutoBuild,
 } from './github-agent.js';
 import { ProcessLog } from './ProcessTimeline.jsx';
+import { DiffView } from './DiffView.jsx';
+import { FileIcon, FileAddedIcon, FileDiffIcon, ChevronDownIcon, ChevronUpIcon, GitBranchIcon } from '@primer/octicons-react';
 
 const F = "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif";
 const MONO = "'SF Mono', 'Cascadia Code', Consolas, monospace";

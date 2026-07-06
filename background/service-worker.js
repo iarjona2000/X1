@@ -6474,14 +6474,15 @@ chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
     return false;
   }
   if(msg.type==='X1_AUTH_CHECK_GOOGLE'){
-    isLoggedIn().then(function(logged) {
-      sendResponse({logged: logged});
+    chrome.storage.local.get('google_user', function(r) {
+      var user = r && r.google_user;
+      sendResponse({logged: !!user, user: user || null});
     });
     return true;
   }
   if(msg.type==='X1_AUTH_LOGIN_GOOGLE'){
     loginGoogle().then(function(info) {
-      sendResponse({ok: true, email: info.email, name: info.name});
+      sendResponse({ok: true, email: info.email, name: info.name, picture: info.picture});
     }).catch(function(err) {
       sendResponse({ok: false, error: err.message});
     });
