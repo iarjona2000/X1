@@ -195,23 +195,23 @@ export function ChatView({ conversations, activeConv, onSelectConv, onCreateConv
 
   var agent = agentById(activeAgent);
   var msgs = (activeConv && activeConv.messages) || [];
-  var [googleOk, setGoogleOk] = React.useState(null);
+  var [googleOk, setGoogleOk] = React.useState(false); // false por defecto, asume no conectado
   var [googleUser, setGoogleUser] = React.useState(null);
   var [googleError, setGoogleError] = React.useState(null);
   var [showGoogleMenu, setShowGoogleMenu] = React.useState(false);
   var [googleLoading, setGoogleLoading] = React.useState(false);
   React.useEffect(function() {
     if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+      var timedOut = false;
+      var timer = setTimeout(function() { timedOut = true; }, 3000);
       chrome.runtime.sendMessage({ type: 'X1_AUTH_CHECK_GOOGLE' }, function(r) {
+        if (timedOut) return;
+        clearTimeout(timer);
         if (!chrome.runtime.lastError && r) {
           setGoogleOk(r.logged);
           if (r.user) setGoogleUser(r.user);
-        } else {
-          setGoogleOk(false);
         }
       });
-    } else {
-      setGoogleOk(false);
     }
   }, []);
 

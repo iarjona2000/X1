@@ -217,28 +217,35 @@ function timeAgo(ts) {
 // queda claro que no es una sola llamada a IA sino una orquestacion real que
 // se reparte en el tiempo.
 function BackgroundQueueView({ queue, onCancel, cancelling }) {
-  var done = queue.tareas.filter(function (t) { return t.status === 'done'; }).length;
-  var errored = queue.tareas.filter(function (t) { return t.status === 'error'; }).length;
-  var pending = queue.tareas.filter(function (t) { return t.status === 'pending'; }).length;
-  var active = queue.tareas.filter(function (t) { return t.status === 'active'; }).length;
-  var finished = pending === 0 && active === 0;
+  var isAutopilot = queue.mode === 'autopilot';
+  var list = isAutopilot ? (queue.history || []) : (queue.tareas || []);
+  var done = list.filter(function (t) { return t.status === 'done'; }).length;
+  var errored = list.filter(function (t) { return t.status === 'error'; }).length;
+  var pending = isAutopilot ? 0 : list.filter(function (t) { return t.status === 'pending'; }).length;
+  var active = list.filter(function (t) { return t.status === 'active'; }).length;
+  var finished = !isAutopilot && pending === 0 && active === 0;
+  // El historial de autopiloto se muestra del mas reciente al mas antiguo
+  // (lo que se acaba de hacer importa mas que el primer ciclo de hace horas).
+  var displayList = isAutopilot ? list.slice().reverse() : list;
 
   return React.createElement('div', { style: { marginBottom: '16px' } },
     React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' } },
-      React.createElement('h3', { style: Object.assign({}, H3, { flex: 1, border: 'none', margin: 0, padding: 0 }) }, 'Cola de automatizacion en segundo plano'),
-      !finished && React.createElement('button', {
+      React.createElement('h3', { style: Object.assign({}, H3, { flex: 1, border: 'none', margin: 0, padding: 0 }) }, isAutopilot ? 'Autopiloto — historial de ciclos' : 'Cola de automatizacion en segundo plano'),
+      React.createElement('button', {
         onClick: onCancel, disabled: cancelling,
         style: { fontSize: '11px', color: C.danger, background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: F },
-      }, cancelling ? 'Cancelando…' : 'Cancelar cola')
+      }, cancelling ? 'Cancelando…' : (isAutopilot ? 'Desactivar autopiloto' : 'Cancelar cola'))
     ),
     React.createElement('div', { style: { fontSize: '11px', color: C.fgMuted, marginBottom: '10px', lineHeight: '1.6' } },
-      finished
-        ? ('Cola completada: ' + done + ' Pull Request(s) creados' + (errored ? ', ' + errored + ' con error' : '') + '.')
-        : (done + ' completada(s) · ' + pending + ' pendiente(s) · X1 procesa una tarea cada 15-25 min, siga o no el sidepanel abierto — ultima actividad hace ' + timeAgo(queue.updatedAt) + '.')
+      isAutopilot
+        ? (done + ' ciclo(s) completado(s)' + (errored ? ', ' + errored + ' con error' : '') + ' · sin fin — X1 sigue decidiendo su proximo objetivo cada 15-25 min, siga o no el sidepanel abierto — ultima actividad hace ' + timeAgo(queue.updatedAt) + '.')
+        : finished
+          ? ('Cola completada: ' + done + ' Pull Request(s) creados' + (errored ? ', ' + errored + ' con error' : '') + '.')
+          : (done + ' completada(s) · ' + pending + ' pendiente(s) · X1 procesa una tarea cada 15-25 min, siga o no el sidepanel abierto — ultima actividad hace ' + timeAgo(queue.updatedAt) + '.')
     ),
     React.createElement('div', { style: { border: '1px solid ' + C.border, borderRadius: '6px', overflow: 'hidden' } },
-      queue.tareas.map(function (t, i) {
-        return React.createElement(QueueTaskRow, { key: i, tarea: t, index: i, isLast: i === queue.tareas.length - 1 });
+      displayList.map(function (t, i) {
+        return React.createElement(QueueTaskRow, { key: i, tarea: t, index: isAutopilot ? (displayList.length - i) : i, isLast: i === displayList.length - 1 });
       })
     )
   );
@@ -383,7 +390,36 @@ export function PRAgent({ githubUser, onGoToRepo }) {
           '.'
         ),
 
-    // ── Input de objetivo ──
+    // ── Autopiloto: sin objetivo, sin fin ──
+    (!queue || queue.mode !== 'autopilot')
+      ? React.createElement('div', { style: { marginTop: '14px', padding: '12px 14px', border: '1px solid ' + C.border, borderRadius: '6px', background: C.canvasSubtle } },
+          React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' } },
+            React.createElement(RocketIcon, { size: 14, fill: C.accent }),
+            React.createElement('span', { style: { fontSize: '13px', fontWeight: '600', color: C.fg } }, 'Autopiloto')
+          ),
+          React.createElement('div', { style: { fontSize: '12px', color: C.fgMuted, marginBottom: '10px', lineHeight: '1.6' } },
+            'X1 decide por si mismo que construir, sin que le des ningun objetivo, y no se detiene: analiza el repositorio, elige la mejora mas valiosa (sector Estrategia), la implementa (Desarrollo → Auditoria de Codigo → Refinamiento) y publica el PR — luego repite, indefinidamente, un ciclo cada 15-25 minutos.'
+          ),
+          React.createElement('button', {
+            onClick: function () { startAutopilot(repoCtx); }, disabled: s.building || !repoCtx,
+            style: {
+              display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 16px', borderRadius: '6px', border: '1px solid rgba(27,31,36,0.15)',
+              background: s.building || !repoCtx ? C.canvasSubtle : C.accent,
+              color: s.building || !repoCtx ? C.fgSubtle : '#ffffff',
+              fontSize: '13px', fontWeight: '600', cursor: s.building || !repoCtx ? 'default' : 'pointer', fontFamily: F,
+            },
+          }, React.createElement(RocketIcon, { size: 12, fill: 'currentColor' }), s.building ? 'Decidiendo…' : 'Activar autopiloto')
+        )
+      : React.createElement(Flash, { variant: 'success' },
+          React.createElement(RocketIcon, { size: 12, fill: C.success }), ' Autopiloto en marcha desde hace ' + timeAgo(queue.createdAt) + ' — X1 sigue decidiendo y construyendo por su cuenta, sin limite de tiempo.'
+        ),
+
+    // ── Input de objetivo (opcional — si prefieres dirigir tu algo concreto) ──
+    React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', margin: '16px 0 10px' } },
+      React.createElement('div', { style: { flex: 1, height: '1px', background: C.border } }),
+      React.createElement('span', { style: { fontSize: '11px', color: C.fgSubtle } }, 'o dale un objetivo concreto'),
+      React.createElement('div', { style: { flex: 1, height: '1px', background: C.border } })
+    ),
     React.createElement('div', { style: { marginTop: '14px', marginBottom: '14px' } },
       React.createElement('textarea', {
         value: s.goal, onChange: function (e) { setGoal(e.target.value); }, disabled: s.building,
@@ -468,7 +504,7 @@ export function PRAgent({ githubUser, onGoToRepo }) {
     ),
 
     // ── Cola de automatizacion en segundo plano ──
-    queue && queue.tareas && queue.tareas.length > 0 && React.createElement(BackgroundQueueView, { queue: queue, onCancel: handleCancelQueue, cancelling: cancelling }),
+    queue && ((queue.mode === 'autopilot') || (queue.tareas && queue.tareas.length > 0)) && React.createElement(BackgroundQueueView, { queue: queue, onCancel: handleCancelQueue, cancelling: cancelling }),
 
     // ── Revision de PRs abiertos (secundario) ──
     React.createElement('div', { style: { marginTop: '24px', paddingTop: '16px', borderTop: '1px solid ' + C.border } },
