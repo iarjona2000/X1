@@ -3,10 +3,11 @@ import * as B from './backend.js';
 import {
   fetchOpenPRs, fetchPRDiff, reviewPRDiff, publishPRComment,
   loadRepoAnalysis, runAutoBuild, publishAutoBuild,
+  getBackgroundQueue, cancelBackgroundQueue,
 } from './github-agent.js';
 import { ProcessLog } from './ProcessTimeline.jsx';
 import { DiffView } from './DiffView.jsx';
-import { FileAddedIcon, FileDiffIcon, ChevronDownIcon, ChevronUpIcon, GitBranchIcon } from '@primer/octicons-react';
+import { FileAddedIcon, FileDiffIcon, ChevronDownIcon, ChevronUpIcon, GitBranchIcon, ClockIcon, SyncIcon } from '@primer/octicons-react';
 
 const F = "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif";
 const MONO = "'SF Mono', 'Cascadia Code', Consolas, monospace";
@@ -196,11 +197,107 @@ function timeAgo(ts) {
   return Math.floor(d / 86400000) + 'd';
 }
 
+// Muestra el progreso acumulado de la cola que procesa el service worker en
+// segundo plano (una tarea cada 15-25 min, ver 'AUTOMATIZACION EN SEGUNDO
+// PLANO' en background/service-worker.js). Por cada tarea completada se ve
+// que sectores/IAs trabajaron en ella (Desarrollo -> Auditoria de Codigo ->
+// Refinamiento), los ficheros tocados, lineas +/- y el enlace al PR — asi
+// queda claro que no es una sola llamada a IA sino una orquestacion real que
+// se reparte en el tiempo.
+function BackgroundQueueView({ queue, onCancel, cancelling }) {
+  var done = queue.tareas.filter(function (t) { return t.status === 'done'; }).length;
+  var errored = queue.tareas.filter(function (t) { return t.status === 'error'; }).length;
+  var pending = queue.tareas.filter(function (t) { return t.status === 'pending'; }).length;
+  var active = queue.tareas.filter(function (t) { return t.status === 'active'; }).length;
+  var finished = pending === 0 && active === 0;
+
+  return React.createElement('div', { style: { marginBottom: '16px' } },
+    React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' } },
+      React.createElement('h3', { style: Object.assign({}, H3, { flex: 1, border: 'none', margin: 0, padding: 0 }) }, 'Cola de automatizacion en segundo plano'),
+      !finished && React.createElement('button', {
+        onClick: onCancel, disabled: cancelling,
+        style: { fontSize: '11px', color: C.danger, background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: F },
+      }, cancelling ? 'Cancelando…' : 'Cancelar cola')
+    ),
+    React.createElement('div', { style: { fontSize: '11px', color: C.fgMuted, marginBottom: '10px', lineHeight: '1.6' } },
+      finished
+        ? ('Cola completada: ' + done + ' Pull Request(s) creados' + (errored ? ', ' + errored + ' con error' : '') + '.')
+        : (done + ' completada(s) · ' + pending + ' pendiente(s) · X1 procesa una tarea cada 15-25 min, siga o no el sidepanel abierto — ultima actividad hace ' + timeAgo(queue.updatedAt) + '.')
+    ),
+    React.createElement('div', { style: { border: '1px solid ' + C.border, borderRadius: '6px', overflow: 'hidden' } },
+      queue.tareas.map(function (t, i) {
+        return React.createElement(QueueTaskRow, { key: i, tarea: t, index: i, isLast: i === queue.tareas.length - 1 });
+      })
+    )
+  );
+}
+
+function QueueTaskRow({ tarea, index, isLast }) {
+  var color = tarea.status === 'done' ? C.success : tarea.status === 'error' ? C.danger : tarea.status === 'active' ? C.accent : C.fgSubtle;
+  var statusLabel = tarea.status === 'done' ? 'completada' : tarea.status === 'error' ? 'error' : tarea.status === 'active' ? 'en curso' : 'en cola';
+
+  return React.createElement('div', { style: { padding: '8px 10px', borderBottom: isLast ? 'none' : '1px solid ' + C.border } },
+    React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '6px' } },
+      tarea.status === 'active'
+        ? React.createElement(SyncIcon, { size: 12, fill: color, style: { animation: 'spin 1s linear infinite' } })
+        : React.createElement(ClockIcon, { size: 12, fill: color }),
+      React.createElement('span', { style: { fontSize: '12px', fontFamily: MONO, color: C.fg, flex: 1 } }, (index + 1) + '. ' + tarea.titulo),
+      React.createElement(Label, { variant: tarea.status === 'done' ? 'success' : tarea.status === 'error' ? 'danger' : 'neutral' }, statusLabel)
+    ),
+    tarea.motivo && React.createElement('div', { style: { fontSize: '11px', color: C.fgMuted, marginTop: '2px', marginLeft: '18px', fontStyle: 'italic' } }, tarea.motivo),
+
+    // Sectores/IAs que trabajaron en esta tarea (solo si ya se proceso).
+    tarea.sectors && tarea.sectors.length > 0 && React.createElement('div', { style: { marginTop: '4px', marginLeft: '18px', display: 'flex', flexWrap: 'wrap', gap: '4px' } },
+      tarea.sectors.map(function (s, i) {
+        return React.createElement('span', {
+          key: i, title: s.model || s.provider || '',
+          style: { fontSize: '10px', padding: '1px 6px', borderRadius: '999px', background: C.neutralSubtle, color: C.fgMuted },
+        }, s.fase + ': ' + (s.model || s.provider || 'IA'));
+      })
+    ),
+
+    tarea.status === 'done' && tarea.result && React.createElement('div', { style: { marginTop: '4px', marginLeft: '18px', fontSize: '11px', color: C.fgMuted, display: 'flex', alignItems: 'center', gap: '8px' } },
+      React.createElement('span', { style: { color: C.success } }, '+' + (tarea.result.linesAdded || 0)),
+      React.createElement('span', { style: { color: C.danger } }, '-' + (tarea.result.linesRemoved || 0)),
+      React.createElement('span', null, (tarea.result.files || []).join(', ')),
+      tarea.result.prUrl && React.createElement('a', { href: tarea.result.prUrl, target: '_blank', rel: 'noopener', style: { color: C.accent, fontWeight: '600' } }, 'Ver PR →'),
+      React.createElement('span', null, 'hace ' + timeAgo(tarea.result.completedAt))
+    ),
+    tarea.status === 'error' && tarea.result && React.createElement('div', { style: { marginTop: '4px', marginLeft: '18px', fontSize: '11px', color: C.danger } }, tarea.result.error)
+  );
+}
+
 export function PRAgent({ githubUser, onGoToRepo }) {
   var isGh = githubUser && githubUser.login && githubUser.login !== 'invitado';
   var s = useAutomationStore();
   var [repoCtx, setRepoCtx] = React.useState(null);
   var [expandedFile, setExpandedFile] = React.useState(null);
+  var [queue, setQueue] = React.useState(null);
+  var [cancelling, setCancelling] = React.useState(false);
+
+  // Cola de automatizacion en segundo plano: la procesa el service worker
+  // via chrome.alarms (una tarea cada 15-25 min), asi que puede avanzar con
+  // el sidepanel cerrado. La leemos al abrir y nos suscribimos a cambios en
+  // storage para que, si el panel esta abierto cuando el SW completa una
+  // tarea, el progreso se actualice solo, sin recargar.
+  React.useEffect(function () {
+    getBackgroundQueue().then(setQueue);
+    function onStorageChange(changes, area) {
+      if (area === 'local' && changes.x1_automation_queue) {
+        try { setQueue(changes.x1_automation_queue.newValue ? JSON.parse(changes.x1_automation_queue.newValue) : null); }
+        catch (e) {}
+      }
+    }
+    if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.onChanged) {
+      chrome.storage.onChanged.addListener(onStorageChange);
+      return function () { chrome.storage.onChanged.removeListener(onStorageChange); };
+    }
+  }, []);
+
+  function handleCancelQueue() {
+    setCancelling(true);
+    cancelBackgroundQueue().then(function () { setQueue(null); setCancelling(false); });
+  }
 
   React.useEffect(function () { setRepoCtx(loadRepoAnalysis()); }, []);
 
@@ -357,6 +454,9 @@ export function PRAgent({ githubUser, onGoToRepo }) {
             )
           )
     ),
+
+    // ── Cola de automatizacion en segundo plano ──
+    queue && queue.tareas && queue.tareas.length > 0 && React.createElement(BackgroundQueueView, { queue: queue, onCancel: handleCancelQueue, cancelling: cancelling }),
 
     // ── Revision de PRs abiertos (secundario) ──
     React.createElement('div', { style: { marginTop: '24px', paddingTop: '16px', borderTop: '1px solid ' + C.border } },

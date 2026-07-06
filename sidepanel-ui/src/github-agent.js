@@ -43,6 +43,20 @@ function providerLabel(id) { return PROVIDER_LABELS[id] || (id ? id : 'IA'); }
 
 var AGENT_SYSTEM_PROMPT = 'Eres X1, un agente de automatizacion de software. Responde SIEMPRE en espanol, de forma directa y sin relleno conversacional. Sigue el formato EXACTO que pida cada instruccion (si se pide JSON puro, responde solo JSON, sin fences de markdown ni texto antes o despues).';
 
+// Cada fase de la construccion de codigo pasa por un "sector" distinto —
+// igual que backend.js hace para el chat (ver SECTOR_PROMPTS/AGENTS ahi) —
+// para que quede claro que X1 no es una unica llamada a IA, sino una
+// orquestacion: Desarrollo escribe un borrador, Auditoria de Codigo lo
+// revisa con un rol critico independiente, y Refinamiento incorpora esa
+// revision en la version final. Mismos sectores que usa el continuador en
+// segundo plano (background/service-worker.js) para que la experiencia sea
+// identica dure la tarea 30s o se procese horas despues en la cola.
+var SECTOR_PROMPTS = {
+  developer: 'Eres X1 en el sector Desarrollo, un arquitecto de software senior. Escribe codigo production-ready, completo y funcional. Responde EN ESPAÑOL solo con el JSON exacto que se te pida, sin texto ni markdown alrededor.',
+  reviewer: 'Eres X1 en el sector Auditoria de Codigo, un revisor senior extremadamente riguroso. Busca bugs, vulnerabilidades, malas practicas, casos sin cubrir y codigo incompleto en lo que te pasen. Responde EN ESPAÑOL de forma directa: una lista breve de problemas concretos, o "Sin problemas relevantes" si esta bien.',
+  refiner: 'Eres X1 en el sector Refinamiento, encargado de incorporar el feedback de una auditoria en la version final del codigo. Responde EN ESPAÑOL solo con el JSON exacto que se te pida, sin texto ni markdown alrededor.',
+};
+
 // Llama al proxy directamente (fetch desde el sidepanel, sin pasar por el
 // service worker) y devuelve {text, label, provider} donde label ya incluye
 // el modelo real que respondio y cuanto tardo, listo para meter en un detail.
@@ -52,7 +66,7 @@ function askAI(prompt, opts) {
   return callAI(prompt, {
     maxTokens: opts.maxTokens,
     timeoutMs: opts.timeoutMs,
-    systemPrompt: AGENT_SYSTEM_PROMPT,
+    systemPrompt: opts.systemPrompt || AGENT_SYSTEM_PROMPT,
   }).then(function (r) {
     var secs = Math.round((Date.now() - t0) / 1000);
     if (!r || !r.text) {
@@ -347,7 +361,7 @@ export function runAutoBuild(goal, repoCtx, onStep) {
   var planPrompt =
     'Eres un agente de automatizacion de software autonomo. El usuario pide:\n"' + goal + '"\n' + repoBlock +
     '\nDivide esto en TAREAS concretas y accionables. Si el objetivo ya es especifico (una sola cosa clara), devuelve UNA tarea. ' +
-    'Si el objetivo es amplio o vago (p.ej. "arregla todos los problemas", "mejora el proyecto", "revisa todo"), usa el informe de analisis de arriba para identificar hasta 5 problemas o recomendaciones CONCRETAS y crea una tarea por cada una — nombra ficheros reales del informe, no generalidades.\n\n' +
+    'Si el objetivo es amplio o vago (p.ej. "arregla todos los problemas", "mejora el proyecto", "revisa todo"), usa el informe de analisis de arriba para identificar hasta 10 problemas o recomendaciones CONCRETAS y crea una tarea por cada una — nombra ficheros reales del informe, no generalidades.\n\n' +
     'Responde SOLO con JSON (sin markdown, sin texto fuera del JSON) con esta forma exacta:\n' +
     '{"resumen":"una frase global de que vas a hacer","tareas":[' +
     '{"titulo":"titulo corto de la tarea","motivo":"por que hace falta, citando el informe o el objetivo",' +
@@ -355,9 +369,9 @@ export function runAutoBuild(goal, repoCtx, onStep) {
     '"leer_url":"una URL real y concreta (documentacion oficial, guia) si conoces una relevante, o null",' +
     '"archivos":[{"path":"ruta/al/archivo.ext","motivo":"por que hay que crear o modificar este fichero"}]}' +
     ']}\n' +
-    'Maximo 5 tareas, maximo 3 archivos por tarea. Si una tarea no requiere tocar codigo (solo investigacion), deja "archivos" como [].';
+    'Maximo 10 tareas, maximo 3 archivos por tarea. Si una tarea no requiere tocar codigo (solo investigacion), deja "archivos" como [].';
 
-  return askAI(planPrompt, { timeoutMs: 20000, maxTokens: 1200 }).then(function (r) {
+  return askAI(planPrompt, { timeoutMs: 20000, maxTokens: 1800 }).then(function (r) {
     var parsed = extractJSON(r.text);
     var tareas = (parsed && Array.isArray(parsed.tareas) && parsed.tareas.length) ? parsed.tareas : [{ titulo: goal, motivo: goal, busquedas: [goal], leer_url: null, archivos: [] }];
     var resumen = (parsed && parsed.resumen) || goal;
@@ -368,9 +382,60 @@ export function runAutoBuild(goal, repoCtx, onStep) {
       why: tareas.map(function (t, i) { return (i + 1) + '. ' + t.titulo; }).join(' · '),
     });
 
+    // Si hay mas de 1 tarea y un repo de referencia (para poder publicar),
+    // esta NO es una automatizacion de 10 segundos: se procesa la primera
+    // tarea al momento (con feedback inmediato) y el resto se entrega a la
+    // cola en segundo plano del service worker, que sigue trabajando durante
+    // horas (una tarea cada 15-25 min) aunque cierres el sidepanel. Ver
+    // 'AUTOMATIZACION EN SEGUNDO PLANO' en background/service-worker.js.
+    if (tareas.length > 1 && repoCtx) {
+      return processTaskDeep(goal, tareas[0], repoCtx, onStep, 0, tareas.length).then(function (proposal) {
+        var queued = tareas.slice(1).map(function (t) { return Object.assign({}, t, { status: 'pending' }); });
+        var queue = {
+          goal: goal, owner: repoCtx.owner, name: repoCtx.name,
+          branch: (repoCtx.meta && repoCtx.meta.default_branch) || 'main',
+          tareas: queued, currentIndex: 0, createdAt: Date.now(), updatedAt: Date.now(),
+        };
+        return startBackgroundQueue(queue).then(function () {
+          emit(onStep, {
+            id: 'queue', title: 'Cola en segundo plano activada', status: 'done',
+            detail: queued.length + ' tarea(s) mas pendientes — X1 seguira trabajando aunque cierres el sidepanel',
+            why: 'Cada tarea restante se procesa cada 15-25 minutos (una a la vez, para poder revisar cada Pull Request) durante las proximas horas. Consulta el progreso en "Cola de automatizacion" mas abajo.',
+          });
+          return proposal;
+        });
+      });
+    }
+
     return runTasksSequentially(goal, tareas, repoCtx, onStep).then(function (results) {
       return aggregateProposal(resumen, tareas, results);
     });
+  });
+}
+
+// Envia la cola al service worker para que la procese en segundo plano via
+// chrome.alarms — sigue corriendo aunque se cierre el sidepanel.
+function startBackgroundQueue(queue) {
+  return new Promise(function (resolve) {
+    try {
+      chrome.runtime.sendMessage({ type: 'X1_AUTOMATION_QUEUE_START', queue: queue }, function () { resolve(); });
+    } catch (e) { resolve(); }
+  });
+}
+
+// Lee el estado actual de la cola de automatizacion en segundo plano.
+export function getBackgroundQueue() {
+  return new Promise(function (resolve) {
+    try {
+      chrome.runtime.sendMessage({ type: 'X1_AUTOMATION_QUEUE_GET' }, function (resp) { resolve(resp && resp.queue); });
+    } catch (e) { resolve(null); }
+  });
+}
+
+export function cancelBackgroundQueue() {
+  return new Promise(function (resolve) {
+    try { chrome.runtime.sendMessage({ type: 'X1_AUTOMATION_QUEUE_CANCEL' }, function () { resolve(); }); }
+    catch (e) { resolve(); }
   });
 }
 
@@ -382,16 +447,24 @@ function runTasksSequentially(goal, tareas, repoCtx, onStep) {
   var chain = Promise.resolve();
   tareas.forEach(function (tarea, i) {
     chain = chain.then(function () {
-      var tag = 'Tarea ' + (i + 1) + '/' + tareas.length;
-      emit(onStep, { id: 't' + i + ':title', title: tag + ': ' + tarea.titulo, status: 'done', detail: tarea.motivo });
-      return runResearch(tarea, onStep, i).then(function (research) {
-        return proposeChanges(goal, tarea, research, repoCtx, onStep, i).then(function (proposal) {
-          results.push({ tarea: tarea, proposal: proposal });
-        });
+      return processTaskDeep(goal, tarea, repoCtx, onStep, i, tareas.length).then(function (proposal) {
+        results.push({ tarea: tarea, proposal: proposal });
       });
     });
   });
   return chain.then(function () { return results; });
+}
+
+// Procesa UNA tarea de principio a fin: investigacion + pipeline de 3 fases
+// (proposeChanges). Reutilizado tanto por el modo secuencial (objetivos
+// concretos, sin cola) como por la primera tarea de un objetivo amplio antes
+// de entregar el resto a la cola en segundo plano.
+function processTaskDeep(goal, tarea, repoCtx, onStep, taskIdx, totalTasks) {
+  var tag = 'Tarea ' + (taskIdx + 1) + (totalTasks ? '/' + totalTasks : '');
+  emit(onStep, { id: 't' + taskIdx + ':title', title: tag + ': ' + tarea.titulo, status: 'done', detail: tarea.motivo });
+  return runResearch(tarea, onStep, taskIdx).then(function (research) {
+    return proposeChanges(goal, tarea, research, repoCtx, onStep, taskIdx);
+  });
 }
 
 function runResearch(tarea, onStep, taskIdx) {
@@ -439,6 +512,11 @@ function runResearch(tarea, onStep, taskIdx) {
   });
 }
 
+// Pipeline de 3 fases con 3 sectores/IAs distintos — no una unica llamada:
+// Desarrollo escribe un borrador, Auditoria de Codigo lo revisa con un rol
+// critico independiente, Refinamiento incorpora esa revision en la version
+// final. Cada fase es su propio paso en el ProcessLog, con el sector y la
+// IA que respondio.
 function proposeChanges(goal, tarea, research, repoCtx, onStep, taskIdx) {
   var tagPrefix = 't' + taskIdx + ':';
   var files = tarea.archivos || [];
@@ -462,8 +540,6 @@ function proposeChanges(goal, tarea, research, repoCtx, onStep, taskIdx) {
       detail: filesWithState.map(function (f) { return f.path + (f.exists ? ' (existente)' : ' (nuevo)'); }).join(', '),
     });
 
-    emit(onStep, { id: tagPrefix + 'generate', title: 'Generando propuesta con panel de IA', status: 'active', why: 'Combina el objetivo, la investigacion y el contenido actual de cada fichero para escribir el cambio completo.' });
-
     var researchBlock = (research.searches || []).map(function (s) {
       var lines = [];
       s.github.forEach(function (r) { lines.push('- [repo] ' + r.name + ': ' + (r.description || '')); });
@@ -471,11 +547,12 @@ function proposeChanges(goal, tarea, research, repoCtx, onStep, taskIdx) {
       s.stackoverflow.forEach(function (q) { lines.push('- [SO] ' + q.title); });
       return 'Busqueda "' + s.term + '":\n' + lines.join('\n');
     }).join('\n\n');
-
     var urlBlock = research.urlText ? '\nContenido leido de ' + tarea.leer_url + ':\n' + research.urlText + '\n' : '';
 
-    var prompt =
-      'Eres un agente de automatizacion de software. Objetivo general del usuario:\n"' + goal + '"\n\n' +
+    // ── Fase 1: Desarrollo (borrador) ──
+    emit(onStep, { id: tagPrefix + 'draft', title: 'Sector Desarrollo: escribiendo borrador', status: 'active', why: 'Primera version del codigo, combinando el objetivo, la investigacion y el contenido actual de cada fichero.' });
+    var draftPrompt =
+      'Objetivo general del usuario:\n"' + goal + '"\n\n' +
       'Tarea concreta a resolver ahora: ' + tarea.titulo + '\nMotivo: ' + tarea.motivo + '\n\n' +
       'Investigacion realizada:\n' + (researchBlock || '(sin resultados relevantes)') + '\n' + urlBlock +
       '\nFicheros a crear/modificar (con su contenido ACTUAL si ya existen):\n' +
@@ -484,23 +561,52 @@ function proposeChanges(goal, tarea, research, repoCtx, onStep, taskIdx) {
       '{"titulo_pr":"titulo corto para esta tarea","descripcion_pr":"descripcion en espanol de que cambia y por que",' +
       '"archivos":[{"path":"mismo path de arriba","contenido":"contenido COMPLETO del fichero tras el cambio"}]}';
 
-    return askAI(prompt, { timeoutMs: 35000, maxTokens: 3500 }).then(function (r) {
-      var proposal = extractJSON(r.text);
-      var ok = !!(proposal && Array.isArray(proposal.archivos) && proposal.archivos.length);
+    return askAI(draftPrompt, { timeoutMs: 35000, maxTokens: 3500, systemPrompt: SECTOR_PROMPTS.developer }).then(function (draftRes) {
+      var draft = extractJSON(draftRes.text);
+      var draftOk = !!(draft && Array.isArray(draft.archivos) && draft.archivos.length);
       emit(onStep, {
-        id: tagPrefix + 'generate', title: ok ? 'Propuesta generada' : 'El panel de IA no devolvio una propuesta valida',
-        status: ok ? 'done' : 'error',
-        detail: (ok ? (proposal.archivos.length + ' fichero(s) listos para revisar') : 'Reintenta esta tarea con mas detalle') + ' · respondido por ' + r.label,
+        id: tagPrefix + 'draft', title: draftOk ? 'Sector Desarrollo: borrador listo' : 'Sector Desarrollo: no genero un borrador valido',
+        status: draftOk ? 'done' : 'error',
+        detail: (draftOk ? (draft.archivos.length + ' fichero(s)') : 'reintenta esta tarea con mas detalle') + ' · ' + draftRes.label,
       });
-      if (!ok) return { titulo_pr: null, descripcion_pr: null, archivos: [], error: true };
-      var withSha = proposal.archivos.map(function (f) {
-        var match = filesWithState.find(function (e) { return e.path === f.path; });
-        return Object.assign({}, f, {
-          sha: match ? match.sha : null, exists: match ? match.exists : false, motivo: match ? match.motivo : '',
-          current: match ? match.current : '',
+      if (!draftOk) return { titulo_pr: null, descripcion_pr: null, archivos: [], error: true };
+
+      // ── Fase 2: Auditoria de Codigo (revision independiente) ──
+      emit(onStep, { id: tagPrefix + 'review', title: 'Sector Auditoria de Codigo: revisando el borrador', status: 'active', why: 'Un segundo pase, con un rol critico independiente, busca bugs, huecos de seguridad y casos sin cubrir antes de dar el codigo por bueno.' });
+      var reviewPrompt = 'Revisa este codigo generado para la tarea "' + tarea.titulo + '". Busca bugs, seguridad, malas practicas y casos sin cubrir.\n\n' +
+        draft.archivos.map(function (f) { return '=== ' + f.path + ' ===\n' + String(f.contenido || '').slice(0, 3000); }).join('\n\n');
+
+      return askAI(reviewPrompt, { timeoutMs: 25000, maxTokens: 1200, systemPrompt: SECTOR_PROMPTS.reviewer }).then(function (reviewRes) {
+        emit(onStep, {
+          id: tagPrefix + 'review', title: 'Sector Auditoria de Codigo: revision completada', status: 'done',
+          detail: (reviewRes.text || 'sin observaciones').slice(0, 160) + ' · ' + reviewRes.label,
+        });
+
+        // ── Fase 3: Refinamiento (version final) ──
+        emit(onStep, { id: tagPrefix + 'refine', title: 'Sector Refinamiento: incorporando la auditoria', status: 'active', why: 'Corrige el borrador segun los problemas detectados en la auditoria y produce la version final publicable.' });
+        var refinePrompt = 'Codigo original:\n' + draft.archivos.map(function (f) { return '=== ' + f.path + ' ===\n' + f.contenido; }).join('\n\n') +
+          '\n\nAuditoria recibida:\n' + (reviewRes.text || '(sin observaciones)') +
+          '\n\nCorrige el codigo segun la auditoria (si no hay problemas reales, deja el codigo igual). Responde SOLO con JSON: {"titulo_pr":"titulo corto","descripcion_pr":"descripcion en espanol","archivos":[{"path":"mismo path de arriba","contenido":"contenido FINAL completo del fichero"}]}';
+
+        return askAI(refinePrompt, { timeoutMs: 35000, maxTokens: 3500, systemPrompt: SECTOR_PROMPTS.refiner }).then(function (refineRes) {
+          var final = extractJSON(refineRes.text);
+          var finalOk = !!(final && Array.isArray(final.archivos) && final.archivos.length);
+          emit(onStep, {
+            id: tagPrefix + 'refine', title: finalOk ? 'Sector Refinamiento: version final lista' : 'Sector Refinamiento: fallo, se conserva el borrador',
+            status: finalOk ? 'done' : 'error',
+            detail: (finalOk ? (final.archivos.length + ' fichero(s) listos para revisar') : 'se publica el borrador sin refinar') + ' · ' + refineRes.label,
+          });
+          var chosen = finalOk ? final : draft;
+          var withSha = chosen.archivos.map(function (f) {
+            var match = filesWithState.find(function (e) { return e.path === f.path; });
+            return Object.assign({}, f, {
+              sha: match ? match.sha : null, exists: match ? match.exists : false, motivo: match ? match.motivo : '',
+              current: match ? match.current : '',
+            });
+          });
+          return { titulo_pr: chosen.titulo_pr || tarea.titulo, descripcion_pr: chosen.descripcion_pr || tarea.motivo, archivos: withSha };
         });
       });
-      return { titulo_pr: proposal.titulo_pr || tarea.titulo, descripcion_pr: proposal.descripcion_pr || tarea.motivo, archivos: withSha };
     });
   });
 }

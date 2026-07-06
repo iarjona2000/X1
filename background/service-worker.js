@@ -67,6 +67,7 @@ try {
     // Ivan's decision: only NVIDIA NIM + Gemini.)
     'protocol.js',
     'integrations/registry.js',
+    'dex/dex-integration.js',
     // 26 bridges de tu socio (2026-07-04, commits cddd5ec/c8da7e8/466775b/c4a7cf3).
     // 3 archivos que su lista original nombraba no existen en el arbol y se
     // omiten aqui (habrian hecho fallar todo el importScripts): 'ai/continue-bridge.js'
@@ -499,6 +500,58 @@ function parseCommand(cmd) {
   // ── MARKETPLACE NEGOTIATION ──
   var mNegotiate = l.match(/^(?:negocia|negociar)\s+(?:en\s+)?(vinted|wallapop|ebay)\s+(.+?)\s+(?:por|a)\s+(\d+)/i);
   if (mNegotiate) return {action:'negotiateMarketplace', platform:mNegotiate[1].toLowerCase(), query:mNegotiate[2].trim(), targetPrice:parseInt(mNegotiate[3])};
+
+  // ══ DEX BY THIRDLAYER FEATURE PARITY ══
+  // Contacts
+  var mContactAdd = l.match(/^(?:a[ñn]ade|guardar|crear)\s+(?:contacto|persona)\s+(.+?)(?:\s*,\s*(.+?))?(?:\s*,\s*(.+?))?(?:\s*\((.+?)\))?$/i);
+  if (mContactAdd) return {action:'contactAdd', name:mContactAdd[1].trim(), email:mContactAdd[2]?mContactAdd[2].trim():'', company:mContactAdd[3]?mContactAdd[3].trim():'', title:mContactAdd[4]?mContactAdd[4].trim():''};
+  var mContactSearch = l.match(/^(?:busca|buscar|encuentra)\s+(?:contacto|contactos)\s+(.+)/i);
+  if (mContactSearch) return {action:'contactSearch', query:mContactSearch[1].trim()};
+  if (/^(?:lista|muestra|dime)\s+(?:mis\s+)?contactos/i.test(l)) return {action:'contactList'};
+  var mContactTimeline = l.match(/^(?:historial|timeline|actividad)\s+(?:de\s+)?(.+)/i);
+  if (mContactTimeline) return {action:'contactSearch', query:mContactTimeline[1].trim()};
+  if (l.match(/^(?:exporta|exportar)\s+(?:contactos|lista)\s+(?:a\s+)?sheets/i)) return {action:'contactExport'};
+
+  // LinkedIn
+  if (l.match(/^(?:extrae|extraer|scrapea|scrapear)\s+(?:perfil\s+de\s+)?linkedin/i)) return {action:'linkedinScrape'};
+  var mLinkedInSearch = l.match(/^(?:busca|buscar)\s+(?:en\s+)?linkedin\s+(.+)/i);
+  if (mLinkedInSearch) return {action:'linkedinSearch', query:mLinkedInSearch[1].trim()};
+
+  // Notes
+  var mNoteAdd = l.match(/^(?:toma|tomar|guarda|guardar|crea|crear)\s+(?:una\s+)?nota\s+(?:sobre|de|para)\s+(.+?)(?:\s*:\s*(.+))?$/i);
+  if (mNoteAdd) return {action:'noteAdd', title:mNoteAdd[1].trim(), content:mNoteAdd[2]?mNoteAdd[2].trim():''};
+  var mNoteSearch = l.match(/^(?:busca|buscar|encuentra)\s+(?:nota|notas)\s+(.+)/i);
+  if (mNoteSearch) return {action:'noteSearch', query:mNoteSearch[1].trim()};
+
+  // Meetings
+  if (l.match(/^(?:prepara|preparar)\s+(?:briefing|brief|resumen)\s+(?:de\s+)?(?:la\s+)?(?:reunion|meeting|proxima|siguiente)/i)) return {action:'meetingBrief'};
+  if (l.match(/^(?:env[ií]a|enviar)\s+(?:follow.?up|seguimiento)\s+(?:de\s+)?(?:la\s+)?reunion/i)) return {action:'meetingFollowUp'};
+
+  // Email
+  if (l.match(/^(?:clasifica|clasificar|triage|organiza)\s+(?:mi\s+)?(?:bandeja|email|correo|inbox)/i)) return {action:'emailTriage'};
+  if (l.match(/^(?:crea|crear)\s+(?:borradores|drafts|respuestas)\s+(?:automaticos|auto)/i)) return {action:'emailAutoDrafts'};
+  var mMassEmail = l.match(/^(?:env[ií]a|enviar)\s+(?:masivo|mass)\s+(?:email|correo)\s+(?:desde\s+)?(?:sheet|hoja)\s+(.+)/i);
+  if (mMassEmail) return {action:'emailMassSend', sheetId:mMassEmail[1].trim()};
+
+  // Tabs
+  if (l.match(/^(?:organiza|organizar|agrupa|agrupar|tab.?zero)\s+(?:mis\s+)?pesta[ñn]as/i)) return {action:'tabZero'};
+  var mWsSave = l.match(/^(?:guarda|guardar)\s+(?:workspace|espacio)\s+(.+)/i);
+  if (mWsSave) return {action:'workspaceSave', name:mWsSave[1].trim()};
+  var mWsRestore = l.match(/^(?:restaura|restaurar|abre|abrir)\s+(?:workspace|espacio)\s+(.+)/i);
+  if (mWsRestore) return {action:'workspaceRestore', name:mWsRestore[1].trim()};
+
+  // Scrape
+  if (l.match(/^(?:extrae|extraer|scrapea|scrapear)\s+(?:datos|data|pagina|page)\s+(?:a\s+)?sheets/i)) return {action:'scrapeToSheet'};
+
+  // Import
+  if (l.match(/^(?:importa|importar)\s+(?:contactos|contacts)\s+(?:desde\s+)?gmail/i)) return {action:'importGmail'};
+  if (l.match(/^(?:importa|importar)\s+(?:contactos|contacts)\s+(?:desde\s+)?calendar/i)) return {action:'importCalendar'};
+
+  // Privacy
+  var mBlock = l.match(/^(?:bloquea|bloquear)\s+(?:sitio|site|pagina|url)\s+(.+)/i);
+  if (mBlock) return {action:'blockSite', url:mBlock[1].trim()};
+  var mUnblock = l.match(/^(?:desbloquea|desbloquear)\s+(?:sitio|site|pagina|url)\s+(.+)/i);
+  if (mUnblock) return {action:'unblockSite', url:mUnblock[1].trim()};
 
   // Everything else → return null → goes to AI
   return null;
@@ -5227,6 +5280,23 @@ function execAction(act, tabId) {
         });
         break;
 
+      // ── Dex by ThirdLayer feature parity ──
+      case 'contactAdd': case 'contactSearch': case 'contactList': case 'contactTimeline': case 'contactExport':
+      case 'noteAdd': case 'noteSearch':
+      case 'linkedinScrape': case 'linkedinSearch':
+      case 'meetingBrief': case 'meetingFollowUp':
+      case 'emailTriage': case 'emailAutoDrafts': case 'emailMassSend':
+      case 'tabZero': case 'workspaceSave': case 'workspaceRestore':
+      case 'scrapeToSheet':
+      case 'importGmail': case 'importCalendar':
+      case 'blockSite': case 'unblockSite':
+        if (typeof X1DexActions !== 'undefined' && X1DexActions[act.action]) {
+          X1DexActions[act.action](act, tabId).then(function(r) { resolve(r); }).catch(function(e) { resolve({text:'Error: '+e.message, showText:true}); });
+        } else {
+          resolve({text:act.text||act.speech||'Accion ejecutada.'});
+        }
+        break;
+
       default:
         resolve({text:act.text||act.speech||'Acción ejecutada.'});
     }
@@ -5402,7 +5472,16 @@ function stepActionToApp(action) {
     'rewrite':'AI','expandText':'AI','summarize':'AI','correctText':'AI','continueWriting':'AI','changeLanguage':'AI',
     'tabGroup':'Google','tabGroupByDomain':'Google','tabCleanup':'Google','tabWorkspace':'Google',
     'remember':'AI','queryGraph':'AI','setKnowledge':'AI','remind':'AI',
-    'loginGoogle':'Google','checkGoogle':'Google'
+    'loginGoogle':'Google','checkGoogle':'Google',
+    'contactAdd':'Contacts','contactSearch':'Contacts','contactList':'Contacts','contactTimeline':'Contacts','contactExport':'Contacts',
+    'noteAdd':'Notes','noteSearch':'Notes',
+    'linkedinScrape':'LinkedIn','linkedinSearch':'LinkedIn',
+    'meetingBrief':'Calendar','meetingFollowUp':'Calendar',
+    'emailTriage':'Gmail','emailAutoDrafts':'Gmail','emailMassSend':'Gmail',
+    'tabZero':'Tabs','workspaceSave':'Tabs','workspaceRestore':'Tabs',
+    'scrapeToSheet':'Sheets',
+    'importGmail':'Contacts','importCalendar':'Contacts',
+    'blockSite':'Privacy','unblockSite':'Privacy'
   };
   return map[action] || 'X1';
 }
@@ -21139,6 +21218,290 @@ function promisify(fn, context) {
   };
 }
 
-// End of final padding section
-console.log('[X1] Service worker line count:', document.documentElement.outerHTML.length);
+// ═══════════════════════════════════════════
+// AUTOMATIZACION EN SEGUNDO PLANO — cola de tareas via chrome.alarms
+// ═══════════════════════════════════════════
+// Cuando el sidepanel (sidepanel-ui/src/github-agent.js) interpreta un
+// objetivo amplio ("arregla todos los problemas de X1"), procesa la PRIMERA
+// tarea al momento para dar feedback inmediato, y guarda el resto de la cola
+// aqui. Este service worker procesa UNA tarea mas cada ~15-25 minutos via
+// chrome.alarms, para que el trabajo siga aunque el sidepanel este cerrado
+// y para no publicar una decena de Pull Requests de golpe (nadie los podria
+// revisar). Cada tarea pasa por 3 fases con IA, cada una con su propio
+// "sector": Desarrollo (borrador) -> Auditoria de codigo (revision critica)
+// -> Refinamiento (version final incorporando la auditoria). El estado
+// completo vive en chrome.storage.local ('x1_automation_queue') y el
+// sidepanel lo lee para mostrar el progreso acumulado (que sectores/IAs
+// trabajaron en que, ficheros, lineas +/-, enlaces a los PRs).
+
+var X1_AUTOMATION_ALARM = 'x1-automation-tick';
+var X1_GH_API = 'https://api.github.com';
+var X1_PROXY_URL = 'https://x1-proxy.calezamindset.workers.dev/v1/chat/completions';
+var X1_PROXY_SECRET = '9ff4b7dda5f7defd5f7fb7c32c133428bc87e8efeb8550d3ce1e5838c1d3b850';
+
+var X1_SECTOR_PROMPTS = {
+  developer: 'Eres X1 en el sector Desarrollo, un arquitecto de software senior. Escribe codigo production-ready, completo y funcional. Responde EN ESPAÑOL solo con el JSON exacto que se te pida, sin texto ni markdown alrededor.',
+  reviewer: 'Eres X1 en el sector Auditoria de Codigo, un revisor senior extremadamente riguroso. Busca bugs, vulnerabilidades, malas practicas, casos sin cubrir y codigo incompleto en lo que te pasen. Responde EN ESPAÑOL de forma directa: una lista breve de problemas concretos, o "Sin problemas relevantes" si esta bien.',
+  refiner: 'Eres X1 en el sector Refinamiento, encargado de incorporar el feedback de una auditoria en la version final del codigo. Responde EN ESPAÑOL solo con el JSON exacto que se te pida, sin texto ni markdown alrededor.',
+};
+
+function x1GetQueue() {
+  return chrome.storage.local.get('x1_automation_queue').then(function(r) {
+    try { return r && r.x1_automation_queue ? JSON.parse(r.x1_automation_queue) : null; } catch (e) { return null; }
+  });
+}
+function x1SaveQueue(q) {
+  return chrome.storage.local.set({ x1_automation_queue: JSON.stringify(q) }).catch(function () {});
+}
+function x1GetGithubToken() {
+  return chrome.storage.local.get('github_token').then(function (r) { return r && r.github_token; });
+}
+function x1GhHeaders(token) {
+  return { 'Authorization': 'Bearer ' + token, 'Accept': 'application/vnd.github+json' };
+}
+
+function x1AiCall(prompt, systemPrompt, maxTokens, timeoutMs) {
+  return fetch(X1_PROXY_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-X1-Auth': X1_PROXY_SECRET },
+    body: JSON.stringify({
+      messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: prompt }],
+      max_tokens: maxTokens || 3000,
+    }),
+    signal: AbortSignal.timeout(timeoutMs || 35000),
+  }).then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (data) {
+      if (!data) return { text: null, provider: null, model: null };
+      var txt = ((data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '').trim();
+      return { text: txt || null, provider: data.x_provider || null, model: data.model || null };
+    })
+    .catch(function () { return { text: null, provider: null, model: null }; });
+}
+
+function x1ExtractJSON(txt) {
+  if (!txt) return null;
+  var cleaned = String(txt).replace(/```(?:json)?\s*([\s\S]*?)\s*```/g, '$1').trim();
+  var m = cleaned.match(/\{[\s\S]*\}/);
+  if (!m) return null;
+  try { return JSON.parse(m[0]); }
+  catch (e) {
+    try { return JSON.parse(m[0].replace(/,\s*}/g, '}').replace(/,\s*]/g, ']')); }
+    catch (e2) { return null; }
+  }
+}
+
+function x1GhFetchFile(token, owner, repo, path) {
+  var encoded = path.split('/').map(encodeURIComponent).join('/');
+  return fetch(X1_GH_API + '/repos/' + owner + '/' + repo + '/contents/' + encoded, { headers: x1GhHeaders(token) })
+    .then(function (r) { return r.status === 404 ? null : (r.ok ? r.json() : null); })
+    .then(function (d) {
+      if (!d || !d.content) return { content: '', sha: null, exists: false };
+      var content = '';
+      try { content = decodeURIComponent(escape(atob(d.content.replace(/\n/g, '')))); }
+      catch (e) { try { content = atob(d.content.replace(/\n/g, '')); } catch (e2) { content = ''; } }
+      return { content: content, sha: d.sha, exists: true };
+    })
+    .catch(function () { return { content: '', sha: null, exists: false }; });
+}
+
+function x1GhSearchRepos(query) {
+  return fetch(X1_GH_API + '/search/repositories?q=' + encodeURIComponent(query) + '&sort=stars&per_page=3')
+    .then(function (r) { return r.ok ? r.json() : { items: [] }; })
+    .then(function (d) { return (d.items || []).map(function (x) { return { name: x.full_name, description: x.description || '' }; }); })
+    .catch(function () { return []; });
+}
+function x1NpmSearch(query) {
+  return fetch('https://registry.npmjs.org/-/v1/search?text=' + encodeURIComponent(query) + '&size=3')
+    .then(function (r) { return r.ok ? r.json() : { objects: [] }; })
+    .then(function (d) { return (d.objects || []).map(function (o) { return { name: o.package.name, description: o.package.description || '' }; }); })
+    .catch(function () { return []; });
+}
+
+// Conteo aproximado de lineas +/- (no un diff completo, solo para el resumen
+// que se muestra en la cola: "Tarea 4: +38 -6 lineas").
+function x1DiffCounts(oldText, newText) {
+  var a = String(oldText || '').split('\n');
+  var b = String(newText || '').split('\n');
+  var seen = {};
+  a.forEach(function (l) { seen[l] = (seen[l] || 0) + 1; });
+  var added = 0, removed = 0;
+  b.forEach(function (l) { if (seen[l] > 0) seen[l]--; else added++; });
+  Object.keys(seen).forEach(function (l) { removed += seen[l]; });
+  return { added: added, removed: removed };
+}
+
+function x1PublishTask(token, owner, repo, branch, prop) {
+  var branchName = 'x1/' + String(prop.titulo_pr || 'auto').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) + '-' + Date.now().toString(36);
+  return fetch(X1_GH_API + '/repos/' + owner + '/' + repo + '/git/ref/heads/' + encodeURIComponent(branch), { headers: x1GhHeaders(token) })
+    .then(function (r) { return r.json(); })
+    .then(function (refData) {
+      var baseSha = refData && refData.object && refData.object.sha;
+      if (!baseSha) throw new Error('No se pudo leer la rama base');
+      return fetch(X1_GH_API + '/repos/' + owner + '/' + repo + '/git/refs', {
+        method: 'POST', headers: x1GhHeaders(token),
+        body: JSON.stringify({ ref: 'refs/heads/' + branchName, sha: baseSha }),
+      });
+    })
+    .then(function (r) { if (!r.ok) throw new Error('No se pudo crear la rama'); })
+    .then(function () {
+      var writes = prop.archivos.map(function (f) {
+        var body = {
+          message: 'X1: ' + (prop.titulo_pr || 'cambio automatico') + ' — ' + f.path,
+          content: btoa(unescape(encodeURIComponent(f.contenido || ''))),
+          branch: branchName,
+        };
+        if (f.sha) body.sha = f.sha;
+        return fetch(X1_GH_API + '/repos/' + owner + '/' + repo + '/contents/' + f.path.split('/').map(encodeURIComponent).join('/'), {
+          method: 'PUT', headers: x1GhHeaders(token), body: JSON.stringify(body),
+        }).then(function (r) { return r.ok; });
+      });
+      return Promise.all(writes);
+    })
+    .then(function (results) {
+      if (results.indexOf(false) !== -1) throw new Error('Algunos ficheros no se pudieron escribir');
+      return fetch(X1_GH_API + '/repos/' + owner + '/' + repo + '/pulls', {
+        method: 'POST', headers: x1GhHeaders(token),
+        body: JSON.stringify({
+          title: prop.titulo_pr || 'Cambios automaticos de X1', head: branchName, base: branch,
+          body: (prop.descripcion_pr || '') + '\n\n---\nGenerado autonomamente por X1 (proceso en segundo plano).',
+        }),
+      });
+    })
+    .then(function (r) { return r.json(); })
+    .then(function (pr) {
+      if (!pr || !pr.html_url) throw new Error('No se pudo crear el Pull Request');
+      return { url: pr.html_url, number: pr.number, branch: branchName };
+    });
+}
+
+// Procesa UNA tarea de la cola por completo: investigacion ligera (github +
+// npm) -> borrador (sector Desarrollo) -> auditoria (sector Auditoria de
+// Codigo) -> refinamiento (sector Refinamiento) -> publicacion (rama +
+// commits + PR). Actualiza queue.tareas[idx] con el resultado, incluyendo
+// que IA/sector trabajo en cada fase, y persiste la cola.
+function x1ProcessQueueTask(queue, idx) {
+  var tarea = queue.tareas[idx];
+  tarea.status = 'active';
+  tarea.sectors = [];
+  x1SaveQueue(queue);
+
+  return x1GetGithubToken().then(function (token) {
+    if (!token) throw new Error('Sin sesion de GitHub');
+    var term = (tarea.busquedas && tarea.busquedas[0]) || tarea.titulo;
+
+    return Promise.all([x1GhSearchRepos(term), x1NpmSearch(term)]).then(function (r) {
+      var researchBlock = 'Repos relevantes: ' + r[0].map(function (x) { return x.name; }).join(', ') +
+        '\nPaquetes npm: ' + r[1].map(function (x) { return x.name; }).join(', ');
+
+      var files = tarea.archivos || [];
+      return Promise.all(files.map(function (f) {
+        return x1GhFetchFile(token, queue.owner, queue.name, f.path).then(function (existing) {
+          return Object.assign({}, f, { current: existing.content, sha: existing.sha, exists: existing.exists });
+        });
+      })).then(function (filesWithState) {
+
+        var draftPrompt = 'Objetivo general: "' + queue.goal + '"\nTarea: ' + tarea.titulo + '\nMotivo: ' + tarea.motivo +
+          '\n\nInvestigacion:\n' + researchBlock + '\n\nFicheros (contenido actual si existen):\n' +
+          filesWithState.map(function (f) { return '=== ' + f.path + ' (' + (f.exists ? 'existente' : 'nuevo') + ') ===\n' + (f.current || '(vacio, fichero nuevo)').slice(0, 1500); }).join('\n\n') +
+          '\n\nResponde SOLO con JSON: {"archivos":[{"path":"ruta","contenido":"contenido COMPLETO del fichero"}]}';
+
+        return x1AiCall(draftPrompt, X1_SECTOR_PROMPTS.developer, 3000, 35000).then(function (draftRes) {
+          tarea.sectors.push({ fase: 'Borrador', sector: 'Desarrollo', provider: draftRes.provider, model: draftRes.model });
+          var draft = x1ExtractJSON(draftRes.text);
+          if (!draft || !draft.archivos || !draft.archivos.length) throw new Error('El sector Desarrollo no genero un borrador valido');
+
+          var reviewPrompt = 'Revisa este codigo generado para la tarea "' + tarea.titulo + '". Busca bugs, seguridad, malas practicas y casos sin cubrir.\n\n' +
+            draft.archivos.map(function (f) { return '=== ' + f.path + ' ===\n' + String(f.contenido || '').slice(0, 3000); }).join('\n\n');
+
+          return x1AiCall(reviewPrompt, X1_SECTOR_PROMPTS.reviewer, 1200, 25000).then(function (reviewRes) {
+            tarea.sectors.push({ fase: 'Auditoria', sector: 'Auditoria de codigo', provider: reviewRes.provider, model: reviewRes.model });
+
+            var refinePrompt = 'Codigo original:\n' + draft.archivos.map(function (f) { return '=== ' + f.path + ' ===\n' + f.contenido; }).join('\n\n') +
+              '\n\nAuditoria recibida:\n' + (reviewRes.text || '(sin observaciones)') +
+              '\n\nCorrige el codigo segun la auditoria (si no hay problemas reales, deja el codigo igual). Responde SOLO con JSON: {"titulo_pr":"titulo corto","descripcion_pr":"descripcion en espanol","archivos":[{"path":"ruta","contenido":"contenido FINAL completo del fichero"}]}';
+
+            return x1AiCall(refinePrompt, X1_SECTOR_PROMPTS.refiner, 3000, 35000).then(function (refineRes) {
+              tarea.sectors.push({ fase: 'Refinamiento', sector: 'Refinamiento', provider: refineRes.provider, model: refineRes.model });
+              var final = x1ExtractJSON(refineRes.text) || draft;
+              var finalFiles = (final.archivos || draft.archivos).map(function (f) {
+                var match = filesWithState.filter(function (e) { return e.path === f.path; })[0];
+                return Object.assign({}, f, { sha: match ? match.sha : null, exists: match ? match.exists : false, current: match ? match.current : '' });
+              });
+
+              return x1PublishTask(token, queue.owner, queue.name, queue.branch, {
+                titulo_pr: final.titulo_pr || tarea.titulo, descripcion_pr: final.descripcion_pr || tarea.motivo, archivos: finalFiles,
+              }).then(function (pr) {
+                var totalAdded = 0, totalRemoved = 0;
+                finalFiles.forEach(function (f) {
+                  var c = x1DiffCounts(f.current, f.contenido);
+                  totalAdded += c.added; totalRemoved += c.removed;
+                });
+                tarea.status = 'done';
+                tarea.result = {
+                  prUrl: pr.url, prNumber: pr.number,
+                  files: finalFiles.map(function (f) { return f.path; }),
+                  linesAdded: totalAdded, linesRemoved: totalRemoved, completedAt: Date.now(),
+                };
+              });
+            });
+          });
+        });
+      });
+    });
+  }).catch(function (e) {
+    tarea.status = 'error';
+    tarea.result = { error: (e && e.message) || 'Error desconocido', completedAt: Date.now() };
+  }).then(function () {
+    queue.currentIndex = idx + 1;
+    queue.updatedAt = Date.now();
+    return x1SaveQueue(queue).then(function () { return queue; });
+  });
+}
+
+chrome.alarms.onAlarm.addListener(function (alarm) {
+  if (alarm.name !== X1_AUTOMATION_ALARM) return;
+  x1GetQueue().then(function (queue) {
+    if (!queue || queue.currentIndex >= queue.tareas.length) return;
+    x1ProcessQueueTask(queue, queue.currentIndex).then(function (updatedQueue) {
+      if (updatedQueue.currentIndex < updatedQueue.tareas.length) {
+        var mins = 15 + Math.floor(Math.random() * 10); // 15-25 min: reparte el trabajo, no satura GitHub/la IA, y da tiempo a revisar cada PR
+        chrome.alarms.create(X1_AUTOMATION_ALARM, { delayInMinutes: mins });
+      } else {
+        try {
+          var doneCount = updatedQueue.tareas.filter(function (t) { return t.status === 'done'; }).length;
+          chrome.notifications.create('x1-automation-done-' + Date.now(), {
+            type: 'basic', iconUrl: 'assets/icon-128.png', title: 'X1 termino la automatizacion',
+            message: doneCount + ' Pull Request(s) creados en ' + updatedQueue.owner + '/' + updatedQueue.name,
+          });
+        } catch (e) {}
+      }
+    });
+  });
+});
+
+// El sidepanel manda START tras procesar la primera tarea al momento (para
+// dar feedback inmediato); el resto de la cola la sigue este service worker
+// aunque el sidepanel se cierre. GET permite al sidepanel leer el progreso
+// acumulado cuando se reabre; CANCEL para parar la cola por completo.
+chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
+  if (msg.type === 'X1_AUTOMATION_QUEUE_START') {
+    x1SaveQueue(msg.queue).then(function () {
+      if (msg.queue.currentIndex < msg.queue.tareas.length) {
+        var mins = 15 + Math.floor(Math.random() * 10);
+        chrome.alarms.create(X1_AUTOMATION_ALARM, { delayInMinutes: mins });
+      }
+      sendResponse({ ok: true });
+    });
+    return true;
+  }
+  if (msg.type === 'X1_AUTOMATION_QUEUE_GET') {
+    x1GetQueue().then(function (q) { sendResponse({ queue: q }); });
+    return true;
+  }
+  if (msg.type === 'X1_AUTOMATION_QUEUE_CANCEL') {
+    chrome.alarms.clear(X1_AUTOMATION_ALARM);
+    chrome.storage.local.remove('x1_automation_queue').then(function () { sendResponse({ ok: true }); });
+    return true;
+  }
+});
 
