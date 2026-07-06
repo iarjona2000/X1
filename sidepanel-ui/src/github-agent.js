@@ -52,6 +52,7 @@ var AGENT_SYSTEM_PROMPT = 'Eres X1, un agente de automatizacion de software. Res
 // segundo plano (background/service-worker.js) para que la experiencia sea
 // identica dure la tarea 30s o se procese horas despues en la cola.
 var SECTOR_PROMPTS = {
+  strategist: 'Eres X1 en el sector Estrategia, responsable de decidir que construir a continuacion sin que nadie te lo pida. Piensas como un CTO que conoce el repositorio a fondo y el estado del arte de otros agentes de IA. Responde EN ESPAÑOL solo con el JSON exacto que se te pida, sin texto ni markdown alrededor.',
   developer: 'Eres X1 en el sector Desarrollo, un arquitecto de software senior. Escribe codigo production-ready, completo y funcional. Responde EN ESPAÑOL solo con el JSON exacto que se te pida, sin texto ni markdown alrededor.',
   reviewer: 'Eres X1 en el sector Auditoria de Codigo, un revisor senior extremadamente riguroso. Busca bugs, vulnerabilidades, malas practicas, casos sin cubrir y codigo incompleto en lo que te pasen. Responde EN ESPAÑOL de forma directa: una lista breve de problemas concretos, o "Sin problemas relevantes" si esta bien.',
   refiner: 'Eres X1 en el sector Refinamiento, encargado de incorporar el feedback de una auditoria en la version final del codigo. Responde EN ESPAÑOL solo con el JSON exacto que se te pida, sin texto ni markdown alrededor.',
@@ -75,6 +76,25 @@ function askAI(prompt, opts) {
     }
     var label = (r.model && r.model !== 'desconocido' ? r.model : providerLabel(r.provider)) + ' · ' + secs + 's';
     return { text: r.text, label: label, provider: r.provider };
+  });
+}
+
+// Como askAI, pero para llamadas que DEBEN devolver un JSON con una forma
+// concreta (validate(parsed) => bool). Si el primer intento no da JSON valido
+// (el modelo a veces "hedgea" con una explicacion en vez del JSON pedido),
+// reintenta UNA vez con un recordatorio explicito de formato antes de darse
+// por vencido — esto evita que fallos de formato de 2-3s corten un ciclo
+// entero que deberia seguir horas.
+function askAIJson(prompt, opts, validate) {
+  return askAI(prompt, opts).then(function (r) {
+    var parsed = extractJSON(r.text);
+    if (parsed && (!validate || validate(parsed))) return { parsed: parsed, label: r.label };
+    var repairPrompt = prompt + '\n\nTu respuesta debe ser UNICAMENTE el JSON pedido arriba — nada de explicaciones, nada de markdown, nada de texto antes o despues. Responde de nuevo, solo el JSON.';
+    return askAI(repairPrompt, opts).then(function (r2) {
+      var parsed2 = extractJSON(r2.text);
+      var ok2 = parsed2 && (!validate || validate(parsed2));
+      return { parsed: ok2 ? parsed2 : null, label: r2.label };
+    });
   });
 }
 
@@ -561,13 +581,14 @@ function proposeChanges(goal, tarea, research, repoCtx, onStep, taskIdx) {
       '{"titulo_pr":"titulo corto para esta tarea","descripcion_pr":"descripcion en espanol de que cambia y por que",' +
       '"archivos":[{"path":"mismo path de arriba","contenido":"contenido COMPLETO del fichero tras el cambio"}]}';
 
-    return askAI(draftPrompt, { timeoutMs: 35000, maxTokens: 3500, systemPrompt: SECTOR_PROMPTS.developer }).then(function (draftRes) {
-      var draft = extractJSON(draftRes.text);
-      var draftOk = !!(draft && Array.isArray(draft.archivos) && draft.archivos.length);
+    var draftValid = function (p) { return Array.isArray(p.archivos) && p.archivos.length > 0; };
+    return askAIJson(draftPrompt, { timeoutMs: 35000, maxTokens: 3500, systemPrompt: SECTOR_PROMPTS.developer }, draftValid).then(function (draftRes) {
+      var draft = draftRes.parsed;
+      var draftOk = !!draft;
       emit(onStep, {
         id: tagPrefix + 'draft', title: draftOk ? 'Sector Desarrollo: borrador listo' : 'Sector Desarrollo: no genero un borrador valido',
         status: draftOk ? 'done' : 'error',
-        detail: (draftOk ? (draft.archivos.length + ' fichero(s)') : 'reintenta esta tarea con mas detalle') + ' · ' + draftRes.label,
+        detail: (draftOk ? (draft.archivos.length + ' fichero(s)') : 'ni tras reintentar — se salta esta tarea') + ' · ' + draftRes.label,
       });
       if (!draftOk) return { titulo_pr: null, descripcion_pr: null, archivos: [], error: true };
 
@@ -588,9 +609,9 @@ function proposeChanges(goal, tarea, research, repoCtx, onStep, taskIdx) {
           '\n\nAuditoria recibida:\n' + (reviewRes.text || '(sin observaciones)') +
           '\n\nCorrige el codigo segun la auditoria (si no hay problemas reales, deja el codigo igual). Responde SOLO con JSON: {"titulo_pr":"titulo corto","descripcion_pr":"descripcion en espanol","archivos":[{"path":"mismo path de arriba","contenido":"contenido FINAL completo del fichero"}]}';
 
-        return askAI(refinePrompt, { timeoutMs: 35000, maxTokens: 3500, systemPrompt: SECTOR_PROMPTS.refiner }).then(function (refineRes) {
-          var final = extractJSON(refineRes.text);
-          var finalOk = !!(final && Array.isArray(final.archivos) && final.archivos.length);
+        return askAIJson(refinePrompt, { timeoutMs: 35000, maxTokens: 3500, systemPrompt: SECTOR_PROMPTS.refiner }, draftValid).then(function (refineRes) {
+          var final = refineRes.parsed;
+          var finalOk = !!final;
           emit(onStep, {
             id: tagPrefix + 'refine', title: finalOk ? 'Sector Refinamiento: version final lista' : 'Sector Refinamiento: fallo, se conserva el borrador',
             status: finalOk ? 'done' : 'error',

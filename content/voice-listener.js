@@ -466,23 +466,54 @@
     var iconBg = '#666';
     var iconLetter = (app || 'X')[0].toUpperCase();
     var iconColors = {
-      'Gmail': '#ea4335', 'Google Docs': '#4285f4', 'Calendar': '#34a853',
-      'Sheets': '#0f9d58', 'Meet': '#00897b', 'Drive': '#ffbb00',
+      'Gmail': '#ea4335', 'Google Calendar': '#34a853', 'Calendar': '#34a853', 'Google Docs': '#4285f4',
+      'Google Sheets': '#0f9d58', 'Sheets': '#0f9d58', 'Meet': '#00897b', 'Drive': '#ffbb00',
       'YouTube': '#ff0000', 'GitHub': '#333', 'Google': '#4285f4',
-      'Search': '#4285f4', 'Docs': '#4285f4', 'Navigate': '#333'
+      'Search': '#4285f4', 'Docs': '#4285f4', 'Navigate': '#333',
+      'LinkedIn': '#0a66c2', 'Contacts': '#34a853', 'Notes': '#f9ab00', 'Tabs': '#666',
+      'Privacy': '#8e24aa', 'AI': '#4285f4', 'X1': '#0969da'
     };
-    var matchedColor = null;
-    for (var key in iconColors) {
-      if (app && app.toLowerCase() === key.toLowerCase()) {
-        matchedColor = iconColors[key];
-        break;
-      }
+    var matchedColor = iconColors[app] || '#666';
+    function appIcon(appName) {
+      var a = (appName || '').toLowerCase();
+      // Gmail envelope
+      if (a === 'gmail') return '<svg width="16" height="16" viewBox="0 0 24 24" fill="#fff"><path d="M24 5.457v13.909c0 .904-.732 1.636-1.636 1.636h-3.819V11.73L12 16.64l-6.545-4.91v9.273H1.636A1.636 1.636 0 0 1 0 19.366V5.457c0-2.023 2.309-3.178 3.927-1.964L5.455 4.9 12 9.818l6.545-4.918 1.528-1.407c1.618-1.214 3.927-.059 3.927 1.964z"/></svg>';
+      // Google Calendar
+      if (a === 'calendar' || a === 'google calendar') return '<svg width="16" height="16" viewBox="0 0 24 24" fill="#fff"><path d="M21 3h-2V1h-2v2H7V1H5v2H3a2 2 0 00-2 2v14a2 2 0 002 2h18a2 2 0 002-2V5a2 2 0 00-2-2zm0 16H3V8h18v11zM5 10h4v4H5v-4z"/></svg>';
+      // Google Sheets
+      if (a === 'sheets' || a === 'google sheets') return '<svg width="16" height="16" viewBox="0 0 24 24" fill="#fff"><path d="M19 3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V5a2 2 0 00-2-2zM7 7h10v2H7V7zm0 4h10v2H7v-2zm0 4h6v2H7v-2z"/></svg>';
+      // Google Docs
+      if (a === 'docs' || a === 'google docs') return '<svg width="16" height="16" viewBox="0 0 24 24" fill="#fff"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6zM8 16v-2h8v2H8zm0-4v-2h8v2H8zm4-4V3.5L16.5 8H12z"/></svg>';
+      // LinkedIn
+      if (a === 'linkedin') return '<svg width="16" height="16" viewBox="0 0 24 24" fill="#fff"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>';
+      // GitHub
+      if (a === 'github') return '<svg width="16" height="16" viewBox="0 0 24 24" fill="#fff"><path d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/></svg>';
+      // Calendar (generic)
+      if (a.indexOf('calendar') >= 0) return '<svg width="16" height="16" viewBox="0 0 24 24" fill="#fff"><path d="M21 3h-2V1h-2v2H7V1H5v2H3a2 2 0 00-2 2v14a2 2 0 002 2h18a2 2 0 002-2V5a2 2 0 00-2-2zm0 16H3V8h18v11zM5 10h4v4H5v-4zm6 0h4v4h-4v-4zm6 0h4v4h-4v-4z"/></svg>';
+      // Contacts
+      if (a === 'contacts') return '<svg width="16" height="16" viewBox="0 0 24 24" fill="#fff"><path d="M20 0H4v2h16V0zM4 24h16v-2H4v2zM20 4H4a2 2 0 00-2 2v12a2 2 0 002 2h16a2 2 0 002-2V6a2 2 0 00-2-2zm-8 2.75A2.75 2.75 0 1110.25 9.5 2.75 2.75 0 0112 6.75zM15 15H9v-1c0-1.5 2-2 3-2s3 .5 3 2v1z"/></svg>';
+      // Notes
+      if (a === 'notes') return '<svg width="16" height="16" viewBox="0 0 24 24" fill="#fff"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zM6 20V4h7v5h5v11H6zm2-6h8v2H8v-2zm0-3h8v2H8v-2zm0 6h5v2H8v-2z"/></svg>';
+      // Tabs / Browser
+      if (a === 'tabs' || a === 'chrome') return '<svg width="16" height="16" viewBox="0 0 24 24" fill="#fff"><path d="M12 0a12 12 0 1012 12A12 12 0 0012 0zm0 22a10 10 0 110-20 10 10 0 010 20zm-1-17v6l5 3-.5 1-5.5-3.3V5H11z"/></svg>';
+      // Privacy / Shield
+      if (a === 'privacy') return '<svg width="16" height="16" viewBox="0 0 24 24" fill="#fff"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"/></svg>';
+      // AI / Robot
+      if (a === 'ai' || a === 'x1') return '<svg width="16" height="16" viewBox="0 0 24 24" fill="#fff"><path d="M12 2A10 10 0 002 12a10 10 0 0010 10 10 10 0 0010-10A10 10 0 0012 2zm0 18a8 8 0 110-16 8 8 0 010 16zm-1-5h2v2h-2v-2zm0-8h2v6h-2V7z"/></svg>';
+      // Sheets
+      if (a.indexOf('sheet') >= 0) return '<svg width="16" height="16" viewBox="0 0 24 24" fill="#fff"><path d="M19 3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V5a2 2 0 00-2-2zM7 7h10v2H7V7zm0 4h10v2H7v-2zm0 4h6v2H7v-2z"/></svg>';
+      // Search / magnifying glass
+      if (a === 'search') return '<svg width="16" height="16" viewBox="0 0 24 24" fill="#fff"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>';
+      // Documents
+      if (a.indexOf('doc') >= 0) return '<svg width="16" height="16" viewBox="0 0 24 24" fill="#fff"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z"/></svg>';
+      // Drive
+      if (a === 'drive') return '<svg width="16" height="16" viewBox="0 0 24 24" fill="#fff"><path d="M7.5 2L2 13.5 6.5 22h11L22 13.5 16.5 2h-9zM13 9.5l-3.5 6h-3l3.5-6h3zm2 0h3l-3.5 6h-3l3.5-6zm2.5 8l-3 5h-5l3-5h5z"/></svg>';
+      // Fallback: first letter
+      return '<span>' + (appName ? appName[0].toUpperCase() : 'X') + '</span>';
     }
-    if (app && iconColors[app]) matchedColor = iconColors[app];
     card.innerHTML =
-      '<div class="step-icon" style="background:' + (matchedColor || iconBg) + '">' +
-        (app && app.toLowerCase() === 'gmail' ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="#fff"><path d="M24 5.457v13.909c0 .904-.732 1.636-1.636 1.636h-3.819V11.73L12 16.64l-6.545-4.91v9.273H1.636A1.636 1.636 0 0 1 0 19.366V5.457c0-2.023 2.309-3.178 3.927-1.964L5.455 4.9 12 9.818l6.545-4.918 1.528-1.407c1.618-1.214 3.927-.059 3.927 1.964z"/></svg>' :
-        '<span>' + iconLetter + '</span>') +
+      '<div class="step-icon" style="background:' + matchedColor + '">' +
+        appIcon(app) +
       '</div>' +
       '<span class="step-desc">' + (description || app || 'Step') + '</span>' +
       '<span class="step-dot ' + (status || 'active') + '"></span>';

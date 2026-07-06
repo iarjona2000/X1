@@ -5505,6 +5505,27 @@ function stepActionToDescapeStorageKey(step) {
   if(a==='newSheet') return 'Creando hoja de cálculo';
   if(a==='sheetsRead') return 'Leyendo hoja';
   if(a==='loginGoogle') return 'Conectando Google';
+  if(a==='contactAdd') return 'Añadiendo contacto';
+  if(a==='contactSearch') return 'Buscando contactos';
+  if(a==='contactList') return 'Listando contactos';
+  if(a==='contactExport') return 'Exportando contactos a Sheets';
+  if(a==='noteAdd') return 'Guardando nota';
+  if(a==='noteSearch') return 'Buscando notas';
+  if(a==='linkedinScrape') return 'Extrayendo perfil LinkedIn';
+  if(a==='linkedinSearch') return 'Buscando en LinkedIn';
+  if(a==='meetingBrief') return 'Preparando briefing de reunión';
+  if(a==='meetingFollowUp') return 'Enviando follow-up';
+  if(a==='emailTriage') return 'Clasificando bandeja';
+  if(a==='emailAutoDrafts') return 'Creando borradores';
+  if(a==='emailMassSend') return 'Enviando emails masivos';
+  if(a==='tabZero') return 'Organizando pestañas';
+  if(a==='workspaceSave') return 'Guardando workspace';
+  if(a==='workspaceRestore') return 'Restaurando workspace';
+  if(a==='scrapeToSheet') return 'Extrayendo datos a Sheets';
+  if(a==='importGmail') return 'Importando contactos de Gmail';
+  if(a==='importCalendar') return 'Importando contactos de Calendar';
+  if(a==='blockSite') return 'Bloqueando sitio';
+  if(a==='unblockSite') return 'Desbloqueando sitio';
   return (step.text||step.goal||step.query||a).substring(0,35);
 }
 
@@ -21240,6 +21261,7 @@ var X1_PROXY_URL = 'https://x1-proxy.calezamindset.workers.dev/v1/chat/completio
 var X1_PROXY_SECRET = '9ff4b7dda5f7defd5f7fb7c32c133428bc87e8efeb8550d3ce1e5838c1d3b850';
 
 var X1_SECTOR_PROMPTS = {
+  strategist: 'Eres X1 en el sector Estrategia, responsable de decidir que construir a continuacion sin que nadie te lo pida. Piensas como un CTO que conoce el repositorio a fondo. Responde EN ESPAÑOL solo con el JSON exacto que se te pida, sin texto ni markdown alrededor.',
   developer: 'Eres X1 en el sector Desarrollo, un arquitecto de software senior. Escribe codigo production-ready, completo y funcional. Responde EN ESPAÑOL solo con el JSON exacto que se te pida, sin texto ni markdown alrededor.',
   reviewer: 'Eres X1 en el sector Auditoria de Codigo, un revisor senior extremadamente riguroso. Busca bugs, vulnerabilidades, malas practicas, casos sin cubrir y codigo incompleto en lo que te pasen. Responde EN ESPAÑOL de forma directa: una lista breve de problemas concretos, o "Sin problemas relevantes" si esta bien.',
   refiner: 'Eres X1 en el sector Refinamiento, encargado de incorporar el feedback de una auditoria en la version final del codigo. Responde EN ESPAÑOL solo con el JSON exacto que se te pida, sin texto ni markdown alrededor.',
@@ -21276,6 +21298,23 @@ function x1AiCall(prompt, systemPrompt, maxTokens, timeoutMs) {
       return { text: txt || null, provider: data.x_provider || null, model: data.model || null };
     })
     .catch(function () { return { text: null, provider: null, model: null }; });
+}
+
+// Como x1AiCall, pero para respuestas que DEBEN ser un JSON con una forma
+// concreta. Si el modelo "hedgea" con texto en vez del JSON pedido,
+// reintenta UNA vez con un recordatorio explicito de formato — evita que un
+// fallo de formato de 2-3s tumbe un ciclo entero que deberia seguir horas.
+function x1AiCallJson(prompt, systemPrompt, maxTokens, timeoutMs, validate) {
+  return x1AiCall(prompt, systemPrompt, maxTokens, timeoutMs).then(function (res) {
+    var parsed = x1ExtractJSON(res.text);
+    if (parsed && (!validate || validate(parsed))) return { parsed: parsed, provider: res.provider, model: res.model };
+    var repairPrompt = prompt + '\n\nTu respuesta debe ser UNICAMENTE el JSON pedido arriba, sin explicaciones ni markdown. Responde de nuevo, solo el JSON.';
+    return x1AiCall(repairPrompt, systemPrompt, maxTokens, timeoutMs).then(function (res2) {
+      var parsed2 = x1ExtractJSON(res2.text);
+      var ok2 = parsed2 && (!validate || validate(parsed2));
+      return { parsed: ok2 ? parsed2 : null, provider: res2.provider, model: res2.model };
+    });
+  });
 }
 
 function x1ExtractJSON(txt) {
