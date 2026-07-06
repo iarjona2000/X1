@@ -124,6 +124,46 @@ function GithubLogin({ onUser, onGuest }) {
   );
 }
 
+// Sin esto, un error de render en cualquier parte del arbol (p.ej. un dato
+// corrupto en localStorage de una version anterior del codigo) deja TODO el
+// sidepanel en negro, y como React desmonta el arbol entero, recargar la
+// extension no ayuda — el mismo dato corrupto revienta el mismo render otra
+// vez. Con el boundary, al menos queda un boton para limpiar el estado local
+// de X1 (no la sesion de GitHub) y reintentar.
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { error: error };
+  }
+  componentDidCatch(error, info) {
+    console.error('[X1] Render error atrapado por ErrorBoundary:', error, info);
+  }
+  render() {
+    if (!this.state.error) return this.props.children;
+    return React.createElement('div', { style: S.page },
+      React.createElement('div', { style: { ...S.card, textAlign: 'center' } },
+        React.createElement('div', { style: { fontSize: '15px', fontWeight: 600, color: '#1f2328', marginBottom: '8px' } }, 'Algo se rompio en X1'),
+        React.createElement('div', { style: { fontSize: '12px', color: '#59636e', marginBottom: '16px', lineHeight: 1.5 } },
+          String((this.state.error && this.state.error.message) || this.state.error)),
+        React.createElement('button', {
+          onClick: function () {
+            try {
+              Object.keys(localStorage).forEach(function (k) {
+                if (k.indexOf('x1_') === 0) localStorage.removeItem(k);
+              });
+            } catch (e) {}
+            window.location.reload();
+          },
+          style: S.btnPrimary,
+        }, 'Limpiar estado de X1 y reintentar')
+      )
+    );
+  }
+}
+
 function Root() {
   const [user, setUser] = useState(null);
   const [ready, setReady] = useState(false);
@@ -155,4 +195,4 @@ function Root() {
 }
 
 const root = createRoot(document.getElementById('root'));
-root.render(React.createElement(Root));
+root.render(React.createElement(ErrorBoundary, null, React.createElement(Root)));

@@ -24,10 +24,21 @@ var STORE_KEY = 'x1_repo_analysis_ui_state';
 var store = { selected: null, meta: null, files: [], analyzing: false, steps: [] };
 var listeners = [];
 
+// Sanea formas viejas/incompletas que puedan quedar en localStorage de una
+// version anterior del codigo — sin esto, un dato corrupto revienta el
+// render con "Cannot read properties of undefined" y, como el dato sigue
+// ahi, recargar la extension repite el mismo crash en bucle.
 (function hydrate() {
   try {
     var raw = localStorage.getItem(STORE_KEY);
-    if (raw) store = Object.assign({}, store, JSON.parse(raw), { analyzing: false });
+    if (raw) {
+      var saved = JSON.parse(raw);
+      store = Object.assign({}, store, saved, {
+        analyzing: false,
+        files: Array.isArray(saved.files) ? saved.files : [],
+        steps: Array.isArray(saved.steps) ? saved.steps : [],
+      });
+    }
   } catch (e) {}
 })();
 

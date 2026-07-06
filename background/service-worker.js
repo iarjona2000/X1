@@ -6473,6 +6473,28 @@ chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
     sendResponse({pong:true, ts:Date.now()});
     return false;
   }
+  if(msg.type==='X1_AUTH_CHECK_GOOGLE'){
+    isLoggedIn().then(function(logged) {
+      sendResponse({logged: logged});
+    });
+    return true;
+  }
+  if(msg.type==='X1_AUTH_LOGIN_GOOGLE'){
+    loginGoogle().then(function(info) {
+      sendResponse({ok: true, email: info.email, name: info.name});
+    }).catch(function(err) {
+      sendResponse({ok: false, error: err.message});
+    });
+    return true;
+  }
+  if(msg.type==='X1_AUTH_LOGOUT_GOOGLE'){
+    logoutGoogle().then(function() {
+      sendResponse({ok: true});
+    }).catch(function(err) {
+      sendResponse({ok: false, error: err.message});
+    });
+    return true;
+  }
   if(msg.type==='PROVIDER_HEALTH'){
     var phSummary = getProviderHealthSummary();
     var phResult = {providers: [], total: 0, healthy: 0};

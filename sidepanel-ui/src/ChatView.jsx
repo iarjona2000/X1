@@ -195,6 +195,8 @@ export function ChatView({ conversations, activeConv, onSelectConv, onCreateConv
 
   var agent = agentById(activeAgent);
   var msgs = (activeConv && activeConv.messages) || [];
+  var [googleOk, setGoogleOk] = React.useState(null);
+  React.useEffect(function() { if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) { chrome.runtime.sendMessage({ type: 'X1_AUTH_CHECK_GOOGLE' }, function(r) { if (!chrome.runtime.lastError) setGoogleOk(r && r.logged); }); } }, []);
 
   // Panel de razonamiento del juez (estilo "Thinking" de Claude/o1).
   function ReasoningPanel({ msg }) {
@@ -365,7 +367,19 @@ export function ChatView({ conversations, activeConv, onSelectConv, onCreateConv
           )
         ),
         React.createElement('div', { style: { flex: 1 } }),
-        React.createElement('span', { style: { fontSize: '12px', color: '#818b98', fontWeight: '500' } }, 'System X1')
+        React.createElement('span', { style: { fontSize: '12px', color: '#818b98', fontWeight: '500' } }, 'System X1'),
+        React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '4px', marginLeft: '8px', cursor: googleOk === false ? 'pointer' : 'default' },
+          onClick: googleOk === false ? async function() { var ok = await B.loginGoogle(); if (ok) setGoogleOk(true); } : undefined,
+          title: googleOk === true ? 'Google conectado' : googleOk === false ? 'Conectar Google' : '...'
+        },
+          React.createElement('svg', { viewBox: '0 0 16 16', width: '14', height: '14', fill: googleOk === true ? '#1a7f37' : googleOk === false ? '#818b98' : '#d0d7de' },
+            React.createElement('path', { d: 'M15.98 7.62c0-.95-.08-1.63-.26-2.3H8.19v4.18h4.44c-.09 1.13-.57 2.1-1.22 2.74v2.29h2.48c1.14-1.05 2.09-2.62 2.09-4.91z' }),
+            React.createElement('path', { d: 'M8.19 16c1.9 0 3.5-.63 4.67-1.7l-2.48-2.3c-.66.46-1.54.77-2.6.77-2 0-3.69-1.36-4.3-3.17H.36v2.38A7.99 7.99 0 008.19 16z' }),
+            React.createElement('path', { d: 'M3.9 9.6c-.1-.28-.17-.57-.17-.6 0-.2.07-.4.17-.53V6.09H.36a8.01 8.01 0 000 7.2l3.53-2.69z' }),
+            React.createElement('path', { d: 'M8.19 3.36c1.41 0 2.36.6 2.9 1.12l2.1-2.06C11.7.59 10.09 0 8.19 0A8 8 0 00.36 2.38L3.9 5.06c.61-1.78 2.3-3.17 4.3-3.17z' })
+          ),
+          googleOk === true ? React.createElement('span', { style: { fontSize: '10px', color: '#1a7f37', fontWeight: 500 } }, 'Google') : null
+        )
       ),
 
       // Mensajes (ProcessTimeline eliminado de aqui, ahora por cada respuesta abajo)

@@ -41,12 +41,28 @@ var STORE_KEY = 'x1_automation_state';
 var store = { goal: '', steps: [], proposal: null, building: false, publishSteps: [], published: null, publishing: false, publishError: null };
 var listeners = [];
 
+// Sanea cualquier forma vieja/incompleta que pueda quedar en localStorage de
+// una version anterior del codigo (p.ej. proposal sin "archivos", o con un
+// shape distinto) — sin esto, un dato corrupto revienta el render con
+// "Cannot read properties of undefined" y, como el dato corrupto sigue ahi,
+// recargar la extension repite el mismo crash en bucle.
+function sanitizeProposal(p) {
+  if (!p || typeof p !== 'object') return null;
+  return Object.assign({}, p, { archivos: Array.isArray(p.archivos) ? p.archivos : [] });
+}
+
 (function hydrate() {
   try {
     var raw = localStorage.getItem(STORE_KEY);
     if (raw) {
       var saved = JSON.parse(raw);
-      store = Object.assign({}, store, saved, { building: false, publishing: false });
+      store = Object.assign({}, store, saved, {
+        building: false,
+        publishing: false,
+        proposal: sanitizeProposal(saved.proposal),
+        steps: Array.isArray(saved.steps) ? saved.steps : [],
+        publishSteps: Array.isArray(saved.publishSteps) ? saved.publishSteps : [],
+      });
     }
   } catch (e) {}
 })();
@@ -89,7 +105,7 @@ function build(repoCtx) {
     var ctx = repoCtx ? Object.assign({}, repoCtx, { token: token }) : null;
     return runAutoBuild(goal.trim(), ctx, function (s) { setStore({ steps: upsertStep(store.steps, s) }); });
   }).then(function (p) {
-    setStore({ proposal: p, building: false });
+    setStore({ proposal: sanitizeProposal(p), building: false });
     // Autonomo de verdad: si hay ficheros que publicar y un repo de
     // referencia, X1 publica la rama + PR sola, sin esperar un clic del
     // usuario. Si no hay repoCtx (nadie ha analizado un repo todavia) no hay
@@ -233,6 +249,7 @@ export function PRAgent({ githubUser, onGoToRepo }) {
   }
 
   var proposal = s.proposal;
+  var proposalFiles = (proposal && proposal.archivos) || [];
 
   return React.createElement('div', { style: { display: 'flex', flexDirection: 'column', flex: 1, overflow: 'auto', fontFamily: F, padding: '16px' } },
 
@@ -290,7 +307,7 @@ export function PRAgent({ githubUser, onGoToRepo }) {
 
     // ── Propuesta ──
     proposal && React.createElement('div', { style: { marginBottom: '16px' } },
-      proposal.archivos.length === 0
+      proposalFiles.length === 0
         ? React.createElement(Flash, { variant: proposal.error ? 'danger' : 'default' },
             proposal.error ? 'El panel de IA no devolvio una propuesta valida para ninguna tarea. Reintenta describiendo el objetivo con mas detalle, o analiza primero el repositorio para que X1 tenga mas contexto.' : (proposal.resumen || 'Investigacion completada — revisa los resultados en el proceso de arriba.')
           )
@@ -299,7 +316,7 @@ export function PRAgent({ githubUser, onGoToRepo }) {
             React.createElement('div', { style: { fontSize: '14px', fontWeight: '600', color: C.fg, marginBottom: '4px' } }, proposal.titulo_pr),
             React.createElement('div', { style: { fontSize: '12px', color: C.fgMuted, marginBottom: '12px', lineHeight: '1.6', whiteSpace: 'pre-wrap' } }, proposal.descripcion_pr),
 
-            proposal.archivos.map(function (f) {
+            proposalFiles.map(function (f) {
               var open = expandedFile === f.path;
               return React.createElement('div', { key: f.path, style: { border: '1px solid ' + C.border, borderRadius: '6px', marginBottom: '8px', overflow: 'hidden' } },
                 React.createElement('div', {
