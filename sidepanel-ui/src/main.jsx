@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App.jsx';
 import './backend.js';
@@ -107,26 +107,13 @@ function GithubLogin({ onUser, onGuest }) {
         ),
 
         mode === 'none' && React.createElement('div', null,
-          React.createElement('button', { onClick: handleDeviceFlow, disabled: loading, style: S.btnGH },
-            React.createElement(GithubMark, { size: 16 }),
-            loading ? 'Conectando...' : 'Sign in with GitHub'
-          ),
-          React.createElement('div', { style: S.divider },
-            React.createElement('div', { style: S.dividerLine }),
-            React.createElement('span', null, 'o'),
-            React.createElement('div', { style: S.dividerLine })
-          ),
-          React.createElement('div', { style: S.label }, 'Personal Access Token'),
-          React.createElement('input', {
-            type: 'password',
-            value: pat,
-            onChange: function(e) { setPat(e.target.value); },
-            placeholder: 'ghp_xxxxxxxxxxxxxxxxxxxx',
-            style: S.input
-          }),
-          React.createElement('button', { onClick: handlePat, disabled: loading || !pat.trim(), style: { ...S.btnPrimary, opacity: !pat.trim() ? 0.5 : 1 } },
-            'Entrar con token'
-          ),
+          React.createElement('div', { style: S.label }, 'Personal Access Token (recomendado)'),
+          React.createElement('input', { type: 'password', value: pat, onChange: function(e) { setPat(e.target.value); }, placeholder: 'ghp_xxxxxxxxxxxxxxxxxxxx', style: S.input }),
+          React.createElement('button', { onClick: handlePat, disabled: loading || !pat.trim(), style: { ...S.btnPrimary, opacity: !pat.trim() ? 0.5 : 1 } }, 'Entrar con token'),
+          React.createElement('div', { style: { fontSize: '11px', color: '#818b98', marginTop: '6px' } }, 'Crea uno en github.com/settings/tokens (scope read:user user:email)'),
+          React.createElement('div', { style: S.divider }, React.createElement('div', { style: S.dividerLine }), React.createElement('span', null, 'o'), React.createElement('div', { style: S.dividerLine })),
+          React.createElement('button', { onClick: handleDeviceFlow, disabled: loading, style: S.btnGH }, React.createElement(GithubMark, { size: 16 }), loading ? 'Conectando...' : 'Sign in con Device Flow'),
+          React.createElement('div', { style: { fontSize: '11px', color: '#818b98', marginTop: '6px' } }, 'Requiere OAuth App con Device Flow habilitado'),
           React.createElement('button', { onClick: onGuest, style: S.btnSecondary },
             'Continuar sin GitHub'
           ),

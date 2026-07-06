@@ -49,7 +49,29 @@ export function RepoAnalysis({ githubUser }) {
         B.saveUser({ login: user.login, name: user.name, avatar_url: user.avatar_url, email: user.email });
         try { window.postMessage({ type: 'GITHUB_USER_SAVED' }, '*'); } catch (e) {}
       }
-    }).catch(function () { setConnecting(false); });
+    }).catch(function (err) {
+      setConnectError('Device Flow no disponible (' + (err?.message || 'error') + '). Usa token personal.');
+      setShowManualToken(true);
+      setConnecting(false);
+    });
+  }
+
+  function handleTokenSubmit() {
+    if (!manualToken.trim()) return;
+    setVerifying(true);
+    B.validateGithubToken(manualToken.trim()).then(function (user) {
+      setVerifying(false);
+      if (user && user.login) {
+        B.saveUser({ login: user.login, name: user.name, avatar_url: user.avatar_url, email: user.email });
+        setShowManualToken(false);
+        setManualToken('');
+        setConnectError(null);
+        try { window.postMessage({ type: 'GITHUB_USER_SAVED' }, '*'); } catch (e) {}
+      }
+    }).catch(function () {
+      setConnectError('Token inválido. Revisa en github.com/settings/tokens');
+      setVerifying(false);
+    });
   }
 
   function pick(repo) {
@@ -86,6 +108,22 @@ export function RepoAnalysis({ githubUser }) {
 
   // ── Sin conexion ──
   if (!isGh) {
+    if (showManualToken) {
+      return React.createElement('div', { style: { padding: '32px 16px', textAlign: 'center', fontFamily: F } },
+        React.createElement('div', { style: { fontSize: '15px', fontWeight: '600', color: '#1f2328', marginBottom: '12px' } }, 'Conectar con token personal'),
+        connectError && React.createElement('div', { style: { padding: '12px', background: '#ffebe6', border: '1px solid #ff7f50', borderRadius: '6px', color: '#e85c47', fontSize: '12px', marginBottom: '12px', lineHeight: '1.6' } }, connectError),
+        React.createElement('input', {
+          type: 'password', placeholder: 'github_pat_xxxxx',
+          value: manualToken, onChange: function (e) { setManualToken(e.target.value); }, disabled: verifying,
+          style: { width: '100%', padding: '10px 12px', borderRadius: '6px', border: '1px solid #d0d7de', background: '#f6f8fa', fontSize: '13px', fontFamily: F, marginBottom: '12px', boxSizing: 'border-box' },
+        }),
+        React.createElement('div', { style: { fontSize: '11px', color: '#59636e', marginBottom: '12px', lineHeight: '1.5' } }, 'Genera en github.com/settings/tokens con permisos: read:user, user:email'),
+        React.createElement('button', {
+          onClick: handleTokenSubmit, disabled: verifying || !manualToken.trim(),
+          style: { display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '8px 18px', borderRadius: '6px', border: '1px solid rgba(27,31,36,0.15)', background: '#24292f', color: '#fff', fontSize: '14px', fontWeight: '600', cursor: verifying || !manualToken.trim() ? 'default' : 'pointer', fontFamily: F, opacity: verifying || !manualToken.trim() ? 0.6 : 1 },
+        }, verifying ? 'Validando…' : 'Conectar')
+      );
+    }
     return React.createElement('div', { style: { padding: '32px 16px', textAlign: 'center', fontFamily: F } },
       React.createElement('div', { style: { fontSize: '15px', fontWeight: '600', color: '#1f2328', marginBottom: '6px' } }, 'Analiza el estado de tus repositorios'),
       React.createElement('div', { style: { fontSize: '13px', color: '#59636e', marginBottom: '20px', lineHeight: '1.6' } }, 'Conecta tu cuenta de GitHub para elegir un repositorio y obtener un analisis exhaustivo.'),

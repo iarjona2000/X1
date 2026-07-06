@@ -556,6 +556,21 @@ export function getGithubToken() {
   });
 }
 
+export function validateGithubToken(token) {
+  return fetch('https://api.github.com/user', {
+    headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/vnd.github+json' }
+  }).then(r => {
+    if (!r.ok) throw new Error('Token inválido (HTTP ' + r.status + ')');
+    return r.json();
+  }).then(info => {
+    if (info.message) throw new Error(info.message);
+    if (!info.login) throw new Error('No login en respuesta');
+    var user = { login: info.login, name: info.name, avatar_url: info.avatar_url, email: info.email };
+    try { chrome.storage.local.set({ github_token: token, github_user: user }); } catch (e) {}
+    return user;
+  });
+}
+
 export function hasEngine() {
   return typeof chrome !== 'undefined' && !!(chrome.runtime?.sendMessage);
 }
