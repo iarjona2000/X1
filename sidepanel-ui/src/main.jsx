@@ -49,12 +49,12 @@ function GithubLogin({ onUser, onGuest }) {
     setError(''); setLoading(true);
     try {
       const {
-        startGithubDeviceFlowViaProxy,
-        pollGithubTokenViaProxy,
+        startGithubDeviceFlow,
+        pollGithubToken,
         fetchGithubUser,
         saveGithubUser
       } = await import('./backend.js');
-      const flow = await startGithubDeviceFlowViaProxy();
+      const flow = await startGithubDeviceFlow();
       if (flow.error) {
         throw new Error(flow.error_description || flow.error || 'Error en Device Flow');
       }
@@ -63,12 +63,12 @@ function GithubLogin({ onUser, onGuest }) {
       setVerifyUrl(flow.verification_uri || 'https://github.com/login/device');
       setMode('device');
       try { chrome.tabs.create({ url: flow.verification_uri || 'https://github.com/login/device' }); } catch (e) {}
-      const token = await pollGithubTokenViaProxy(flow.device_code);
+      const token = await pollGithubToken(flow.device_code);
       const user = await fetchGithubUser(token);
       try { saveGithubUser(user, token); } catch (e) {}
       onUser(user);
     } catch (e) {
-      setError((e && e.message) || 'Error de conexion. Usa el token personal abajo.');
+      setError((e && e.message) || 'Device Flow no disponible. Usa el token personal abajo (crea uno en github.com/settings/tokens).');
       setMode('none');
       setLoading(false);
     }

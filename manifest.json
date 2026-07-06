@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "System X1",
-  "version": "3.0.2",
+  "version": "3.0.3",
   "description": "Browser agent con voz + texto. Sin API keys. Navega, busca, gestiona email/calendario, ejecuta tareas multi-paso.",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAxby3wxothK8kGSwB6ZnvopHjH7AV5x5+YGuYYTNK8iQhuGZHiXNIoHxVLPrF/xCi5vPuWwWPZ5PHh9ObnfJpjk1u7oJwcuhEPsbHGi9uMfNS8E24ywS8YcR335zfxZC0nQF+GUBsXeM24oRhKn3h0+SN/G7c3NNVMv4HpWuevQjYXDyeRIhojNWpvoBhHUUPaDw+nYrUnGxZ5f6nzrBATiizwZIvft2BO7cPfgzdo95TSocTima14rExvQNAvYa+RiAaKQMOc9LFm2bTtBhTs+A/0Lg7XIFTZwxJEgN/GTtuNXLsnDplX/oCnJQp/ASsfWRw00Fi/FhGiojA5Ki33QIDAQAB",
   "permissions": [
