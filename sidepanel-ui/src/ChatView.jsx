@@ -206,28 +206,12 @@ export function ChatView({ conversations, activeConv, onSelectConv, onCreateConv
         if (!chrome.runtime.lastError && r) {
           setGoogleOk(r.logged);
           if (r.user) setGoogleUser(r.user);
-          if (!r.logged && !googleLoading) {
-            // No conectado → auto-lanzar el flujo OAuth de Google real
-            setGoogleLoading(true);
-            B.loginGoogle().then(function(resp) {
-              setGoogleLoading(false);
-              if (resp) {
-                setGoogleOk(true);
-                setGoogleUser({ email: resp.email, name: resp.name, picture: resp.picture });
-                // Recargar pagina si es necesario para Dex
-                if (window.__X1_DEX_READY) window.location.reload();
-              } else {
-                setGoogleError('Conecta con Google para usar todas las funciones de X1 (Gmail, Calendar, Sheets).');
-              }
-            }).catch(function(err) {
-              setGoogleLoading(false);
-              setGoogleError('Conecta con Google para usar todas las funciones de X1.');
-            });
-          }
         } else {
           setGoogleOk(false);
         }
       });
+    } else {
+      setGoogleOk(false);
     }
   }, []);
 
@@ -515,6 +499,65 @@ export function ChatView({ conversations, activeConv, onSelectConv, onCreateConv
 
       // Mensajes (ProcessTimeline eliminado de aqui, ahora por cada respuesta abajo)
       React.createElement('div', { ref: logRef, style: { flex: 1, overflow: 'auto', padding: '20px' } },
+        msgs.length === 0 && googleOk === false ?
+          React.createElement('div', { style: { height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0' } },
+            React.createElement('div', { style: { width: '75px', height: '75px', marginBottom: '24px' } },
+              React.createElement('svg', { viewBox: '0 0 48 48', width: '75', height: '75' },
+                React.createElement('path', { fill: '#EA4335', d: 'M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z' }),
+                React.createElement('path', { fill: '#4285F4', d: 'M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z' }),
+                React.createElement('path', { fill: '#FBBC05', d: 'M10.53 28.59A14.5 14.5 0 019.5 24c0-1.59.28-3.14.76-4.59l-7.98-6.19A23.99 23.99 0 000 24c0 3.77.87 7.35 2.56 10.56l7.97-5.97z' }),
+                React.createElement('path', { fill: '#34A853', d: 'M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 5.97C6.51 42.62 14.62 48 24 48z' })
+              )
+            ),
+            React.createElement('div', { style: { fontSize: '24px', fontWeight: '400', color: '#202124', fontFamily: 'Google Sans, sans-serif', marginBottom: '8px' } }, 'Iniciar sesión'),
+            React.createElement('div', { style: { fontSize: '14px', color: '#5f6368', fontFamily: F, marginBottom: '28px', textAlign: 'center', maxWidth: '280px', lineHeight: '1.5' } },
+              'Usa tu cuenta de Google para activar Gmail, Calendar y Sheets en X1'
+            ),
+            React.createElement('div', { style: { width: '100%', maxWidth: '320px', marginBottom: '16px' } },
+              React.createElement('div', { style: {
+                border: '1px solid #dadce0', borderRadius: '4px', padding: '13px 15px',
+                fontSize: '14px', color: '#202124', fontFamily: F, background: '#f8f9fa',
+                display: 'flex', alignItems: 'center', gap: '10px',
+              } },
+                React.createElement('div', { style: { width: '20px', height: '20px', borderRadius: '50%', background: '#e8f0fe', display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                  React.createElement('svg', { viewBox: '0 0 24 24', width: '12', height: '12', fill: '#4285f4' },
+                    React.createElement('path', { d: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10h5v-2h-5c-4.34 0-8-3.66-8-8s3.66-8 8-8 8 3.66 8 8v1.43c0 .79-.71 1.57-1.5 1.57s-1.5-.78-1.5-1.57V12c0-2.76-2.24-5-5-5s-5 2.24-5 5 2.24 5 5 5c1.38 0 2.64-.56 3.54-1.47.65.89 1.77 1.47 2.96 1.47 1.97 0 3.5-1.6 3.5-3.57V12c0-5.52-4.48-10-10-10zm0 13c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3z' })
+                  )
+                ),
+                React.createElement('span', { style: { color: '#5f6368' } }, 'tucuenta@gmail.com')
+              )
+            ),
+            React.createElement('button', {
+              onClick: async function() {
+                setGoogleError(null);
+                setGoogleLoading(true);
+                var r = await B.loginGoogle();
+                setGoogleLoading(false);
+                if (r) { setGoogleOk(true); setGoogleUser({email:r.email,name:r.name,picture:r.picture}); }
+                else { setGoogleError('No se pudo conectar. Asegurate de que Google Cloud Console tenga configurado el redirect URI.'); }
+              },
+              disabled: googleLoading,
+              style: {
+                padding: '9px 24px', borderRadius: '4px', border: 'none',
+                background: googleLoading ? '#f1f3f4' : '#1a73e8',
+                color: googleLoading ? '#80868b' : '#ffffff',
+                fontSize: '14px', fontWeight: '500', cursor: googleLoading ? 'default' : 'pointer',
+                fontFamily: 'Google Sans, sans-serif', letterSpacing: '0.25px',
+                transition: 'all 80ms', boxShadow: googleLoading ? 'none' : '0 1px 3px rgba(26,115,232,0.3)',
+              },
+              onMouseEnter: function(e) { if (!googleLoading) { e.currentTarget.style.background = '#1b66c9'; e.currentTarget.style.boxShadow = '0 1px 5px rgba(26,115,232,0.4)'; } },
+              onMouseLeave: function(e) { if (!googleLoading) { e.currentTarget.style.background = '#1a73e8'; e.currentTarget.style.boxShadow = '0 1px 3px rgba(26,115,232,0.3)'; } },
+            }, googleLoading ? 'Conectando...' : 'Iniciar sesión con Google'),
+            React.createElement('div', { style: { marginTop: '32px', fontSize: '12px', color: '#5f6368', fontFamily: F, textAlign: 'center', maxWidth: '280px', lineHeight: '1.5' } },
+              'Al iniciar sesión, X1 podrá acceder a tu Gmail, Calendar, Sheets y Docs.'
+            ),
+            React.createElement('div', { style: { marginTop: '24px', display: 'flex', gap: '24px', fontSize: '12px', color: '#5f6368', fontFamily: F } },
+              React.createElement('a', { href: '#', style: { color: '#1a73e8', textDecoration: 'none' }, onClick: function(e) { e.preventDefault(); B.loginGoogle().then(function(r) { if (r) { setGoogleOk(true); setGoogleUser({email:r.email,name:r.name,picture:r.picture}); } }); } }, 'Ayuda'),
+              React.createElement('a', { href: '#', style: { color: '#1a73e8', textDecoration: 'none' }, onClick: function(e) { e.preventDefault(); } }, 'Privacidad'),
+              React.createElement('a', { href: '#', style: { color: '#1a73e8', textDecoration: 'none' }, onClick: function(e) { e.preventDefault(); } }, 'Términos')
+            )
+          )
+        :
         msgs.length === 0 ?
           React.createElement('div', { style: { height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '12px' } },
             React.createElement('div', { style: { width: '56px', height: '56px', borderRadius: '50%', background: '#f6f8fa', border: '1px solid #d0d7de', display: 'flex', alignItems: 'center', justifyContent: 'center' } },

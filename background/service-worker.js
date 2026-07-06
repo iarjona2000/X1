@@ -21418,6 +21418,80 @@ function x1PublishTask(token, owner, repo, branch, prop) {
 // Codigo) -> refinamiento (sector Refinamiento) -> publicacion (rama +
 // commits + PR). Actualiza queue.tareas[idx] con el resultado, incluyendo
 // que IA/sector trabajo en cada fase, y persiste la cola.
+// Pipeline compartido de 3 fases (Desarrollo -> Auditoria de Codigo ->
+// Refinamiento), usado tanto por la cola finita (objetivo dado por el
+// usuario, dividido en tareas) como por el autopiloto (X1 decide su propio
+// objetivo, ciclo tras ciclo, sin fin). goalLabel describe el objetivo para
+// el prompt de borrador; sectorsOut acumula que IA respondio en cada fase
+// para mostrarlo en la UI.
+function x1RunCodePipeline(goalLabel, tarea, filesWithState, researchBlock, sectorsOut) {
+  var draftValid = function (p) { return Array.isArray(p.archivos) && p.archivos.length > 0; };
+  var draftPrompt = 'Objetivo: "' + goalLabel + '"\nTarea: ' + tarea.titulo + '\nMotivo: ' + tarea.motivo +
+    '\n\nInvestigacion:\n' + researchBlock + '\n\nFicheros (contenido actual si existen):\n' +
+    filesWithState.map(function (f) { return '=== ' + f.path + ' (' + (f.exists ? 'existente' : 'nuevo') + ') ===\n' + (f.current || '(vacio, fichero nuevo)').slice(0, 1500); }).join('\n\n') +
+    '\n\nResponde SOLO con JSON: {"archivos":[{"path":"ruta","contenido":"contenido COMPLETO del fichero"}]}';
+
+  return x1AiCallJson(draftPrompt, X1_SECTOR_PROMPTS.developer, 3000, 35000, draftValid).then(function (draftRes) {
+    sectorsOut.push({ fase: 'Borrador', sector: 'Desarrollo', provider: draftRes.provider, model: draftRes.model });
+    if (!draftRes.parsed) throw new Error('El sector Desarrollo no genero un borrador valido ni tras reintentar');
+    var draft = draftRes.parsed;
+
+    var reviewPrompt = 'Revisa este codigo generado para la tarea "' + tarea.titulo + '". Busca bugs, seguridad, malas practicas y casos sin cubrir.\n\n' +
+      draft.archivos.map(function (f) { return '=== ' + f.path + ' ===\n' + String(f.contenido || '').slice(0, 3000); }).join('\n\n');
+
+    return x1AiCall(reviewPrompt, X1_SECTOR_PROMPTS.reviewer, 1200, 25000).then(function (reviewRes) {
+      sectorsOut.push({ fase: 'Auditoria', sector: 'Auditoria de codigo', provider: reviewRes.provider, model: reviewRes.model });
+
+      var refinePrompt = 'Codigo original:\n' + draft.archivos.map(function (f) { return '=== ' + f.path + ' ===\n' + f.contenido; }).join('\n\n') +
+        '\n\nAuditoria recibida:\n' + (reviewRes.text || '(sin observaciones)') +
+        '\n\nCorrige el codigo segun la auditoria (si no hay problemas reales, deja el codigo igual). Responde SOLO con JSON: {"titulo_pr":"titulo corto","descripcion_pr":"descripcion en espanol","archivos":[{"path":"ruta","contenido":"contenido FINAL completo del fichero"}]}';
+
+      return x1AiCallJson(refinePrompt, X1_SECTOR_PROMPTS.refiner, 3000, 35000, draftValid).then(function (refineRes) {
+        sectorsOut.push({ fase: 'Refinamiento', sector: 'Refinamiento', provider: refineRes.provider, model: refineRes.model });
+        var final = refineRes.parsed || draft;
+        var finalFiles = final.archivos.map(function (f) {
+          var match = filesWithState.filter(function (e) { return e.path === f.path; })[0];
+          return Object.assign({}, f, { sha: match ? match.sha : null, exists: match ? match.exists : false, current: match ? match.current : '' });
+        });
+        return { titulo_pr: final.titulo_pr || tarea.titulo, descripcion_pr: final.descripcion_pr || tarea.motivo, archivos: finalFiles };
+      });
+    });
+  });
+}
+
+// Investigacion ligera + lectura de ficheros existentes, compartido por
+// ambos modos de cola.
+function x1PrepareTask(token, owner, name, tarea) {
+  var term = (tarea.busquedas && tarea.busquedas[0]) || tarea.titulo;
+  return Promise.all([x1GhSearchRepos(term), x1NpmSearch(term)]).then(function (r) {
+    var researchBlock = 'Repos relevantes: ' + r[0].map(function (x) { return x.name; }).join(', ') +
+      '\nPaquetes npm: ' + r[1].map(function (x) { return x.name; }).join(', ');
+    var files = tarea.archivos || [];
+    return Promise.all(files.map(function (f) {
+      return x1GhFetchFile(token, owner, name, f.path).then(function (existing) {
+        return Object.assign({}, f, { current: existing.content, sha: existing.sha, exists: existing.exists });
+      });
+    })).then(function (filesWithState) { return { researchBlock: researchBlock, filesWithState: filesWithState }; });
+  });
+}
+
+function x1PublishAndCount(token, owner, name, branch, proposal) {
+  return x1PublishTask(token, owner, name, branch, proposal).then(function (pr) {
+    var totalAdded = 0, totalRemoved = 0;
+    proposal.archivos.forEach(function (f) {
+      var c = x1DiffCounts(f.current, f.contenido);
+      totalAdded += c.added; totalRemoved += c.removed;
+    });
+    return {
+      prUrl: pr.url, prNumber: pr.number,
+      files: proposal.archivos.map(function (f) { return f.path; }),
+      linesAdded: totalAdded, linesRemoved: totalRemoved, completedAt: Date.now(),
+    };
+  });
+}
+
+// Modo "cola finita": el usuario dio un objetivo, ya dividido en
+// queue.tareas concretas. Procesa la tarea en queue.currentIndex.
 function x1ProcessQueueTask(queue, idx) {
   var tarea = queue.tareas[idx];
   tarea.status = 'active';
@@ -21426,64 +21500,11 @@ function x1ProcessQueueTask(queue, idx) {
 
   return x1GetGithubToken().then(function (token) {
     if (!token) throw new Error('Sin sesion de GitHub');
-    var term = (tarea.busquedas && tarea.busquedas[0]) || tarea.titulo;
-
-    return Promise.all([x1GhSearchRepos(term), x1NpmSearch(term)]).then(function (r) {
-      var researchBlock = 'Repos relevantes: ' + r[0].map(function (x) { return x.name; }).join(', ') +
-        '\nPaquetes npm: ' + r[1].map(function (x) { return x.name; }).join(', ');
-
-      var files = tarea.archivos || [];
-      return Promise.all(files.map(function (f) {
-        return x1GhFetchFile(token, queue.owner, queue.name, f.path).then(function (existing) {
-          return Object.assign({}, f, { current: existing.content, sha: existing.sha, exists: existing.exists });
-        });
-      })).then(function (filesWithState) {
-
-        var draftPrompt = 'Objetivo general: "' + queue.goal + '"\nTarea: ' + tarea.titulo + '\nMotivo: ' + tarea.motivo +
-          '\n\nInvestigacion:\n' + researchBlock + '\n\nFicheros (contenido actual si existen):\n' +
-          filesWithState.map(function (f) { return '=== ' + f.path + ' (' + (f.exists ? 'existente' : 'nuevo') + ') ===\n' + (f.current || '(vacio, fichero nuevo)').slice(0, 1500); }).join('\n\n') +
-          '\n\nResponde SOLO con JSON: {"archivos":[{"path":"ruta","contenido":"contenido COMPLETO del fichero"}]}';
-
-        return x1AiCall(draftPrompt, X1_SECTOR_PROMPTS.developer, 3000, 35000).then(function (draftRes) {
-          tarea.sectors.push({ fase: 'Borrador', sector: 'Desarrollo', provider: draftRes.provider, model: draftRes.model });
-          var draft = x1ExtractJSON(draftRes.text);
-          if (!draft || !draft.archivos || !draft.archivos.length) throw new Error('El sector Desarrollo no genero un borrador valido');
-
-          var reviewPrompt = 'Revisa este codigo generado para la tarea "' + tarea.titulo + '". Busca bugs, seguridad, malas practicas y casos sin cubrir.\n\n' +
-            draft.archivos.map(function (f) { return '=== ' + f.path + ' ===\n' + String(f.contenido || '').slice(0, 3000); }).join('\n\n');
-
-          return x1AiCall(reviewPrompt, X1_SECTOR_PROMPTS.reviewer, 1200, 25000).then(function (reviewRes) {
-            tarea.sectors.push({ fase: 'Auditoria', sector: 'Auditoria de codigo', provider: reviewRes.provider, model: reviewRes.model });
-
-            var refinePrompt = 'Codigo original:\n' + draft.archivos.map(function (f) { return '=== ' + f.path + ' ===\n' + f.contenido; }).join('\n\n') +
-              '\n\nAuditoria recibida:\n' + (reviewRes.text || '(sin observaciones)') +
-              '\n\nCorrige el codigo segun la auditoria (si no hay problemas reales, deja el codigo igual). Responde SOLO con JSON: {"titulo_pr":"titulo corto","descripcion_pr":"descripcion en espanol","archivos":[{"path":"ruta","contenido":"contenido FINAL completo del fichero"}]}';
-
-            return x1AiCall(refinePrompt, X1_SECTOR_PROMPTS.refiner, 3000, 35000).then(function (refineRes) {
-              tarea.sectors.push({ fase: 'Refinamiento', sector: 'Refinamiento', provider: refineRes.provider, model: refineRes.model });
-              var final = x1ExtractJSON(refineRes.text) || draft;
-              var finalFiles = (final.archivos || draft.archivos).map(function (f) {
-                var match = filesWithState.filter(function (e) { return e.path === f.path; })[0];
-                return Object.assign({}, f, { sha: match ? match.sha : null, exists: match ? match.exists : false, current: match ? match.current : '' });
-              });
-
-              return x1PublishTask(token, queue.owner, queue.name, queue.branch, {
-                titulo_pr: final.titulo_pr || tarea.titulo, descripcion_pr: final.descripcion_pr || tarea.motivo, archivos: finalFiles,
-              }).then(function (pr) {
-                var totalAdded = 0, totalRemoved = 0;
-                finalFiles.forEach(function (f) {
-                  var c = x1DiffCounts(f.current, f.contenido);
-                  totalAdded += c.added; totalRemoved += c.removed;
-                });
-                tarea.status = 'done';
-                tarea.result = {
-                  prUrl: pr.url, prNumber: pr.number,
-                  files: finalFiles.map(function (f) { return f.path; }),
-                  linesAdded: totalAdded, linesRemoved: totalRemoved, completedAt: Date.now(),
-                };
-              });
-            });
-          });
+    return x1PrepareTask(token, queue.owner, queue.name, tarea).then(function (prep) {
+      return x1RunCodePipeline(queue.goal, tarea, prep.filesWithState, prep.researchBlock, tarea.sectors).then(function (proposal) {
+        return x1PublishAndCount(token, queue.owner, queue.name, queue.branch, proposal).then(function (result) {
+          tarea.status = 'done';
+          tarea.result = result;
         });
       });
     });
@@ -21497,10 +21518,67 @@ function x1ProcessQueueTask(queue, idx) {
   });
 }
 
+// Modo "autopiloto": SIN objetivo del usuario y SIN fin. Cada ciclo, el
+// sector Estrategia decide por si mismo la mejora mas valiosa a hacer ahora
+// (usando el informe de analisis guardado al activar el autopiloto + un
+// resumen de lo que ya se hizo, para no repetirse), y despues corre el mismo
+// pipeline de 3 fases. El historial crece indefinidamente (recortado a las
+// ultimas 40 entradas para no disparar el tamano de chrome.storage).
+function x1DecideNextObjective(queue) {
+  var recent = (queue.history || []).slice(-10).map(function (h, i) {
+    return (i + 1) + '. ' + h.titulo + (h.result && h.result.error ? ' (fallo: ' + h.result.error + ')' : ' (hecho)');
+  }).join('\n');
+  var prompt = 'No hay ningun objetivo dado por el usuario: decide TU MISMO cual es la mejora mas valiosa que se puede hacer AHORA en este repositorio.\n\n' +
+    'Repositorio: ' + queue.owner + '/' + queue.name + '\nInforme de analisis:\n' + (queue.analysisReport || '(sin informe)') + '\n\n' +
+    (recent ? 'Ya se hizo (NO repitas esto, elige algo distinto):\n' + recent + '\n\n' : '(Primer ciclo de autopiloto, sin historial previo.)\n\n') +
+    'Responde SOLO con JSON: {"titulo":"titulo corto de la mejora elegida","motivo":"por que es la mas valiosa ahora","busquedas":["hasta 2 terminos de busqueda utiles"],"archivos":[{"path":"ruta","motivo":"..."}]}\nMaximo 3 archivos.';
+  return x1AiCallJson(prompt, X1_SECTOR_PROMPTS.strategist, 1200, 25000, function (p) { return !!p.titulo; }).then(function (r) {
+    var tarea = r.parsed || { titulo: 'Mejora general de calidad', motivo: 'El sector Estrategia no pudo decidir un objetivo especifico esta vez.', busquedas: ['buenas practicas de codigo'], archivos: [] };
+    return { tarea: tarea, sector: { fase: 'Estrategia', sector: 'Estrategia', provider: r.provider, model: r.model } };
+  });
+}
+
+function x1ProcessAutopilotCycle(queue) {
+  return x1GetGithubToken().then(function (token) {
+    if (!token) throw new Error('Sin sesion de GitHub');
+    return x1DecideNextObjective(queue).then(function (decision) {
+      var tarea = decision.tarea;
+      tarea.sectors = [decision.sector];
+      return x1PrepareTask(token, queue.owner, queue.name, tarea).then(function (prep) {
+        return x1RunCodePipeline(tarea.titulo, tarea, prep.filesWithState, prep.researchBlock, tarea.sectors).then(function (proposal) {
+          return x1PublishAndCount(token, queue.owner, queue.name, queue.branch, proposal).then(function (result) {
+            tarea.status = 'done';
+            tarea.result = result;
+            return tarea;
+          });
+        });
+      }).catch(function (e) {
+        tarea.status = 'error';
+        tarea.result = { error: (e && e.message) || 'Error desconocido', completedAt: Date.now() };
+        return tarea;
+      });
+    });
+  }).then(function (tarea) {
+    queue.history = (queue.history || []).concat([tarea]).slice(-40);
+    queue.updatedAt = Date.now();
+    return x1SaveQueue(queue).then(function () { return queue; });
+  });
+}
+
 chrome.alarms.onAlarm.addListener(function (alarm) {
   if (alarm.name !== X1_AUTOMATION_ALARM) return;
   x1GetQueue().then(function (queue) {
-    if (!queue || queue.currentIndex >= queue.tareas.length) return;
+    if (!queue || queue.status === 'paused') return;
+
+    if (queue.mode === 'autopilot') {
+      x1ProcessAutopilotCycle(queue).then(function () {
+        var mins = 15 + Math.floor(Math.random() * 10);
+        chrome.alarms.create(X1_AUTOMATION_ALARM, { delayInMinutes: mins }); // sin fin: el autopiloto no termina nunca por si solo
+      });
+      return;
+    }
+
+    if (queue.currentIndex >= queue.tareas.length) return;
     x1ProcessQueueTask(queue, queue.currentIndex).then(function (updatedQueue) {
       if (updatedQueue.currentIndex < updatedQueue.tareas.length) {
         var mins = 15 + Math.floor(Math.random() * 10); // 15-25 min: reparte el trabajo, no satura GitHub/la IA, y da tiempo a revisar cada PR
@@ -21525,7 +21603,11 @@ chrome.alarms.onAlarm.addListener(function (alarm) {
 chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
   if (msg.type === 'X1_AUTOMATION_QUEUE_START') {
     x1SaveQueue(msg.queue).then(function () {
-      if (msg.queue.currentIndex < msg.queue.tareas.length) {
+      // Autopiloto: siempre sigue (no hay "ultima tarea"). Cola finita: solo
+      // si quedan tareas pendientes tras la primera (ya procesada al momento
+      // por el sidepanel).
+      var shouldSchedule = msg.queue.mode === 'autopilot' ? msg.queue.status !== 'paused' : msg.queue.currentIndex < msg.queue.tareas.length;
+      if (shouldSchedule) {
         var mins = 15 + Math.floor(Math.random() * 10);
         chrome.alarms.create(X1_AUTOMATION_ALARM, { delayInMinutes: mins });
       }

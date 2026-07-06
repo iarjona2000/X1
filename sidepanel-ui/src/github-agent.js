@@ -433,6 +433,74 @@ export function runAutoBuild(goal, repoCtx, onStep) {
   });
 }
 
+// ── Autopiloto ──
+// Sin objetivo del usuario y sin fin: en cada ciclo, el sector Estrategia
+// decide POR SI MISMO cual es la mejora mas valiosa a hacer ahora (usando el
+// informe de analisis del repo + lo que ya se hizo antes, para no
+// repetirse), y despues corre el mismo pipeline de 3 fases que el modo
+// dirigido por objetivo. El primer ciclo se procesa aqui para dar feedback
+// inmediato; los siguientes los encadena para siempre la cola en segundo
+// plano del service worker (uno cada 15-25 min) hasta que el usuario la
+// cancele explicitamente — no hay condicion de "objetivo cumplido" porque no
+// hay objetivo: X1 se construye sobre si mismo de forma indefinida.
+export function runAutopilot(repoCtx, onStep) {
+  if (!repoCtx) {
+    emit(onStep, { id: 'autopilot', title: 'Sin repositorio de referencia', status: 'error', detail: 'Analiza un repositorio en "Tu Repositorio" antes de activar el autopiloto — X1 necesita el informe para decidir que construir.' });
+    return Promise.resolve({ titulo_pr: null, descripcion_pr: null, archivos: [], error: true });
+  }
+
+  emit(onStep, {
+    id: 'strategy', title: 'Sector Estrategia: decidiendo el proximo objetivo', status: 'active',
+    why: 'Sin instrucciones del usuario: X1 analiza el estado del repositorio y decide por si mismo que construir ahora. Esto se repetira sin fin, un ciclo tras otro.',
+  });
+
+  var strategyPrompt =
+    'No hay ningun objetivo dado por el usuario: decide TU MISMO cual es la mejora mas valiosa que se puede hacer AHORA en este repositorio.\n\n' +
+    'Repositorio: ' + repoCtx.repo + '\nInforme de analisis:\n' + String(repoCtx.report || '').slice(0, 5000) + '\n\n' +
+    '(Primer ciclo de autopiloto, sin historial previo.)\n\n' +
+    'Responde SOLO con JSON: {"titulo":"titulo corto de la mejora elegida","motivo":"por que es la mas valiosa ahora, citando el informe","busquedas":["hasta 2 terminos de busqueda utiles"],"leer_url":"URL relevante o null","archivos":[{"path":"ruta","motivo":"..."}]}\nMaximo 3 archivos.';
+
+  return askAIJson(strategyPrompt, { timeoutMs: 25000, maxTokens: 1200, systemPrompt: SECTOR_PROMPTS.strategist }, function (p) { return !!p.titulo; }).then(function (stratRes) {
+    var tarea = stratRes.parsed || {
+      titulo: 'Mejora general de calidad', motivo: 'El sector Estrategia no pudo decidir un objetivo especifico; se hace una pasada general.',
+      busquedas: ['buenas practicas de codigo'], leer_url: null, archivos: [],
+    };
+
+    emit(onStep, {
+      id: 'strategy', title: 'Sector Estrategia: objetivo elegido — ' + tarea.titulo, status: stratRes.parsed ? 'done' : 'error',
+      detail: tarea.motivo + ' · ' + stratRes.label,
+    });
+
+    return processTaskDeep(tarea.titulo, tarea, repoCtx, onStep, 0, null).then(function (proposal) {
+      var firstCycleStatus = proposal.archivos.length ? 'done' : 'error';
+      var firstCycleEntry = {
+        titulo: tarea.titulo, motivo: tarea.motivo,
+        sectors: [{ fase: 'Estrategia', sector: 'Estrategia', model: null }],
+        status: firstCycleStatus,
+        result: proposal.archivos.length
+          ? { files: proposal.archivos.map(function (f) { return f.path; }), linesAdded: 0, linesRemoved: 0, completedAt: Date.now() }
+          : { error: 'Sin cambios de fichero validos en el primer ciclo', completedAt: Date.now() },
+      };
+      var queue = {
+        mode: 'autopilot',
+        owner: repoCtx.owner, name: repoCtx.name,
+        branch: (repoCtx.meta && repoCtx.meta.default_branch) || 'main',
+        analysisReport: String(repoCtx.report || '').slice(0, 5000),
+        history: [firstCycleEntry],
+        status: 'running', createdAt: Date.now(), updatedAt: Date.now(),
+      };
+      return startBackgroundQueue(queue).then(function () {
+        emit(onStep, {
+          id: 'autopilot-loop', title: 'Autopiloto activado — sin limite de tiempo', status: 'done',
+          detail: 'X1 seguira decidiendo y construyendo por su cuenta cada 15-25 minutos, indefinidamente, hasta que canceles la cola.',
+          why: 'Cada ciclo: Estrategia decide que construir -> Desarrollo -> Auditoria de Codigo -> Refinamiento -> Pull Request. Nadie le da instrucciones.',
+        });
+        return proposal;
+      });
+    });
+  });
+}
+
 // Envia la cola al service worker para que la procese en segundo plano via
 // chrome.alarms — sigue corriendo aunque se cierre el sidepanel.
 function startBackgroundQueue(queue) {

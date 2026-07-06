@@ -2,12 +2,12 @@ import * as React from 'react';
 import * as B from './backend.js';
 import {
   fetchOpenPRs, fetchPRDiff, reviewPRDiff, publishPRComment,
-  loadRepoAnalysis, runAutoBuild, publishAutoBuild,
+  loadRepoAnalysis, runAutoBuild, runAutopilot, publishAutoBuild,
   getBackgroundQueue, cancelBackgroundQueue,
 } from './github-agent.js';
 import { ProcessLog } from './ProcessTimeline.jsx';
 import { DiffView } from './DiffView.jsx';
-import { FileAddedIcon, FileDiffIcon, ChevronDownIcon, ChevronUpIcon, GitBranchIcon, ClockIcon, SyncIcon } from '@primer/octicons-react';
+import { FileAddedIcon, FileDiffIcon, ChevronDownIcon, ChevronUpIcon, GitBranchIcon, ClockIcon, SyncIcon, RocketIcon } from '@primer/octicons-react';
 
 const F = "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif";
 const MONO = "'SF Mono', 'Cascadia Code', Consolas, monospace";
@@ -126,6 +126,18 @@ function publish(repoCtx) {
     return publishAutoBuild(token, repoCtx.owner, repoCtx.name, branch, proposal, function (s) { setStore({ publishSteps: upsertStep(store.publishSteps, s) }); });
   }).then(function (r) { setStore({ published: r, publishing: false }); })
     .catch(function (e) { setStore({ publishError: e.message || 'Error al publicar', publishing: false }); });
+}
+
+// Autopiloto: sin objetivo, sin fin. X1 decide el primer ciclo aqui mismo
+// (feedback inmediato) y activa la cola en segundo plano para que siga
+// decidiendo y construyendo por su cuenta, indefinidamente.
+function startAutopilot(repoCtx) {
+  if (store.building || !repoCtx) return;
+  setStore({ building: true, goal: '', steps: [], proposal: null, published: null, publishError: null });
+  runAutopilot(repoCtx, function (s) { setStore({ steps: upsertStep(store.steps, s) }); }).then(function (p) {
+    setStore({ proposal: sanitizeProposal(p), building: false });
+    if (p && p.archivos && p.archivos.length) publish(repoCtx);
+  }).catch(function (e) { setStore({ building: false, steps: upsertStep(store.steps, { id: 'fatal', title: 'Error inesperado: ' + (e && e.message), status: 'error' }) }); });
 }
 
 // ── Componentes Primer a medida ──
