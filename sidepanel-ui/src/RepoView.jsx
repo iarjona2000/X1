@@ -1,5 +1,6 @@
 import * as React from 'react';
 import * as B from './backend.js';
+import { RepoAnalysis } from './RepoAnalysis.jsx';
 
 const F = "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif";
 
@@ -162,8 +163,11 @@ export function RepoView({ conversations, githubUser }) {
 
       <div style={{ flex: 1, overflow: 'auto' }}>
 
-        {/* LOCAL TAB */}
+        {/* LOCAL TAB — Estado y analisis exhaustivo del repositorio */}
         {activeTab === 'local' && (
+          <RepoAnalysis githubUser={githubUser} />
+        )}
+        {false && (
           <div style={{ padding: '16px' }}>
             {/* Search + filters */}
             <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>

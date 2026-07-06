@@ -366,7 +366,7 @@ export function startGithubDeviceFlow() {
   }).then(function(r) {
     if (!r.ok) {
       return r.json().then(function(data) {
-        throw new Error(data.error_description || 'Error HTTP ' + r.status);
+        throw new Error(data.error_description || ('Error HTTP ' + r.status));
       }, function() {
         throw new Error('Error HTTP ' + r.status + ' al contactar GitHub');
       });
@@ -405,6 +405,51 @@ export function pollGithubToken(device_code) {
         if (data.error === 'slow_down') { setTimeout(poll, 8000); return; }
         if (data.error === 'expired_token') { reject(new Error('El codigo ha expirado. Intenta de nuevo.')); return; }
         if (data.error === 'access_denied') { reject(new Error('Autorizacion denegada.')); return; }
+        setTimeout(poll, 5000);
+      }).catch(function() { setTimeout(poll, 5000); });
+    }
+    poll();
+  });
+}
+
+// Proxy CORS-friendly para Device Flow GitHub (vía Cloudflare Worker).
+// Resuelve el problema "Device Flow must be explicitly enabled for this App"
+// y los errores de CORS si el navegador bloquea la petición directa.
+const GITHUB_PROXY_URL = 'https://c-bos-proxy.calezamindset.workers.dev';
+
+export function startGithubDeviceFlowViaProxy() {
+  return fetch(GITHUB_PROXY_URL + '/github/device/code', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      client_id: 'Ov23limUz0ywpxqoPJXo',
+      scope: 'read:user user:email'
+    })
+  }).then(function(r) { return r.json(); });
+}
+
+export function pollGithubTokenViaProxy(device_code) {
+  return new Promise(function(resolve, reject) {
+    var attempts = 0;
+    var maxAttempts = 60;
+    function poll() {
+      if (attempts >= maxAttempts) { reject(new Error('Tiempo de espera agotado')); return; }
+      attempts++;
+      fetch(GITHUB_PROXY_URL + '/github/oauth/access_token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          client_id: 'Ov23limUz0ywpxqoPJXo',
+          client_secret: '7997bfe3d604dfbc9f6c65bbb46620d44cfe26c8',
+          device_code: device_code,
+          grant_type: 'urn:ietf:params:oauth:grant-type:device_code'
+        })
+      }).then(function(r) { return r.json(); }).then(function(data) {
+        if (data.error === 'authorization_pending') { setTimeout(poll, 5000); return; }
+        if (data.error === 'slow_down') { setTimeout(poll, 8000); return; }
+        if (data.error === 'expired_token') { reject(new Error('El codigo ha expirado')); return; }
+        if (data.error === 'access_denied') { reject(new Error('Autorizacion denegada')); return; }
+        if (data.access_token) { resolve(data.access_token); return; }
         setTimeout(poll, 5000);
       }).catch(function() { setTimeout(poll, 5000); });
     }

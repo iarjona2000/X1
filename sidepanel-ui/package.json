@@ -4,8 +4,8 @@
   "private": true,
   "description": "X1 side panel — Fluent 2 UI (React v9). Builds into ../sidepanel/dist/panel-ui.js",
   "scripts": {
-    "build": "esbuild src/main.jsx --bundle --minify --jsx=automatic --define:process.env.NODE_ENV=\\\"production\\\" --outfile=../sidepanel/dist/panel-ui.js",
-    "dev": "esbuild src/main.jsx --bundle --jsx=automatic --define:process.env.NODE_ENV=\\\"development\\\" --outfile=../sidepanel/dist/panel-ui.js --watch"
+    "build": "esbuild src/main.jsx --bundle --minify --jsx=automatic --define:process.env.NODE_ENV=\\\"production\\\" --outfile=../sidepanel/dist/panel-ui-2026.js",
+    "dev": "esbuild src/main.jsx --bundle --jsx=automatic --define:process.env.NODE_ENV=\\\"development\\\" --outfile=../sidepanel/dist/panel-ui-2026.js --watch"
   },
   "dependencies": {
     "@fluentui/react-components": "^9.54.0",

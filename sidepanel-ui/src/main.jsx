@@ -48,19 +48,27 @@ function GithubLogin({ onUser, onGuest }) {
   async function handleDeviceFlow() {
     setError(''); setLoading(true);
     try {
-      const { startGithubDeviceFlow, pollGithubToken, fetchGithubUser, saveGithubUser } = await import('./backend.js');
-      const flow = await startGithubDeviceFlow();
+      const {
+        startGithubDeviceFlowViaProxy,
+        pollGithubTokenViaProxy,
+        fetchGithubUser,
+        saveGithubUser
+      } = await import('./backend.js');
+      const flow = await startGithubDeviceFlowViaProxy();
+      if (flow.error) {
+        throw new Error(flow.error_description || flow.error || 'Error en Device Flow');
+      }
       setDeviceCode(flow.device_code);
       setUserCode(flow.user_code);
       setVerifyUrl(flow.verification_uri || 'https://github.com/login/device');
       setMode('device');
-      chrome.tabs.create({ url: flow.verification_uri || 'https://github.com/login/device' });
-      const token = await pollGithubToken(flow.device_code);
+      try { chrome.tabs.create({ url: flow.verification_uri || 'https://github.com/login/device' }); } catch (e) {}
+      const token = await pollGithubTokenViaProxy(flow.device_code);
       const user = await fetchGithubUser(token);
       try { saveGithubUser(user, token); } catch (e) {}
       onUser(user);
     } catch (e) {
-      setError(e.message || 'Error al conectar con GitHub. Comprueba que la app GitHub OAuth este habilitada para Device Flow.');
+      setError((e && e.message) || 'Error de conexion. Usa el token personal abajo.');
       setMode('none');
       setLoading(false);
     }

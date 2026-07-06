@@ -2,6 +2,7 @@ import * as React from 'react';
 import * as B from './backend.js';
 import { ChatView } from './ChatView.jsx';
 import { RepoView } from './RepoView.jsx';
+import { PRAgent } from './PRAgent.jsx';
 
 const F = "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif";
 
@@ -23,6 +24,8 @@ const GoogleSvg = ({ w = 16, h = 16 }) => (
 const ChatIcon = ({ active }) => <svg viewBox="0 0 16 16" width="16" height="16" fill={active ? '#ffffff' : '#9198a0'}><path d="M1.5 2.75a.25.25 0 01.25-.25h8.5a.25.25 0 01.25.25v5.5a.25.25 0 01-.25.25h-3.5a.75.75 0 00-.53.22L3.5 11.44V9.25a.75.75 0 00-.75-.75h-1a.25.25 0 01-.25-.25v-5.5zM1.75 1A1.75 1.75 0 000 2.75v5.5C0 9.216.784 10 1.75 10H2v1.543a1.457 1.457 0 002.487 1.03L7.061 10h3.189A1.75 1.75 0 0012 8.25v-5.5A1.75 1.75 0 0010.25 1h-8.5z"/></svg>;
 
 const RepoIcon = ({ active }) => <svg viewBox="0 0 16 16" width="16" height="16" fill={active ? '#ffffff' : '#9198a0'}><path d="M2 2.5A2.5 2.5 0 014.5 0h8.75a.75.75 0 01.75.75v12.5a.75.75 0 01-.75.75h-2.5a.75.75 0 110-1.5h1.75v-2h-8a1 1 0 00-.714 1.7.75.75 0 01-1.072 1.05A2.495 2.495 0 012 11.5v-9zm10.5-1h-8a1 1 0 00-1 1v6.708A2.486 2.486 0 014.5 9h8V1.5z"/></svg>;
+
+const PRIcon = ({ active }) => <svg viewBox="0 0 16 16" width="16" height="16" fill={active ? '#ffffff' : '#9198a0'}><path d="M1.5 3.25a2.25 2.25 0 1 1 3 2.122v5.256a2.251 2.251 0 1 1-1.5 0V5.372A2.25 2.25 0 0 1 1.5 3.25Zm5.677-.177L9.573.677A.25.25 0 0 1 10 .854V2.5h1A2.5 2.5 0 0 1 13.5 5v5.628a2.251 2.251 0 1 1-1.5 0V5a1 1 0 0 0-1-1h-1v1.646a.25.25 0 0 1-.427.177L7.177 3.427a.25.25 0 0 1 0-.354ZM3.75 2.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm0 9.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm8.25.75a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0Z"/></svg>;
 
 let convSeq = 0;
 const convUid = () => ++convSeq;
@@ -92,6 +95,12 @@ export default function App({ githubUser }) {
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           transition: 'background 80ms',
         }}><RepoIcon active={tab === 'repo'} /></button>
+        <button onClick={() => setTab('agent')} title="Automatizacion de PRs" style={{
+          width: '32px', height: '32px', borderRadius: '6px', border: 'none',
+          background: tab === 'agent' ? '#0969da' : 'transparent', cursor: 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          transition: 'background 80ms',
+        }}><PRIcon active={tab === 'agent'} /></button>
         <div style={{ marginTop: 'auto' }} />
         {githubUser?.avatar_url ? (
           <img src={githubUser.avatar_url} alt={githubUser.login}
@@ -113,6 +122,8 @@ export default function App({ githubUser }) {
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden' }}>
         {tab === 'chat' ? (
           <ChatView conversations={conversations} activeConv={activeConv} onSelectConv={setActiveConvId} onCreateConv={createConversation} onEnsureConv={ensureConversation} onUpdateConv={updateConversation} onDeleteConv={deleteConversation} />
+        ) : tab === 'agent' ? (
+          <PRAgent githubUser={githubUser} />
         ) : (
           <RepoView conversations={conversations} githubUser={githubUser} />
         )}
