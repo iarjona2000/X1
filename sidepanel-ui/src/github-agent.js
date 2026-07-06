@@ -1,4 +1,4 @@
-import { sendToEngine, sendToEngineMeta } from './backend.js';
+import { callAI } from './backend.js';
 import { githubSearch, npmSearch, stackOverflowSearch } from './tools.js';
 
 // ── Automatizacion de repositorios de GitHub ──
@@ -8,8 +8,8 @@ import { githubSearch, npmSearch, stackOverflowSearch } from './tools.js';
 //    usando el analisis previo del repo, lo divide en tareas concretas
 //    (una si el objetivo ya es concreto, varias si es amplio: "arregla todos
 //    los problemas"), y para cada tarea investiga (GitHub/npm/StackOverflow +
-//    una URL si lo decide), consulta el panel de IAs y propone cambios de
-//    fichero. El usuario publica todo junto como rama + PR con un clic.
+//    una URL si lo decide), consulta el panel de IAs, propone cambios de
+//    fichero y PUBLICA la rama + PR automaticamente — sin pedir confirmacion.
 // Cada fase reporta pasos estructurados via onStep({id,title,detail,status,why})
 // para que la UI (ProcessLog) muestre siempre donde esta X1, que IA respondio
 // y por que — nunca debe quedar una fase muda mas de un instante.
@@ -41,13 +41,25 @@ var PROVIDER_LABELS = {
 };
 function providerLabel(id) { return PROVIDER_LABELS[id] || (id ? id : 'IA'); }
 
-// Llama al motor con panel+juez y devuelve {text, label} donde label ya
-// incluye la IA que respondio y cuanto tardo, listo para meter en un detail.
+var AGENT_SYSTEM_PROMPT = 'Eres X1, un agente de automatizacion de software. Responde SIEMPRE en espanol, de forma directa y sin relleno conversacional. Sigue el formato EXACTO que pida cada instruccion (si se pide JSON puro, responde solo JSON, sin fences de markdown ni texto antes o despues).';
+
+// Llama al proxy directamente (fetch desde el sidepanel, sin pasar por el
+// service worker) y devuelve {text, label, provider} donde label ya incluye
+// el modelo real que respondio y cuanto tardo, listo para meter en un detail.
 function askAI(prompt, opts) {
+  opts = opts || {};
   var t0 = Date.now();
-  return sendToEngineMeta(prompt, opts).then(function (r) {
+  return callAI(prompt, {
+    maxTokens: opts.maxTokens,
+    timeoutMs: opts.timeoutMs,
+    systemPrompt: AGENT_SYSTEM_PROMPT,
+  }).then(function (r) {
     var secs = Math.round((Date.now() - t0) / 1000);
-    var label = r.provider ? (providerLabel(r.provider) + ' · ' + secs + 's') : (secs + 's');
+    if (!r || !r.text) {
+      var errLabel = (r && r.error) || 'sin respuesta';
+      return { text: null, label: errLabel + ' · ' + secs + 's', provider: r && r.provider };
+    }
+    var label = (r.model && r.model !== 'desconocido' ? r.model : providerLabel(r.provider)) + ' · ' + secs + 's';
     return { text: r.text, label: label, provider: r.provider };
   });
 }
@@ -95,7 +107,7 @@ export function reviewPRDiff(title, diff) {
     'Actua como revisor de codigo senior. Revisa este Pull Request y responde en espanol con este formato:\n' +
     '1) Resumen del cambio\n2) Problemas (bugs, seguridad, rendimiento)\n3) Sugerencias concretas\n4) Veredicto: APROBAR / CAMBIOS / RECHAZAR\n' +
     context + '\nPR: "' + title + '"\n\nDiff:\n' + diff;
-  return sendToEngine(prompt, { forceJudge: true, timeoutMs: 60000, clientTimeoutMs: 75000, maxTokens: 3000 });
+  return askAI(prompt, { timeoutMs: 25000, maxTokens: 1500 }).then(function (r) { return r.text; });
 }
 
 // Publica la revision como comentario en el PR.
@@ -195,7 +207,7 @@ export function analyzeRepo(token, owner, repo, meta, files, onStep) {
   var keyNames = ['README.md', 'readme.md', 'README', 'package.json', 'requirements.txt', 'go.mod', 'Cargo.toml', 'pom.xml', 'tsconfig.json', 'manifest.json', 'Dockerfile', 'pyproject.toml'];
   var keyFiles = files
     .filter(function (f) { return keyNames.indexOf(f.path.split('/').pop()) !== -1 && f.path.split('/').length <= 2; })
-    .slice(0, 6);
+    .slice(0, 4);
 
   if (keyFiles.length === 0) {
     emit(onStep, { id: 'nokeys', title: 'Sin ficheros clave en la raiz', status: 'done', detail: 'No hay README/package.json/etc en el nivel superior; X1 analizara solo con el arbol de ficheros.' });
@@ -212,29 +224,36 @@ export function analyzeRepo(token, owner, repo, meta, files, onStep) {
           detail: fmtBytes((c || '').length),
           why: readWhy(f.path),
         });
-        return { path: f.path, content: (c || '').slice(0, 3000) };
+        // Cap a 1500 chars: el objetivo es que la IA entienda el rol del
+        // fichero, no que reciba el fuente entero — cada caracter de mas aqui
+        // es tiempo de espera de mas para el usuario, multiplicado por
+        // cada fichero clave.
+        return { path: f.path, content: (c || '').slice(0, 1500) };
       });
     })
   ).then(function (contents) {
     emit(onStep, {
       id: 'ai', title: 'Consultando panel de IA (varios modelos + arbitro)', status: 'active',
-      why: 'Con el arbol y los ficheros clave ya leidos, X1 pide un informe exhaustivo: proposito, stack, arquitectura, riesgos y recomendaciones.',
+      why: 'Con el arbol y los ficheros clave ya leidos, X1 pide un informe conciso: proposito, stack, arquitectura, riesgos y recomendaciones.',
     });
-    var tree = files.slice(0, 150).map(function (f) { return f.path; }).join('\n');
+    var tree = files.slice(0, 100).map(function (f) { return f.path; }).join('\n');
     var prompt =
-      'Analiza a fondo este repositorio de GitHub y devuelve un informe EXHAUSTIVO en espanol con estas secciones:\n' +
-      '1) Proposito y tipo de proyecto\n2) Stack y lenguajes\n3) Arquitectura y estructura de carpetas\n4) Ficheros clave y su rol\n5) Calidad y riesgos observados (se ESPECIFICO: nombra ficheros y problemas concretos, no generalidades)\n6) Recomendaciones concretas de mejora (una lista numerada de acciones puntuales, cada una accionable por separado)\n\n' +
+      'Analiza este repositorio de GitHub y devuelve un informe en espanol, en formato MARKDOWN, con EXACTAMENTE estas 6 secciones (usa "## " para cada titulo):\n' +
+      '## Proposito\n## Stack\n## Arquitectura\n## Ficheros clave\n## Riesgos\n## Recomendaciones\n\n' +
+      'Reglas: se CONCISO y directo (3-5 frases o 3-6 bullets por seccion, nunca mas). ' +
+      'En "Riesgos" y "Recomendaciones" nombra ficheros y acciones CONCRETAS (nada de generalidades tipo "mejorar el codigo"), usa listas con "- ". ' +
+      '"Recomendaciones" es la seccion mas importante: el usuario la usara para decidir que construir despues, cada punto debe ser una accion accionable por si sola.\n\n' +
       'Repo: ' + owner + '/' + repo + '\nDescripcion: ' + ((meta && meta.description) || 'N/A') +
       '\nLenguaje principal: ' + ((meta && meta.language) || 'N/A') + '\nFicheros: ' + files.length + '\n\n' +
-      'Arbol (parcial):\n' + tree + '\n\nContenido de ficheros clave:\n' +
+      'Arbol (parcial):\n' + tree + '\n\nContenido de ficheros clave (resumido):\n' +
       contents.map(function (c) { return '=== ' + c.path + ' ===\n' + c.content; }).join('\n\n');
 
-    return askAI(prompt, { forceJudge: true, timeoutMs: 60000, clientTimeoutMs: 75000, maxTokens: 4000 }).then(function (r) {
+    return askAI(prompt, { timeoutMs: 25000, maxTokens: 1800 }).then(function (r) {
       var report = r.text;
       var ok = !!(report && report.trim());
       emit(onStep, {
-        id: 'ai', title: ok ? 'Informe generado' : 'El panel de IA no respondio', status: ok ? 'done' : 'error',
-        detail: ok ? (report.length + ' caracteres · respondido por ' + r.label) : ('Reintenta en unos segundos (' + r.label + ')'),
+        id: 'ai', title: ok ? 'Informe generado' : 'El panel de IA no respondio a tiempo', status: ok ? 'done' : 'error',
+        detail: ok ? (report.length + ' caracteres · respondido por ' + r.label) : ('Fallo tras ' + r.label + ' — pulsa "Analizar a fondo" para reintentar'),
       });
       var analysis = {
         repo: owner + '/' + repo,
@@ -316,13 +335,13 @@ function extractJSON(txt) {
 // amplio, p.ej. "arregla todos los problemas"), 2) por cada tarea investiga
 // en GitHub/npm/StackOverflow y, si lo decide, lee una URL, 3) genera una
 // propuesta concreta de ficheros a crear/modificar + titulo y descripcion de
-// PR. Cada fase reporta pasos via onStep — nada se publica todavia, eso lo
-// hace publishAutoBuild() solo cuando el usuario confirma.
+// PR. Cada fase reporta pasos via onStep — el llamador (PRAgent.jsx) publica
+// la propuesta automaticamente en cuanto esta lista, sin pedir confirmacion.
 export function runAutoBuild(goal, repoCtx, onStep) {
   emit(onStep, { id: 'plan', title: 'Entendiendo el objetivo', status: 'active', detail: '"' + goal + '"' });
 
   var repoBlock = repoCtx
-    ? '\nRepositorio de referencia: ' + repoCtx.repo + '\nInforme de analisis previo de X1 (usalo para identificar problemas CONCRETOS si el objetivo es amplio):\n' + String(repoCtx.report || '').slice(0, 6000) + '\n'
+    ? '\nRepositorio de referencia: ' + repoCtx.repo + '\nInforme de analisis previo de X1 (usalo para identificar problemas CONCRETOS si el objetivo es amplio):\n' + String(repoCtx.report || '').slice(0, 4000) + '\n'
     : '\n(No hay un repositorio de referencia seleccionado; propon una investigacion util igualmente, sin poder detallar problemas concretos de codigo.)\n';
 
   var planPrompt =
@@ -338,7 +357,7 @@ export function runAutoBuild(goal, repoCtx, onStep) {
     ']}\n' +
     'Maximo 5 tareas, maximo 3 archivos por tarea. Si una tarea no requiere tocar codigo (solo investigacion), deja "archivos" como [].';
 
-  return askAI(planPrompt, { forceJudge: true, timeoutMs: 45000, clientTimeoutMs: 60000, maxTokens: 2000 }).then(function (r) {
+  return askAI(planPrompt, { timeoutMs: 20000, maxTokens: 1200 }).then(function (r) {
     var parsed = extractJSON(r.text);
     var tareas = (parsed && Array.isArray(parsed.tareas) && parsed.tareas.length) ? parsed.tareas : [{ titulo: goal, motivo: goal, busquedas: [goal], leer_url: null, archivos: [] }];
     var resumen = (parsed && parsed.resumen) || goal;
@@ -460,12 +479,12 @@ function proposeChanges(goal, tarea, research, repoCtx, onStep, taskIdx) {
       'Tarea concreta a resolver ahora: ' + tarea.titulo + '\nMotivo: ' + tarea.motivo + '\n\n' +
       'Investigacion realizada:\n' + (researchBlock || '(sin resultados relevantes)') + '\n' + urlBlock +
       '\nFicheros a crear/modificar (con su contenido ACTUAL si ya existen):\n' +
-      filesWithState.map(function (f) { return '=== ' + f.path + ' (' + (f.exists ? 'existente' : 'nuevo') + ') ===\n' + (f.current || '(vacio, fichero nuevo)').slice(0, 3000); }).join('\n\n') +
+      filesWithState.map(function (f) { return '=== ' + f.path + ' (' + (f.exists ? 'existente' : 'nuevo') + ') ===\n' + (f.current || '(vacio, fichero nuevo)').slice(0, 1800); }).join('\n\n') +
       '\n\nResponde SOLO con JSON (sin markdown) con esta forma exacta:\n' +
       '{"titulo_pr":"titulo corto para esta tarea","descripcion_pr":"descripcion en espanol de que cambia y por que",' +
       '"archivos":[{"path":"mismo path de arriba","contenido":"contenido COMPLETO del fichero tras el cambio"}]}';
 
-    return askAI(prompt, { forceJudge: true, timeoutMs: 60000, clientTimeoutMs: 75000, maxTokens: 6000 }).then(function (r) {
+    return askAI(prompt, { timeoutMs: 35000, maxTokens: 3500 }).then(function (r) {
       var proposal = extractJSON(r.text);
       var ok = !!(proposal && Array.isArray(proposal.archivos) && proposal.archivos.length);
       emit(onStep, {

@@ -88,8 +88,14 @@ function build(repoCtx) {
   B.getGithubToken().then(function (token) {
     var ctx = repoCtx ? Object.assign({}, repoCtx, { token: token }) : null;
     return runAutoBuild(goal.trim(), ctx, function (s) { setStore({ steps: upsertStep(store.steps, s) }); });
-  }).then(function (p) { setStore({ proposal: p, building: false }); })
-    .catch(function (e) { setStore({ building: false, steps: upsertStep(store.steps, { id: 'fatal', title: 'Error inesperado: ' + (e && e.message), status: 'error' }) }); });
+  }).then(function (p) {
+    setStore({ proposal: p, building: false });
+    // Autonomo de verdad: si hay ficheros que publicar y un repo de
+    // referencia, X1 publica la rama + PR sola, sin esperar un clic del
+    // usuario. Si no hay repoCtx (nadie ha analizado un repo todavia) no hay
+    // donde publicar, asi que se queda solo en propuesta.
+    if (p && p.archivos && p.archivos.length && repoCtx) publish(repoCtx);
+  }).catch(function (e) { setStore({ building: false, steps: upsertStep(store.steps, { id: 'fatal', title: 'Error inesperado: ' + (e && e.message), status: 'error' }) }); });
 }
 
 function publish(repoCtx) {
@@ -271,7 +277,7 @@ export function PRAgent({ githubUser, onGoToRepo }) {
             color: s.building || !s.goal.trim() ? C.fgSubtle : '#ffffff',
             fontSize: '13px', fontWeight: '600', cursor: s.building || !s.goal.trim() ? 'default' : 'pointer', fontFamily: F,
           },
-        }, s.building ? 'Construyendo…' : 'Construir de forma autonoma'),
+        }, s.building ? 'Construyendo…' : 'Construir y publicar solo, sin preguntar'),
         React.createElement('span', { style: { fontSize: '11px', color: C.fgSubtle } }, 'GitHub · npm · Stack Overflow · lectura de paginas web · panel de IAs'),
         s.building && React.createElement('span', { style: { fontSize: '11px', color: C.accent, marginLeft: 'auto' } }, 'Sigue corriendo aunque cambies de pestana')
       )
@@ -311,28 +317,26 @@ export function PRAgent({ githubUser, onGoToRepo }) {
               );
             }),
 
-            !repoCtx && React.createElement(Flash, { variant: 'attention' }, 'Selecciona y analiza un repositorio en "Tu Repositorio" para poder publicar estos cambios.'),
+            !repoCtx && React.createElement(Flash, { variant: 'attention' }, 'No hay un repositorio de referencia, asi que X1 se queda en la propuesta — analiza un repositorio en "Tu Repositorio" para que tambien publique la rama y el Pull Request sin preguntar.'),
+
+            repoCtx && !s.publishing && !s.published && !s.publishError && s.publishSteps.length === 0 && React.createElement('div', { style: { fontSize: '11px', color: C.fgSubtle, fontStyle: 'italic' } }, 'Publicando automaticamente, sin confirmacion…'),
 
             s.publishSteps.length > 0 && React.createElement('div', { style: { margin: '12px 0' } },
-              React.createElement(ProcessLog, { steps: s.publishSteps, title: 'Publicando' })
+              React.createElement(ProcessLog, { steps: s.publishSteps, title: 'Publicando automaticamente' })
             ),
 
-            s.publishError && React.createElement('div', { style: { marginBottom: '12px' } }, React.createElement(Flash, { variant: 'danger' }, s.publishError)),
+            s.publishError && React.createElement('div', { style: { marginBottom: '12px' } },
+              React.createElement(Flash, { variant: 'danger' }, s.publishError),
+              React.createElement('button', {
+                onClick: function () { publish(repoCtx); },
+                style: { marginTop: '8px', padding: '5px 14px', borderRadius: '6px', border: '1px solid ' + C.border, background: C.canvasSubtle, color: C.fg, fontSize: '12px', fontWeight: '500', cursor: 'pointer', fontFamily: F },
+              }, 'Reintentar publicacion')
+            ),
 
-            s.published
-              ? React.createElement(Flash, { variant: 'success' },
-                  'Pull Request creado correctamente.',
-                  React.createElement('a', { href: s.published.url, target: '_blank', rel: 'noopener', style: { marginLeft: '8px', color: C.success, fontWeight: '600' } }, 'Ver en GitHub →')
-                )
-              : React.createElement('button', {
-                  onClick: function () { publish(repoCtx); }, disabled: s.publishing || !repoCtx,
-                  style: {
-                    padding: '6px 16px', borderRadius: '6px', border: '1px solid rgba(27,31,36,0.15)',
-                    background: s.publishing || !repoCtx ? C.canvasSubtle : C.successEmphasis,
-                    color: s.publishing || !repoCtx ? C.fgSubtle : '#ffffff',
-                    fontSize: '13px', fontWeight: '600', cursor: s.publishing || !repoCtx ? 'default' : 'pointer', fontFamily: F,
-                  },
-                }, s.publishing ? 'Publicando…' : 'Publicar cambios (rama + Pull Request)')
+            s.published && React.createElement(Flash, { variant: 'success' },
+              'Pull Request creado y publicado automaticamente, sin confirmacion.',
+              React.createElement('a', { href: s.published.url, target: '_blank', rel: 'noopener', style: { marginLeft: '8px', color: C.success, fontWeight: '600' } }, 'Ver en GitHub →')
+            )
           )
     ),
 

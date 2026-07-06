@@ -166,24 +166,30 @@ export function ChatView({ conversations, activeConv, onSelectConv, onCreateConv
       if (safetyRef.current) clearTimeout(safetyRef.current);
       setStep(3, 'done'); setStep(4, 'active');
       if (result) {
+        var processSteps = [
+          { icon: 'sector', label: 'Sector',       detail: result.sector || sector },
+          { icon: 'agent',  label: 'Agente',        detail: (result.agentName || pickedAgent.name) + ' (' + (result.agentModel || pickedAgent.ai) + ')' },
+          { icon: 'repo',   label: 'Repo Open-Source', detail: result.agentRepo || pickedAgent.repo || '' },
+          { icon: 'ai',     label: 'Proveedor',     detail: (result.provider || 'proxy') + ' - ' + (result.model || 'desconocido') },
+          { icon: 'clock',  label: 'Latencia',      detail: (result.latencyMs || '?') + 'ms' },
+        ];
         patchMsg(conv.id, aiMsg.id, {
-          content: result.response || 'Completado.',
-          status: 'done',
-          toolsUsed: result.tools || [],
-          judgeReason: result.judgeReason || judgeReason,
-          sector: result.sector || sector,
-          finishedAt: Date.now(),
+          content: result.response || 'Completado.', status: 'done',
+          toolsUsed: result.tools || [], judgeReason: result.judgeReason || judgeReason,
+          sector: result.sector || sector, model: result.model || null,
+          provider: result.provider || null, latencyMs: result.latencyMs || 0,
+          processSteps: processSteps, finishedAt: Date.now(),
         });
       } else {
-        patchMsg(conv.id, aiMsg.id, { content: 'No pude procesar eso.', status: 'done', finishedAt: Date.now() });
+        patchMsg(conv.id, aiMsg.id, { content: 'No pude procesar eso.', status: 'done',
+          processSteps: [{ icon: 'error', label: 'Estado', detail: 'IA no disponible' }], finishedAt: Date.now() });
       }
-      finishProc(true);
-      setBusy(false);
-    }).catch(function() {
+      finishProc(true); setBusy(false);
+    }).catch(function(err) {
       if (safetyRef.current) clearTimeout(safetyRef.current);
-      patchMsg(conv.id, aiMsg.id, { content: 'Error de conexion.', status: 'done', finishedAt: Date.now() });
-      finishProc(false);
-      setBusy(false);
+      patchMsg(conv.id, aiMsg.id, { content: 'Error: ' + ((err && err.message) || 'desconocido'), status: 'done',
+        processSteps: [{ icon: 'error', label: 'Error', detail: (err && err.message) || 'desconocido' }], finishedAt: Date.now() });
+      finishProc(false); setBusy(false);
     });
   }
 
@@ -362,10 +368,7 @@ export function ChatView({ conversations, activeConv, onSelectConv, onCreateConv
         React.createElement('span', { style: { fontSize: '12px', color: '#818b98', fontWeight: '500' } }, 'System X1')
       ),
 
-      // ProcessTimeline (juez en vivo)
-      procSteps.length > 0 ? React.createElement(ProcessTimeline, { steps: procSteps }) : null,
-
-      // Mensajes
+      // Mensajes (ProcessTimeline eliminado de aqui, ahora por cada respuesta abajo)
       React.createElement('div', { ref: logRef, style: { flex: 1, overflow: 'auto', padding: '20px' } },
         msgs.length === 0 ?
           React.createElement('div', { style: { height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '12px' } },
@@ -450,7 +453,30 @@ export function ChatView({ conversations, activeConv, onSelectConv, onCreateConv
                                 );
                               })
                             )
-                          : null
+                          : null,
+                          // Panel de proceso debajo de la respuesta
+                          m.processSteps ? React.createElement('div', {
+                            style: {
+                              marginTop: '12px', borderTop: '1px solid #d8dee4', paddingTop: '10px',
+                              display: 'flex', flexDirection: 'column', gap: '6px',
+                            }
+                          },
+                            React.createElement('div', { style: { fontSize: '11px', fontWeight: '600', color: '#59636e', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' } }, 'Proceso de ejecucion'),
+                            m.processSteps.map(function(ps, i) {
+                              var iconSvg = null;
+                              if (ps.icon === 'sector') iconSvg = React.createElement('svg', { viewBox: '0 0 16 16', width: '12', height: '12', fill: '#59636e' }, React.createElement('path', { d: 'M1.75 1h8.5c.966 0 1.75.784 1.75 1.75v5.5A1.75 1.75 0 0110.25 10H7.061l-2.574 2.573A1.458 1.458 0 012 11.543V10h-.25A1.75 1.75 0 010 8.25v-5.5C0 1.784.784 1 1.75 1z' }));
+                              else if (ps.icon === 'agent') iconSvg = React.createElement('svg', { viewBox: '0 0 16 16', width: '12', height: '12', fill: '#59636e' }, React.createElement('path', { d: 'M10.561 8.073a6.005 6.005 0 013.432 5.142.75.75 0 11-1.498.07 4.5 4.5 0 00-8.99 0 .75.75 0 11-1.498-.07 6.004 6.004 0 013.431-5.142 3.999 3.999 0 115.123 0zM10.5 5a2.5 2.5 0 10-5 0 2.5 2.5 0 005 0z' }));
+                              else if (ps.icon === 'repo') iconSvg = React.createElement('svg', { viewBox: '0 0 16 16', width: '12', height: '12', fill: '#59636e' }, React.createElement('path', { d: 'M2 2.5A2.5 2.5 0 014.5 0h8.75a.75.75 0 01.75.75v12.5a.75.75 0 01-.75.75h-2.5a.75.75 0 110-1.5h1.75v-2h-8a1 1 0 00-.714 1.7.75.75 0 01-1.072 1.05A2.495 2.495 0 012 11.5v-9z' }));
+                              else if (ps.icon === 'ai') iconSvg = React.createElement('svg', { viewBox: '0 0 16 16', width: '12', height: '12', fill: '#59636e' }, React.createElement('path', { d: 'M8 0a8 8 0 110 16A8 8 0 018 0zM1.5 8a6.5 6.5 0 1013 0 6.5 6.5 0 00-13 0zm6.25-3.25v2.992l2.028.812a.75.75 0 01-.557 1.392l-2.5-1A.751.751 0 017.25 8.25v-3.5a.75.75 0 011.5 0z' }));
+                              else if (ps.icon === 'clock') iconSvg = React.createElement('svg', { viewBox: '0 0 16 16', width: '12', height: '12', fill: '#59636e' }, React.createElement('path', { d: 'M8 0a8 8 0 110 16A8 8 0 018 0zM1.5 8a6.5 6.5 0 1013 0 6.5 6.5 0 00-13 0zm6.25-3.25v3a.75.75 0 01-.22.53l-2 2a.75.75 0 01-1.06-1.06l1.78-1.78V4.75a.75.75 0 111.5 0z' }));
+                              else iconSvg = React.createElement('svg', { viewBox: '0 0 16 16', width: '12', height: '12', fill: '#d1242f' }, React.createElement('path', { d: 'M3.72 3.72a.75.75 0 011.06 0L8 6.94l3.22-3.22a.75.75 0 111.06 1.06L9.06 8l3.22 3.22a.75.75 0 11-1.06 1.06L8 9.06l-3.22 3.22a.75.75 0 01-1.06-1.06L6.94 8 3.72 4.78a.75.75 0 010-1.06z' }));
+                              return React.createElement('div', { key: i, style: { display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px' } },
+                                iconSvg,
+                                React.createElement('span', { style: { color: '#59636e', flexShrink: 0, minWidth: '60px', fontWeight: 500 } }, ps.label),
+                                React.createElement('span', { style: { color: '#1f2328' } }, ps.detail)
+                              );
+                            })
+                          ) : null
                         )
                       : null
                     )

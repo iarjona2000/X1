@@ -2,6 +2,7 @@ import * as React from 'react';
 import * as B from './backend.js';
 import { fetchRepoMeta, fetchRepoTree, analyzeRepo, languageStats, loadRepoAnalysis } from './github-agent.js';
 import { ProcessLog } from './ProcessTimeline.jsx';
+import { MarkdownReport } from './MarkdownReport.jsx';
 
 const F = "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif";
 const H3 = { fontSize: '14px', fontWeight: '600', color: '#1f2328', margin: '0 0 8px', padding: '0 0 8px', borderBottom: '1px solid #d0d7de' };
@@ -283,7 +284,9 @@ export function RepoAnalysis({ githubUser }) {
             // Informe
             analysis && analysis.repo === (selected.owner + '/' + selected.name) && React.createElement('div', null,
               React.createElement('h3', { style: H3 }, 'Analisis a fondo'),
-              React.createElement('div', { style: { fontSize: '13px', color: '#1f2328', lineHeight: '1.7', whiteSpace: 'pre-wrap', wordBreak: 'break-word', padding: '14px 16px', border: '1px solid #d0d7de', borderRadius: '6px', background: '#f6f8fa' } }, analysis.report),
+              React.createElement('div', { style: { padding: '16px 18px', border: '1px solid #d0d7de', borderRadius: '6px', background: '#ffffff' } },
+                React.createElement(MarkdownReport, { text: analysis.report })
+              ),
               React.createElement('div', { style: { fontSize: '11px', color: '#818b98', marginTop: '8px' } }, 'Este analisis queda disponible para la seccion de Automatizacion.')
             )
           )
