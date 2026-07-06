@@ -24,6 +24,10 @@ export function RepoAnalysis({ githubUser }) {
   const [step, setStep] = React.useState('');
   const [analysis, setAnalysis] = React.useState(loadRepoAnalysis());
   const [filter, setFilter] = React.useState('');
+  const [connectError, setConnectError] = React.useState(null);
+  const [showManualToken, setShowManualToken] = React.useState(false);
+  const [manualToken, setManualToken] = React.useState('');
+  const [verifying, setVerifying] = React.useState(false);
 
   const isGh = githubUser && githubUser.login && githubUser.login !== 'invitado';
 

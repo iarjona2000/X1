@@ -112,8 +112,6 @@ function GithubLogin({ onUser, onGuest }) {
           React.createElement('button', { onClick: handlePat, disabled: loading || !pat.trim(), style: { ...S.btnPrimary, opacity: !pat.trim() ? 0.5 : 1 } }, 'Entrar con token'),
           React.createElement('div', { style: { fontSize: '11px', color: '#818b98', marginTop: '6px' } }, 'Crea uno en github.com/settings/tokens (scope read:user user:email)'),
           React.createElement('div', { style: S.divider }, React.createElement('div', { style: S.dividerLine }), React.createElement('span', null, 'o'), React.createElement('div', { style: S.dividerLine })),
-          React.createElement('button', { onClick: handleDeviceFlow, disabled: loading, style: S.btnGH }, React.createElement(GithubMark, { size: 16 }), loading ? 'Conectando...' : 'Sign in con Device Flow'),
-          React.createElement('div', { style: { fontSize: '11px', color: '#818b98', marginTop: '6px' } }, 'Requiere OAuth App con Device Flow habilitado'),
           React.createElement('button', { onClick: onGuest, style: S.btnSecondary },
             'Continuar sin GitHub'
           ),
@@ -153,7 +151,7 @@ function Root() {
 
   if (!user) return React.createElement(GithubLogin, { onUser: setUser, onGuest: function() { setUser({ login: 'invitado', name: 'Invitado' }); } });
 
-  return React.createElement(App, { user: user });
+  return React.createElement(App, { githubUser: user });
 }
 
 const root = createRoot(document.getElementById('root'));

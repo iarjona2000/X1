@@ -3478,8 +3478,8 @@ function aiComplete(userMsg, opts) {
   // ═══════════════════════════════════════════
   // PROVIDER FUNCTIONS (fast timeouts)
   // ═══════════════════════════════════════════
-  var FAST_TIMEOUT = 5000;
-  var NORMAL_TIMEOUT = 5000;
+  var FAST_TIMEOUT = opts.timeoutMs || 5000;
+  var NORMAL_TIMEOUT = opts.timeoutMs || 5000;
 
   function callProviderFast(p) {
     var start = Date.now();
@@ -3575,12 +3575,13 @@ function aiComplete(userMsg, opts) {
     return firstWins(panelProviders);
   });
 
-  // Global timeout 5s
+  // Global timeout (5s por defecto; llamadas de informe largo pasan opts.timeoutMs)
+  var globalTimeoutMs = opts.timeoutMs || 5000;
   var globalTimeout = new Promise(function(resolve) {
     setTimeout(function() {
-      console.warn('[X1] Global timeout 5s');
+      console.warn('[X1] Global timeout ' + globalTimeoutMs + 'ms');
       resolve(null);
-    }, 5000);
+    }, globalTimeoutMs);
   });
 
   var result = Promise.race([resultPromise, globalTimeout]);
