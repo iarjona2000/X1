@@ -1,5 +1,7 @@
 const GITHUB_API = 'https://api.github.com';
 const SEARCH_API = 'https://api.github.com/search';
+const NPM_API = 'https://registry.npmjs.org/-/v1/search';
+const SO_API = 'https://api.stackexchange.com/2.3/search';
 
 let memoryStore = [];
 const MEMORY_KEY = 'x1_memory';
@@ -67,7 +69,7 @@ export async function githubSearchCode(query) {
 
 export async function npmSearch(query) {
   try {
-    const r = await fetch('https://registry.npmjs.org/-/v1/search?text=' + encodeURIComponent(query) + '&size=5');
+    const r = await fetch(NPM_API + '?text=' + encodeURIComponent(query) + '&size=5');
     if (!r.ok) return null;
     const d = await r.json();
     return (d.objects || []).map(p => ({
@@ -81,7 +83,7 @@ export async function npmSearch(query) {
 
 export async function stackOverflowSearch(query) {
   try {
-    const r = await fetch('https://api.stackexchange.com/2.3/search?order=desc&sort=relevance&intitle=' + encodeURIComponent(query) + '&site=stackoverflow&pagesize=3');
+    const r = await fetch(SO_API + '?order=desc&sort=relevance&intitle=' + encodeURIComponent(query) + '&site=stackoverflow&pagesize=3');
     if (!r.ok) return null;
     const d = await r.json();
     return (d.items || []).map(q => ({
@@ -93,21 +95,52 @@ export async function stackOverflowSearch(query) {
   } catch (e) { return null; }
 }
 
-export function detectTools(query) {
-  var t = query.toLowerCase().trim();
-  if (/^(hola|buenas|hey|hi|hello|que tal|como estas|buen[ao]s|saludos|gracias|ok|vale|perfecto|chao|adiós|bye)$/i.test(t)) return [];
+// Deteccion de herramientas: ahora por agente y por intencion, no solo keywords.
+export function detectTools(query, agentId) {
+  var t = (query || '').toLowerCase().trim();
+  if (!t || /^(hola|buenas|hey|hi|hello|que tal|como estas|buen[ao]s|saludos|gracias|ok|vale|perfecto|chao|adios|bye|si|no|dale|vamos|genial|bien|mal)$/i.test(t)) return [];
+
   var tools = [];
-  if (/github|repo|repositorio|codigo fuente|source/.test(t)) tools.push('github');
-  if (/buscar|search|investiga|que es|define|explica|encuentra/.test(t)) tools.push('github');
-  if (/npm|paquete|package|dependencia/.test(t)) tools.push('npm');
-  if (/stack.?overflow|solucion|error|bug/.test(t)) tools.push('stackoverflow');
-  if (/recuerda|memory|memoria|guarda|recuerdo/.test(t)) tools.push('memory');
-  return tools;
+
+  // Developer -> GitHub + npm por defecto
+  if (agentId === 'developer') {
+    tools.push('github');
+    if (/npm|paquete|package|dependencia|instalar|install/.test(t)) tools.push('npm');
+    if (/error|bug|solucion|problem|fix|stack/.test(t)) tools.push('stackoverflow');
+  }
+  // Research -> SO + GitHub
+  else if (agentId === 'research') {
+    if (/error|bug|solucion|problem|fix/.test(t)) tools.push('stackoverflow');
+    if (/github|repo|codigo|code|librer[ia]a|library/.test(t)) tools.push('github');
+  }
+  // Writer, Email, Meeting, Marketing, Finance, Legal -> no tools especificas
+  // pero si menciona herramientas explicitas, las usa
+
+  // Deteccion explicita (sobreescribe agente)
+  if (/github|repo|repositorio|codigo fuente|source code/.test(t)) {
+    if (tools.indexOf('github') === -1) tools.push('github');
+  }
+  if (/buscar|search|investiga|que es|define|explica|encuentra|mejores|recomienda/.test(t)) {
+    if (agentId === 'developer' || agentId === 'research') {
+      if (tools.indexOf('github') === -1) tools.push('github');
+    }
+  }
+  if (/npm|paquete|package|dependencia/.test(t)) {
+    if (tools.indexOf('npm') === -1) tools.push('npm');
+  }
+  if (/stack.?overflow|solucion|error|bug|no funciona|crashea|exception|traceback/.test(t)) {
+    if (tools.indexOf('stackoverflow') === -1) tools.push('stackoverflow');
+  }
+
+  // Dedupe
+  return tools.filter(function(v, i, a) { return a.indexOf(v) === i; });
 }
 
-export async function executeTools(query) {
-  const tools = detectTools(query);
+export async function executeTools(query, agentId) {
+  const tools = detectTools(query, agentId);
   const results = {};
+  if (!tools.length) return results;
+
   const promises = tools.map(async tool => {
     switch (tool) {
       case 'github': {
@@ -127,55 +160,65 @@ export async function executeTools(query) {
         if (so) results.stackoverflow = so;
         break;
       }
-      case 'memory': {
-        results.memory = getMemoryContext();
-        break;
-      }
     }
   });
   await Promise.allSettled(promises);
   return results;
 }
 
-export function buildResponse(query, toolResults) {
-  const parts = [];
-  const t = query.toLowerCase();
+// Lista de herramientas ejecutadas (para el badge Tools en el mensaje).
+export function toolsUsedList(results) {
+  var list = [];
+  if (results.github && results.github.length) list.push('github');
+  if (results.npm && results.npm.length) list.push('npm');
+  if (results.stackoverflow && results.stackoverflow.length) list.push('stackoverflow');
+  return list;
+}
 
-  if (toolResults.github && toolResults.github.length > 0) {
-    parts.push(' Repositorios en GitHub:');
-    toolResults.github.forEach(r => {
-      parts.push(' ' + r.name + ' (' + r.stars + ' estrellas, ' + (r.language || 'N/A') + ')');
+// Formatea resultados de tools en texto legible para el chat.
+export function formatToolResults(query, results) {
+  var parts = [];
+
+  if (results.github && results.github.length > 0) {
+    parts.push('**Repositorios en GitHub**');
+    results.github.forEach(function(r, i) {
+      parts.push('**' + (i + 1) + '. [' + r.name + '](' + r.url + ')** - ' + r.stars + ' stars, ' + (r.language || 'N/A'));
       if (r.description) parts.push('   ' + r.description);
-      parts.push('   ' + r.url);
     });
+    parts.push('');
   }
 
-  if (toolResults.code && toolResults.code.length > 0) {
-    parts.push(' Codigo encontrado:');
-    toolResults.code.forEach(c => {
-      parts.push(' ' + c.repo + '/' + c.path);
-      parts.push('   ' + c.url);
+  if (results.code && results.code.length > 0) {
+    parts.push('**Codigo relevante**');
+    results.code.forEach(function(c) {
+      parts.push('- `' + c.repo + '/' + c.path + '`');
     });
+    parts.push('');
   }
 
-  if (toolResults.npm && toolResults.npm.length > 0) {
-    parts.push(' Paquetes npm:');
-    toolResults.npm.forEach(p => {
-      parts.push(' ' + p.name + ' v' + p.version + ': ' + (p.description || ''));
+  if (results.npm && results.npm.length > 0) {
+    parts.push('**Paquetes npm**');
+    results.npm.forEach(function(p) {
+      parts.push('- **' + p.name + '** v' + p.version + ': ' + (p.description || ''));
     });
+    parts.push('');
   }
 
-  if (toolResults.stackoverflow && toolResults.stackoverflow.length > 0) {
-    parts.push(' Stack Overflow:');
-    toolResults.stackoverflow.forEach(q => {
-      parts.push(' ' + q.title + ' (' + q.answers + ' respuestas, score: ' + q.score + ')');
-      parts.push('   ' + q.url);
+  if (results.stackoverflow && results.stackoverflow.length > 0) {
+    parts.push('**Stack Overflow**');
+    results.stackoverflow.forEach(function(q) {
+      parts.push('- [' + q.title + '](' + q.url + ') (' + q.answers + ' respuestas, score: ' + q.score + ')');
     });
+    parts.push('');
   }
 
-  if (parts.length > 0) {
-    return parts.join('\n');
+  if (parts.length === 0) {
+    return null;
   }
 
-  return 'No encontre resultados para "' + query + '". Intenta con otros terminos.';
+  return parts.join('\n');
+}
+
+export function buildResponse(query, toolResults) {
+  return formatToolResults(query, toolResults) || 'No encontre resultados para "' + query + '". Intenta con otros terminos.';
 }

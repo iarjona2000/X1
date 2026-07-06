@@ -1,6 +1,7 @@
 import * as React from 'react';
 import * as B from './backend.js';
 import { fetchRepoMeta, fetchRepoTree, analyzeRepo, languageStats, loadRepoAnalysis } from './github-agent.js';
+import { ProcessLog } from './ProcessTimeline.jsx';
 
 const F = "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif";
 const H3 = { fontSize: '14px', fontWeight: '600', color: '#1f2328', margin: '0 0 8px', padding: '0 0 8px', borderBottom: '1px solid #d0d7de' };
@@ -12,16 +13,85 @@ function fmtBytes(n) {
   return n + ' B';
 }
 
+// ═══════════════════════════════════════════════════════════════════════
+// Store a nivel de modulo (mismo patron que en PRAgent.jsx): el repositorio
+// elegido y el proceso de analisis en curso sobreviven a que se desmonte
+// este componente (p.ej. al cambiar de pestana a Chat o Automatizacion y
+// volver), porque runAnalysis() escribe aqui, no en useState local.
+// ═══════════════════════════════════════════════════════════════════════
+var STORE_KEY = 'x1_repo_analysis_ui_state';
+var store = { selected: null, meta: null, files: [], analyzing: false, steps: [] };
+var listeners = [];
+
+(function hydrate() {
+  try {
+    var raw = localStorage.getItem(STORE_KEY);
+    if (raw) store = Object.assign({}, store, JSON.parse(raw), { analyzing: false });
+  } catch (e) {}
+})();
+
+function persist() {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(store)); } catch (e) {}
+}
+
+function setStore(patch) {
+  store = Object.assign({}, store, patch);
+  persist();
+  listeners.forEach(function (l) { l(store); });
+}
+
+function useRepoStore() {
+  var [, forceRender] = React.useState(0);
+  React.useEffect(function () {
+    function onChange() { forceRender(function (n) { return n + 1; }); }
+    listeners.push(onChange);
+    return function () { listeners = listeners.filter(function (l) { return l !== onChange; }); };
+  }, []);
+  return store;
+}
+
+function upsertStep(list, step) {
+  var i = list.findIndex(function (s) { return s.id === step.id; });
+  if (i === -1) return list.concat([step]);
+  var copy = list.slice();
+  copy[i] = Object.assign({}, copy[i], step);
+  return copy;
+}
+
+function pick(repo) {
+  var parts = (repo.name || '').split('/');
+  var owner = parts[0], name = parts[1];
+  setStore({ selected: { owner: owner, name: name, url: repo.url }, meta: null, files: [], steps: [] });
+  B.getGithubToken().then(function (token) {
+    return fetchRepoMeta(token, owner, name).then(function (m) {
+      var branch = (m && m.default_branch) || 'main';
+      return fetchRepoTree(token, owner, name, branch).then(function (tree) {
+        setStore({ meta: m, files: tree });
+      });
+    });
+  });
+}
+
+function runAnalysis(onDone) {
+  var sel = store.selected;
+  if (!sel || store.analyzing) return;
+  setStore({ analyzing: true, steps: [] });
+  B.getGithubToken().then(function (token) {
+    return analyzeRepo(token, sel.owner, sel.name, store.meta, store.files, function (s) { setStore({ steps: upsertStep(store.steps, s) }); });
+  }).then(function (a) {
+    setStore({ analyzing: false });
+    if (onDone) onDone(a);
+  }).catch(function (e) {
+    setStore({ analyzing: false, steps: upsertStep(store.steps, { id: 'fatal', title: 'Error inesperado: ' + (e && e.message), status: 'error' }) });
+  });
+}
+
 export function RepoAnalysis({ githubUser }) {
+  const st = useRepoStore();
   const [repos, setRepos] = React.useState([]);
   const [loadingRepos, setLoadingRepos] = React.useState(false);
   const [connecting, setConnecting] = React.useState(false);
-  const [selected, setSelected] = React.useState(null);
-  const [meta, setMeta] = React.useState(null);
-  const [files, setFiles] = React.useState([]);
   const [loadingRepo, setLoadingRepo] = React.useState(false);
-  const [analyzing, setAnalyzing] = React.useState(false);
-  const [step, setStep] = React.useState('');
   const [analysis, setAnalysis] = React.useState(loadRepoAnalysis());
   const [filter, setFilter] = React.useState('');
   const [connectError, setConnectError] = React.useState(null);
@@ -39,6 +109,10 @@ export function RepoAnalysis({ githubUser }) {
       B.fetchGithubRepos(token).then(function (list) { setRepos(list || []); setLoadingRepos(false); });
     });
   }, [githubUser]);
+
+  React.useEffect(function () {
+    setLoadingRepo(!!(st.selected && !st.meta));
+  }, [st.selected, st.meta]);
 
   function connectGithub() {
     setConnecting(true);
@@ -78,32 +152,7 @@ export function RepoAnalysis({ githubUser }) {
     });
   }
 
-  function pick(repo) {
-    var parts = (repo.name || '').split('/');
-    var owner = parts[0], name = parts[1];
-    setSelected({ owner: owner, name: name, url: repo.url });
-    setMeta(null); setFiles([]); setLoadingRepo(true);
-    B.getGithubToken().then(function (token) {
-      return fetchRepoMeta(token, owner, name).then(function (m) {
-        setMeta(m);
-        var branch = (m && m.default_branch) || 'main';
-        return fetchRepoTree(token, owner, name, branch).then(function (tree) {
-          setFiles(tree); setLoadingRepo(false);
-        });
-      });
-    }).catch(function () { setLoadingRepo(false); });
-  }
-
-  function runAnalysis() {
-    if (!selected) return;
-    setAnalyzing(true); setStep('Preparando');
-    B.getGithubToken().then(function (token) {
-      return analyzeRepo(token, selected.owner, selected.name, meta, files, function (s) { setStep(s); });
-    }).then(function (a) {
-      setAnalysis(a); setAnalyzing(false); setStep('');
-    }).catch(function () { setAnalyzing(false); setStep(''); });
-  }
-
+  var files = st.files, meta = st.meta, selected = st.selected;
   var langs = files.length ? languageStats(files) : {};
   var langList = Object.keys(langs).sort(function (a, b) { return langs[b] - langs[a]; }).slice(0, 6);
   var visibleRepos = filter
@@ -150,7 +199,7 @@ export function RepoAnalysis({ githubUser }) {
             meta && React.createElement('div', { style: { fontSize: '12px', color: '#59636e', marginTop: '2px' } }, meta.description || 'Sin descripcion')
           ),
           React.createElement('button', {
-            onClick: function () { setSelected(null); setMeta(null); setFiles([]); },
+            onClick: function () { setStore({ selected: null, meta: null, files: [], steps: [] }); },
             style: { padding: '5px 12px', borderRadius: '6px', border: '1px solid #d0d7de', background: '#f6f8fa', fontSize: '12px', fontWeight: '500', cursor: 'pointer', color: '#24292f', fontFamily: F },
           }, 'Cambiar')
         )
@@ -209,9 +258,16 @@ export function RepoAnalysis({ githubUser }) {
 
             // Boton de analisis
             React.createElement('button', {
-              onClick: runAnalysis, disabled: analyzing,
-              style: { width: '100%', padding: '8px 16px', borderRadius: '6px', border: '1px solid rgba(27,31,36,0.15)', background: analyzing ? '#f6f8fa' : '#1f883d', color: analyzing ? '#818b98' : '#fff', fontSize: '14px', fontWeight: '600', cursor: analyzing ? 'default' : 'pointer', marginBottom: '16px', fontFamily: F },
-            }, analyzing ? ('Analizando… ' + step) : 'Analizar a fondo'),
+              onClick: function () { runAnalysis(function (a) { setAnalysis(a); }); }, disabled: st.analyzing,
+              style: { width: '100%', padding: '8px 16px', borderRadius: '6px', border: '1px solid rgba(27,31,36,0.15)', background: st.analyzing ? '#f6f8fa' : '#1f883d', color: st.analyzing ? '#818b98' : '#fff', fontSize: '14px', fontWeight: '600', cursor: st.analyzing ? 'default' : 'pointer', marginBottom: st.steps.length ? '12px' : '16px', fontFamily: F },
+            }, st.analyzing ? 'Analizando…' : 'Analizar a fondo'),
+
+            st.analyzing && React.createElement('div', { style: { fontSize: '11px', color: '#0969da', marginTop: '-8px', marginBottom: '12px' } }, 'Sigue corriendo aunque cambies de pestana'),
+
+            // Proceso en vivo: que esta haciendo X1 y por que, paso a paso.
+            st.steps.length > 0 && React.createElement('div', { style: { marginBottom: '16px' } },
+              React.createElement(ProcessLog, { steps: st.steps, title: st.analyzing ? 'Analizando en directo' : 'Ultimo analisis' })
+            ),
 
             // Arbol de ficheros
             React.createElement('h3', { style: H3 }, 'Ficheros (' + files.length + ')'),

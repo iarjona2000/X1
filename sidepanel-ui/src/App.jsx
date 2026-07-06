@@ -95,7 +95,7 @@ export default function App({ githubUser }) {
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           transition: 'background 80ms',
         }}><RepoIcon active={tab === 'repo'} /></button>
-        <button onClick={() => setTab('agent')} title="Automatizacion de PRs" style={{
+        <button onClick={() => setTab('agent')} title="Automatizacion" style={{
           width: '32px', height: '32px', borderRadius: '6px', border: 'none',
           background: tab === 'agent' ? '#0969da' : 'transparent', cursor: 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -123,7 +123,7 @@ export default function App({ githubUser }) {
         {tab === 'chat' ? (
           <ChatView conversations={conversations} activeConv={activeConv} onSelectConv={setActiveConvId} onCreateConv={createConversation} onEnsureConv={ensureConversation} onUpdateConv={updateConversation} onDeleteConv={deleteConversation} />
         ) : tab === 'agent' ? (
-          <PRAgent githubUser={githubUser} />
+          <PRAgent githubUser={githubUser} onGoToRepo={() => setTab('repo')} />
         ) : (
           <RepoView conversations={conversations} githubUser={githubUser} />
         )}

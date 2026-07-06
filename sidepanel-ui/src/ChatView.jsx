@@ -1,12 +1,14 @@
 import * as React from 'react';
 import * as B from './backend.js';
 import { ProcessTimeline } from './ProcessTimeline.jsx';
+import { Markdown } from './Markdown.jsx';
 
 const F = "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif";
 const C = {
   border: '#d0d7de', borderSubtle: '#d8dee4', bg: '#ffffff', bgSubtle: '#f6f8fa',
   fg: '#1f2328', fgMuted: '#59636e', fgSubtle: '#818b98', fgAccent: '#0969da',
   fgSuccess: '#1a7f37', fgDanger: '#d1242f', fgAttention: '#bf8700',
+  accentUnderline: '#fd8c73',
 };
 
 function timeAgo(ts) {
@@ -18,15 +20,15 @@ function timeAgo(ts) {
 }
 
 const AGENTS = [
-  { id: 'auto',     name: 'AUTO',      ai: 'Automatico',   letter: 'A', color: '#0969da', aiIcon: 'dist/x1-logo.png' },
-  { id: 'research',  name: 'Research',  ai: 'Gemini',       letter: 'R', color: '#4285f4', aiIcon: '../assets/ai/googlegemini.svg' },
-  { id: 'writer',    name: 'Writer',    ai: 'Claude',       letter: 'W', color: '#d97706', aiIcon: '../assets/ai/anthropic.svg' },
-  { id: 'developer', name: 'Developer', ai: 'GPT-4o',       letter: 'D', color: '#10a37f', aiIcon: '../assets/ai/openai.svg' },
-  { id: 'marketing', name: 'Marketing', ai: 'Gemini',       letter: 'M', color: '#4285f4', aiIcon: '../assets/ai/googlegemini.svg' },
-  { id: 'finance',   name: 'Finance',   ai: 'Claude',       letter: 'F', color: '#d97706', aiIcon: '../assets/ai/anthropic.svg' },
-  { id: 'legal',     name: 'Legal',     ai: 'Mistral',      letter: 'L', color: '#ff7000', aiIcon: '../assets/ai/mistralai.svg' },
-  { id: 'email',     name: 'Email',     ai: 'Llama',        letter: 'E', color: '#0668e1', aiIcon: '../assets/ai/meta.svg' },
-  { id: 'meeting',   name: 'Meeting',   ai: 'Gemini',       letter: 'G', color: '#4285f4', aiIcon: '../assets/ai/googlegemini.svg' },
+  { id: 'auto',      name: 'AUTO',      ai: 'Automatico', letter: 'A', color: '#0969da', aiIcon: 'dist/x1-logo.png' },
+  { id: 'research',  name: 'Research',  ai: 'Gemini',    letter: 'R', color: '#4285f4', aiIcon: '../assets/ai/googlegemini.svg' },
+  { id: 'writer',    name: 'Writer',    ai: 'Claude',    letter: 'W', color: '#d97706', aiIcon: '../assets/ai/anthropic.svg' },
+  { id: 'developer', name: 'Developer', ai: 'GPT-4o',    letter: 'D', color: '#10a37f', aiIcon: '../assets/ai/openai.svg' },
+  { id: 'marketing', name: 'Marketing', ai: 'Gemini',    letter: 'M', color: '#4285f4', aiIcon: '../assets/ai/googlegemini.svg' },
+  { id: 'finance',   name: 'Finance',   ai: 'Claude',    letter: 'F', color: '#d97706', aiIcon: '../assets/ai/anthropic.svg' },
+  { id: 'legal',     name: 'Legal',     ai: 'Mistral',   letter: 'L', color: '#ff7000', aiIcon: '../assets/ai/mistralai.svg' },
+  { id: 'email',     name: 'Email',     ai: 'Llama',      letter: 'E', color: '#0668e1', aiIcon: '../assets/ai/meta.svg' },
+  { id: 'meeting',   name: 'Meeting',   ai: 'Gemini',    letter: 'G', color: '#4285f4', aiIcon: '../assets/ai/googlegemini.svg' },
 ];
 
 function agentById(id) {
@@ -36,20 +38,24 @@ function agentById(id) {
 function AgentAvatar({ agent, size }) {
   size = size || 20;
   if (agent.aiIcon) {
-    return React.createElement('img', { src: agent.aiIcon, alt: '', style: { width: size, height: size, borderRadius: '4px', objectFit: 'contain' }, onError: function(e) { e.currentTarget.style.display = 'none'; } });
+    return React.createElement('img', {
+      src: agent.aiIcon, alt: '',
+      style: { width: size, height: size, borderRadius: '4px', objectFit: 'contain', flexShrink: 0 },
+      onError: function(e) { e.currentTarget.style.display = 'none'; }
+    });
   }
   return React.createElement('div', {
     style: {
       width: size, height: size, borderRadius: '4px',
       background: agent.color || '#0969da', color: '#fff',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      fontSize: size * 0.55, fontWeight: '600',
+      fontSize: size * 0.55, fontWeight: '600', flexShrink: 0,
     }
   }, agent.letter);
 }
 
 function ToolIcon({ tool, size }) {
-  size = size || 14;
+  size = size || 12;
   var colors = { github: '#1f2328', npm: '#cb3837', stackoverflow: '#f48024', web: '#de5833' };
   var letters = { github: 'G', npm: 'N', stackoverflow: 'S', web: 'W' };
   return React.createElement('div', {
@@ -63,15 +69,16 @@ function ToolIcon({ tool, size }) {
 }
 
 const QUICK = [
-  { label: 'Resumir', prompt: 'Resume la pagina que tengo abierta' },
+  { label: 'Resumir',    prompt: 'Resume la pagina que tengo abierta' },
   { label: 'Investigar', prompt: 'Investiga sobre esta pagina' },
-  { label: 'Codigo', prompt: 'Escribe codigo para esto' },
-  { label: 'Email', prompt: 'Redacta un email profesional' },
+  { label: 'Codigo',     prompt: 'Escribe codigo para esto' },
+  { label: 'Email',      prompt: 'Redacta un email profesional' },
 ];
 
 export function ChatView({ conversations, activeConv, onSelectConv, onCreateConv, onEnsureConv, onUpdateConv }) {
   const [text, setText] = React.useState('');
   const textRef = React.useRef('');
+  const taRef = React.useRef(null);
   const [busy, setBusy] = React.useState(false);
   const [activeAgent, setActiveAgent] = React.useState('auto');
   const [agentMenu, setAgentMenu] = React.useState(false);
@@ -82,7 +89,21 @@ export function ChatView({ conversations, activeConv, onSelectConv, onCreateConv
   const busyRef = React.useRef(false);
 
   React.useEffect(function() { busyRef.current = busy; }, [busy]);
-  React.useEffect(function() { if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight; }, [activeConv && activeConv.messages && activeConv.messages.length]);
+
+  // Auto-scroll suave al ultimo mensaje cuando llega.
+  React.useEffect(function() {
+    if (logRef.current) {
+      logRef.current.scrollTo({ top: logRef.current.scrollHeight, behavior: 'smooth' });
+    }
+  }, [activeConv && activeConv.messages && activeConv.messages.length, activeConv && activeConv.messages && activeConv.messages.length > 0 && activeConv.messages[activeConv.messages.length - 1].content]);
+
+  // Auto-resize del textarea segun contenido.
+  React.useEffect(function() {
+    if (!taRef.current) return;
+    var ta = taRef.current;
+    ta.style.height = 'auto';
+    ta.style.height = Math.min(ta.scrollHeight, 120) + 'px';
+  }, [text]);
 
   function patchMsg(convId, msgId, patch) {
     onUpdateConv(convId, { messages: function(prevMsgs) {
@@ -102,6 +123,7 @@ export function ChatView({ conversations, activeConv, onSelectConv, onCreateConv
     var conv = activeConv || (onEnsureConv && onEnsureConv());
     if (!conv) return;
     setBusy(true); setText(''); textRef.current = '';
+    if (taRef.current) taRef.current.style.height = 'auto';
     if (clearProcRef.current) clearTimeout(clearProcRef.current);
 
     var agentId = activeAgent === 'auto' ? B.getBestAgent(q) : activeAgent;
@@ -109,32 +131,32 @@ export function ChatView({ conversations, activeConv, onSelectConv, onCreateConv
     var sector = B.detectSector(q);
     var pickedAgent = agentById(agentId);
 
-    // Proceso de seleccion visible (juez): sector -> IA -> consulta -> respuesta.
+    // Timeline del proceso: sector -> IA -> tools -> respuesta
     var aiIcon = pickedAgent.aiIcon;
     setProcSteps([
-      { id: 1, iconSrc: aiIcon, description: 'Sector: ' + sector, sub: 'Identificando', status: 'active' },
-      { id: 2, iconSrc: aiIcon, description: 'IA: ' + pickedAgent.ai, sub: 'Seleccionada', status: 'pending' },
-      { id: 3, iconSrc: aiIcon, description: pickedAgent.ai, sub: 'Consultando motor', status: 'pending' },
-      { id: 4, iconSrc: aiIcon, description: 'Respuesta', sub: 'Listando', status: 'pending' },
+      { id: 1, iconSrc: aiIcon, description: 'Sector: ' + sector,            sub: 'Clasificando tu consulta',   status: 'active' },
+      { id: 2, iconSrc: aiIcon, description: 'IA: ' + pickedAgent.ai,         sub: 'Agente ' + pickedAgent.name,   status: 'pending' },
+      { id: 3, iconSrc: aiIcon, description: 'Procesando',                    sub: 'Razonando + herramientas',     status: 'pending' },
+      { id: 4, iconSrc: aiIcon, description: 'Respuesta',                     sub: 'Redactando',                  status: 'pending' },
     ]);
-    setTimeout(function() { setStep(1, 'done'); setStep(2, 'active'); }, 250);
-    setTimeout(function() { setStep(2, 'done'); setStep(3, 'active'); }, 550);
+    setTimeout(function() { setStep(1, 'done'); setStep(2, 'active'); }, 300);
+    setTimeout(function() { setStep(2, 'done'); setStep(3, 'active'); }, 700);
 
-    var title = conv.messages.length === 0 ? q.slice(0, 40) : conv.title;
+    var title = conv.messages.length === 0 ? q.slice(0, 42) : conv.title;
     var userMsg = { id: Date.now(), role: 'user', content: q, timestamp: Date.now() };
-    var aiMsg = { id: Date.now() + 1, role: 'assistant', content: '', status: 'thinking', agent: agentId, toolsUsed: [], judgeReason: judgeReason, sector: sector };
+    var aiMsg = { id: Date.now() + 1, role: 'assistant', content: '', status: 'thinking', agent: agentId, toolsUsed: [], judgeReason: judgeReason, sector: sector, startedAt: Date.now() };
     var newMessages = conv.messages.concat([userMsg, aiMsg]);
     onUpdateConv(conv.id, { messages: newMessages, title: title, agent: agentId });
 
     function finishProc(ok) {
       setStep(3, 'done'); setStep(4, ok ? 'done' : 'error');
       if (clearProcRef.current) clearTimeout(clearProcRef.current);
-      clearProcRef.current = setTimeout(function() { setProcSteps([]); }, 1400);
+      clearProcRef.current = setTimeout(function() { setProcSteps([]); }, 1600);
     }
 
     safetyRef.current = setTimeout(function() {
       if (busyRef.current) {
-        patchMsg(conv.id, aiMsg.id, { content: 'Tiempo de espera agotado.', status: 'done' });
+        patchMsg(conv.id, aiMsg.id, { content: 'Tiempo de espera agotado (24s). Intenta de nuevo.', status: 'done' });
         finishProc(false);
         setBusy(false);
       }
@@ -143,13 +165,23 @@ export function ChatView({ conversations, activeConv, onSelectConv, onCreateConv
     B.smartQuery(q, agentId).then(function(result) {
       if (safetyRef.current) clearTimeout(safetyRef.current);
       setStep(3, 'done'); setStep(4, 'active');
-      if (result) patchMsg(conv.id, aiMsg.id, { content: result.response || 'Completado.', status: 'done', toolsUsed: result.tools || [], judgeReason: result.judgeReason || judgeReason, sector: result.sector || sector });
-      else patchMsg(conv.id, aiMsg.id, { content: 'No pude procesar eso.', status: 'done' });
+      if (result) {
+        patchMsg(conv.id, aiMsg.id, {
+          content: result.response || 'Completado.',
+          status: 'done',
+          toolsUsed: result.tools || [],
+          judgeReason: result.judgeReason || judgeReason,
+          sector: result.sector || sector,
+          finishedAt: Date.now(),
+        });
+      } else {
+        patchMsg(conv.id, aiMsg.id, { content: 'No pude procesar eso.', status: 'done', finishedAt: Date.now() });
+      }
       finishProc(true);
       setBusy(false);
     }).catch(function() {
       if (safetyRef.current) clearTimeout(safetyRef.current);
-      patchMsg(conv.id, aiMsg.id, { content: 'Error de conexion.', status: 'done' });
+      patchMsg(conv.id, aiMsg.id, { content: 'Error de conexion.', status: 'done', finishedAt: Date.now() });
       finishProc(false);
       setBusy(false);
     });
@@ -158,9 +190,61 @@ export function ChatView({ conversations, activeConv, onSelectConv, onCreateConv
   var agent = agentById(activeAgent);
   var msgs = (activeConv && activeConv.messages) || [];
 
+  // Panel de razonamiento del juez (estilo "Thinking" de Claude/o1).
+  function ReasoningPanel({ msg }) {
+    if (!msg.judgeReason) return null;
+    return React.createElement('div', {
+      style: {
+        marginBottom: '10px',
+        background: '#f6f8fa',
+        border: '1px solid #d0d7de',
+        borderRadius: '6px',
+        padding: '10px 12px',
+        fontSize: '12px',
+        color: '#59636e',
+        lineHeight: '1.6',
+        fontFamily: F,
+      }
+    },
+      React.createElement('div', {
+        style: {
+          display: 'flex', alignItems: 'center', gap: '6px',
+          marginBottom: '6px', paddingBottom: '6px',
+          borderBottom: '1px solid #d8dee4',
+        }
+      },
+        React.createElement('svg', { viewBox: '0 0 16 16', width: '13', height: '13', fill: '#59636e' },
+          React.createElement('path', { d: 'M8 0a8 8 0 110 16A8 8 0 018 0zM1.5 8a6.5 6.5 0 1013 0 6.5 6.5 0 00-13 0zm6.25-3.25v2.992l2.028.812a.75.75 0 01-.557 1.392l-2.5-1A.751.751 0 017.25 8.25v-3.5a.75.75 0 011.5 0z' })
+        ),
+        React.createElement('span', {
+          style: { fontWeight: '600', color: '#1f2328', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px' }
+        }, 'Razonamiento'),
+        msg.sector && React.createElement('span', {
+          style: {
+            fontSize: '10px', padding: '1px 8px', borderRadius: '999px',
+            background: '#ddf4ff', color: '#0969da', fontWeight: '600',
+          }
+        }, msg.sector)
+      ),
+      React.createElement('div', { style: { fontSize: '12px', color: '#59636e' } }, msg.judgeReason)
+    );
+  }
+
+  // Indicador "Pensando..." con 3 puntos animados.
+  function ThinkingDots() {
+    return React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 0' } },
+      React.createElement('div', { style: { display: 'flex', gap: '4px' } },
+        React.createElement('span', { style: { width: '6px', height: '6px', borderRadius: '50%', background: '#0969da', animation: 'pulse 1s infinite' } }),
+        React.createElement('span', { style: { width: '6px', height: '6px', borderRadius: '50%', background: '#0969da', animation: 'pulse 1s infinite 0.2s' } }),
+        React.createElement('span', { style: { width: '6px', height: '6px', borderRadius: '50%', background: '#0969da', animation: 'pulse 1s infinite 0.4s' } })
+      ),
+      React.createElement('span', { style: { fontSize: '12px', color: '#818b98', fontFamily: F } }, 'Pensando...')
+    );
+  }
+
   return React.createElement('div', { style: { display: 'flex', flex: 1, overflow: 'hidden', fontFamily: F } },
 
-    // Sidebar conversaciones
+    // Sidebar conversaciones (260px, GitHub Primer)
     React.createElement('div', { style: { width: '260px', borderRight: '1px solid #d0d7de', display: 'flex', flexDirection: 'column', background: '#f6f8fa' } },
       React.createElement('div', { style: { padding: '12px', borderBottom: '1px solid #d0d7de' } },
         React.createElement('button', {
@@ -168,7 +252,7 @@ export function ChatView({ conversations, activeConv, onSelectConv, onCreateConv
           style: {
             width: '100%', padding: '6px 12px', borderRadius: '6px',
             border: '1px solid rgba(27,31,36,0.15)', background: '#2da44e', color: '#ffffff',
-            fontSize: '12px', fontWeight: '600', cursor: 'pointer',
+            fontSize: '12px', fontWeight: '600', cursor: 'pointer', fontFamily: F,
             boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.25)',
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
           }
@@ -180,10 +264,11 @@ export function ChatView({ conversations, activeConv, onSelectConv, onCreateConv
           var msgCount = c.messages ? c.messages.length : 0;
           var lastMsg = c.messages && c.messages.length > 0 ? c.messages[c.messages.length - 1] : null;
           var preview = lastMsg ? (lastMsg.content || '').slice(0, 60) : 'Sin mensajes';
+          var cAgent = agentById(c.agent || 'research');
           return React.createElement('div', {
             key: c.id, onClick: function() { onSelectConv(c.id); },
             style: {
-              padding: '12px', borderRadius: '6px', cursor: 'pointer', marginBottom: '6px',
+              padding: '10px 12px', borderRadius: '6px', cursor: 'pointer', marginBottom: '4px',
               background: isActive ? '#ddf4ff' : 'transparent',
               border: isActive ? '1px solid rgba(9,105,218,0.2)' : '1px solid transparent',
               transition: 'all 80ms',
@@ -191,14 +276,20 @@ export function ChatView({ conversations, activeConv, onSelectConv, onCreateConv
             onMouseEnter: function(e) { if (!isActive) e.currentTarget.style.background = '#eaeef2'; },
             onMouseLeave: function(e) { if (!isActive) e.currentTarget.style.background = 'transparent'; },
           },
-            React.createElement('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' } },
+            React.createElement('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' } },
               React.createElement('div', { style: { fontSize: '13px', fontWeight: isActive ? '600' : '500', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: isActive ? '#1f2328' : '#24292f', flex: 1 } }, c.title || 'Nueva conversacion'),
               React.createElement('span', { style: { fontSize: '11px', color: '#818b98', flexShrink: 0, marginLeft: '6px' } }, timeAgo(c.updatedAt || c.createdAt))
             ),
-            React.createElement('div', { style: { fontSize: '12px', color: '#59636e', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: '1.6' } }, preview),
-            React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '6px', marginTop: '8px' } },
-              React.createElement('span', { style: { fontSize: '11px', color: '#818b98' } }, msgCount + ' mensaje' + (msgCount !== 1 ? 's' : '')),
-              c.agent && React.createElement('span', { style: { fontSize: '10px', padding: '1px 6px', borderRadius: '999px', background: '#ddf4ff', color: '#0969da', fontWeight: '500' } }, c.agent)
+            React.createElement('div', { style: { fontSize: '12px', color: '#59636e', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, preview),
+            React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px' } },
+              msgCount > 0 && React.createElement('span', { style: { fontSize: '11px', color: '#818b98' } }, msgCount + ' msg'),
+              React.createElement('span', {
+                style: {
+                  fontSize: '10px', padding: '1px 6px', borderRadius: '999px',
+                  background: '#ddf4ff', color: '#0969da', fontWeight: '500',
+                  display: 'inline-flex', alignItems: 'center', gap: '3px',
+                }
+              }, cAgent.name)
             )
           );
         }),
@@ -214,15 +305,15 @@ export function ChatView({ conversations, activeConv, onSelectConv, onCreateConv
     // Chat area
     React.createElement('div', { style: { flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 } },
 
-      // Header
-      React.createElement('div', { style: { padding: '10px 16px', borderBottom: '1px solid #d0d7de', display: 'flex', alignItems: 'center', gap: '12px', background: '#ffffff' } },
+      // Header con selector de agente (UnderlineNav style)
+      React.createElement('div', { style: { padding: '8px 16px', borderBottom: '1px solid #d0d7de', display: 'flex', alignItems: 'center', gap: '12px', background: '#ffffff' } },
         React.createElement('div', { style: { position: 'relative' } },
           React.createElement('button', {
             onClick: function() { setAgentMenu(function(v) { return !v; }); },
             style: {
               display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 10px',
               background: '#f6f8fa', border: '1px solid #d0d7de', borderRadius: '6px',
-              fontSize: '13px', cursor: 'pointer', transition: 'border-color 80ms',
+              fontSize: '13px', cursor: 'pointer', transition: 'border-color 80ms', fontFamily: F,
             },
             onMouseEnter: function(e) { e.currentTarget.style.borderColor = '#0969da'; },
             onMouseLeave: function(e) { e.currentTarget.style.borderColor = '#d0d7de'; },
@@ -237,7 +328,7 @@ export function ChatView({ conversations, activeConv, onSelectConv, onCreateConv
           agentMenu && React.createElement('div', {
             style: {
               position: 'absolute', top: '100%', left: 0, zIndex: 30, marginTop: '4px',
-              minWidth: '200px', background: '#ffffff', border: '1px solid #d0d7de',
+              minWidth: '210px', background: '#ffffff', border: '1px solid #d0d7de',
               borderRadius: '6px', boxShadow: '0 8px 24px rgba(140,149,159,0.2)', padding: '4px',
             }
           },
@@ -255,7 +346,7 @@ export function ChatView({ conversations, activeConv, onSelectConv, onCreateConv
                 onMouseEnter: function(e) { if (!isActive) e.currentTarget.style.background = '#eaeef2'; },
                 onMouseLeave: function(e) { if (!isActive) e.currentTarget.style.background = isActive ? '#ddf4ff' : 'transparent'; },
               },
-                React.createElement(AgentAvatar, { agent: a, size: 24 }),
+                React.createElement(AgentAvatar, { agent: a, size: 22 }),
                 React.createElement('div', { style: { flex: 1 } },
                   React.createElement('div', { style: { fontSize: '13px', fontWeight: '600', color: '#1f2328' } }, a.name),
                   React.createElement('div', { style: { fontSize: '11px', color: '#59636e' } }, a.ai)
@@ -271,72 +362,77 @@ export function ChatView({ conversations, activeConv, onSelectConv, onCreateConv
         React.createElement('span', { style: { fontSize: '12px', color: '#818b98', fontWeight: '500' } }, 'System X1')
       ),
 
-      // Proceso de seleccion (juez) visible en vivo
+      // ProcessTimeline (juez en vivo)
       procSteps.length > 0 ? React.createElement(ProcessTimeline, { steps: procSteps }) : null,
 
-      // Messages
-      React.createElement('div', { ref: logRef, style: { flex: 1, overflow: 'auto', padding: '24px 20px' } },
+      // Mensajes
+      React.createElement('div', { ref: logRef, style: { flex: 1, overflow: 'auto', padding: '20px' } },
         msgs.length === 0 ?
           React.createElement('div', { style: { height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '12px' } },
             React.createElement('div', { style: { width: '56px', height: '56px', borderRadius: '50%', background: '#f6f8fa', border: '1px solid #d0d7de', display: 'flex', alignItems: 'center', justifyContent: 'center' } },
-              React.createElement('svg', { viewBox: '0 0 16 16', width: '24', height: '24', fill: '#818b98' },
-                React.createElement('path', { d: 'M8 0a8 8 0 110 16A8 8 0 018 0zM1.5 8a6.5 6.5 0 1013 0 6.5 6.5 0 00-13 0zm7.25-3.25v2.992l2.028.812a.75.75 0 01-.557 1.392l-2.5-1A.751.751 0 017.25 8.25v-3.5a.75.75 0 011.5 0z' })
-              )
+              React.createElement('img', { src: 'dist/x1-logo.png', alt: 'X1', style: { width: '32px', height: '32px', borderRadius: '4px' }, onError: function(e) { e.currentTarget.style.display = 'none'; } })
             ),
-            React.createElement('div', { style: { fontSize: '16px', fontWeight: '600', color: '#1f2328' } }, 'System X1'),
-            React.createElement('div', { style: { fontSize: '14px', color: '#59636e', maxWidth: '280px', textAlign: 'center', lineHeight: '1.7' } }, 'Escribe tu consulta. Puedo buscar en GitHub, npm, Stack Overflow y mas.')
+            React.createElement('div', { style: { fontSize: '17px', fontWeight: '600', color: '#1f2328', fontFamily: F } }, 'System X1'),
+            React.createElement('div', { style: { fontSize: '14px', color: '#59636e', maxWidth: '300px', textAlign: 'center', lineHeight: '1.7', fontFamily: F } },
+              'Preguntame lo que quieras. Tengo 8 agentes especializados. Puedo buscar en GitHub, npm, Stack Overflow y mas.'
+            ),
+            React.createElement('div', { style: { display: 'flex', gap: '6px', marginTop: '8px', flexWrap: 'wrap', justifyContent: 'center', maxWidth: '320px' } },
+              QUICK.map(function(q) {
+                return React.createElement('button', {
+                  key: q.label,
+                  onClick: function() { send(q.prompt); },
+                  style: {
+                    padding: '4px 12px', border: '1px solid #d0d7de', borderRadius: '999px',
+                    background: '#ffffff', fontSize: '12px', color: '#59636e', cursor: 'pointer',
+                    fontFamily: F, transition: 'all 80ms',
+                  },
+                  onMouseEnter: function(e) { e.currentTarget.style.background = '#f6f8fa'; e.currentTarget.style.borderColor = '#0969da'; e.currentTarget.style.color = '#0969da'; },
+                  onMouseLeave: function(e) { e.currentTarget.style.background = '#ffffff'; e.currentTarget.style.borderColor = '#d0d7de'; e.currentTarget.style.color = '#59636e'; },
+                }, q.label);
+              })
+            )
           )
         :
-          React.createElement('div', { style: { maxWidth: '680px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '24px' } },
+          React.createElement('div', { style: { maxWidth: '680px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '20px' } },
             msgs.map(function(m) {
-              return React.createElement('div', { key: m.id, style: { display: 'flex', flexDirection: 'column', gap: '8px' } },
+              var mAgent = agentById(m.agent || 'research');
+              var elapsed = m.finishedAt && m.startedAt ? Math.round((m.finishedAt - m.startedAt) / 100) / 10 : null;
+              return React.createElement('div', { key: m.id, style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
                 m.role === 'user' ?
                   React.createElement('div', { style: { display: 'flex', justifyContent: 'flex-end' } },
                     React.createElement('div', {
                       style: {
-                        maxWidth: '70%', padding: '12px 16px', borderRadius: '16px 16px 4px 16px',
-                        background: '#ddf4ff', fontSize: '14px', lineHeight: '1.8', color: '#1f2328',
+                        maxWidth: '75%', padding: '10px 14px', borderRadius: '14px 14px 4px 14px',
+                        background: '#ddf4ff', fontSize: '14px', lineHeight: '1.6', color: '#1f2328',
+                        fontFamily: F, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
                       }
                     }, m.content)
                   )
                 :
-                  React.createElement('div', { style: { display: 'flex', gap: '8px', alignItems: 'flex-start' } },
-                    React.createElement(AgentAvatar, { agent: agentById(m.agent), size: 20 }),
+                  // Mensaje del asistente: avatar + nombre + razonamiento + respuesta + tools + meta
+                  React.createElement('div', { style: { display: 'flex', gap: '10px', alignItems: 'flex-start' } },
+                    React.createElement(AgentAvatar, { agent: mAgent, size: 22 }),
                     React.createElement('div', { style: { flex: 1, minWidth: 0 } },
-                      React.createElement('div', { style: { fontSize: '12px', fontWeight: '600', color: '#59636e', marginBottom: '4px' } }, agentById(m.agent).name),
+                      // Nombre del agente + IA
+                      React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' } },
+                        React.createElement('span', { style: { fontSize: '13px', fontWeight: '600', color: '#1f2328', fontFamily: F } }, mAgent.name),
+                        React.createElement('span', { style: { fontSize: '11px', color: '#818b98' } }, mAgent.ai),
+                        elapsed != null && React.createElement('span', { style: { fontSize: '10px', color: '#818b98' } }, elapsed + 's')
+                      ),
+                      // Estado "thinking" -> puntos animados
                       m.status === 'thinking' ?
-                        React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 0' } },
-                          React.createElement('div', { style: { display: 'flex', gap: '4px' } },
-                            React.createElement('span', { style: { width: '6px', height: '6px', borderRadius: '50%', background: '#0969da', animation: 'pulse 1s infinite' } }),
-                            React.createElement('span', { style: { width: '6px', height: '6px', borderRadius: '50%', background: '#0969da', animation: 'pulse 1s infinite 0.2s' } }),
-                            React.createElement('span', { style: { width: '6px', height: '6px', borderRadius: '50%', background: '#0969da', animation: 'pulse 1s infinite 0.4s' } })
-                          ),
-                          React.createElement('span', { style: { fontSize: '12px', color: '#818b98' } }, 'Pensando...')
-                        )
+                        React.createElement(ThinkingDots, null)
                       :
+                      // Estado "done" con contenido
                       m.status === 'done' && m.content ?
-                        React.createElement('div', { style: { fontSize: '14px', lineHeight: '1.8', color: '#1f2328' } },
-                          m.judgeReason && React.createElement('div', {
-                            style: {
-                              padding: '12px 16px', borderRadius: '6px', marginBottom: '12px',
-                              background: '#f6f8fa', border: '1px solid #d0d7de',
-                              fontSize: '12px', color: '#59636e', lineHeight: '1.7',
-                            }
-                          },
-                            React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' } },
-                              React.createElement('span', { style: { fontWeight: '600', color: '#1f2328', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px' } }, 'Sistema juez'),
-                              m.sector && React.createElement('span', { style: { fontSize: '10px', padding: '1px 8px', borderRadius: '999px', background: '#ddf4ff', color: '#0969da', fontWeight: '600' } }, m.sector)
-                            ),
-                            React.createElement('div', null, m.judgeReason)
+                        React.createElement('div', null,
+                          // Panel de razonamiento del juez (estilo Claude/o1 "Thinking")
+                          React.createElement(ReasoningPanel, { msg: m }),
+                          // Cuerpo de la respuesta (formato markdown)
+                          React.createElement('div', { style: { padding: '4px 0' } },
+                            React.createElement(Markdown, { text: m.content })
                           ),
-                          React.createElement('div', {
-                            style: {
-                              padding: '4px 0', borderRadius: '4px',
-                              whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-                              borderLeft: '2px solid #d0d7de', paddingLeft: '16px',
-                              lineHeight: '1.85',
-                            }
-                          }, m.content),
+                          // Badges de herramientas usadas
                           m.toolsUsed && m.toolsUsed.length > 0 ?
                             React.createElement('div', { style: { display: 'flex', gap: '4px', marginTop: '8px', flexWrap: 'wrap' } },
                               m.toolsUsed.map(function(tool) {
@@ -346,6 +442,7 @@ export function ChatView({ conversations, activeConv, onSelectConv, onCreateConv
                                     display: 'inline-flex', alignItems: 'center', gap: '4px',
                                     fontSize: '11px', padding: '2px 8px', borderRadius: '999px',
                                     background: '#f6f8fa', border: '1px solid #d0d7de', color: '#59636e',
+                                    fontFamily: F,
                                   }
                                 },
                                   React.createElement(ToolIcon, { tool: tool, size: 12 }),
@@ -363,25 +460,8 @@ export function ChatView({ conversations, activeConv, onSelectConv, onCreateConv
           )
       ),
 
-      // Quick actions
-      React.createElement('div', { style: { padding: '4px 20px 10px', display: 'flex', gap: '8px', flexWrap: 'wrap' } },
-        QUICK.map(function(q) {
-          return React.createElement('button', {
-            key: q.label,
-            onClick: function() { send(q.prompt); },
-            style: {
-              padding: '3px 10px', border: '1px solid #d0d7de', borderRadius: '999px',
-              background: '#ffffff', fontSize: '12px', color: '#59636e', cursor: 'pointer',
-              fontFamily: F, transition: 'background 80ms',
-            },
-            onMouseEnter: function(e) { e.currentTarget.style.background = '#f6f8fa'; },
-            onMouseLeave: function(e) { e.currentTarget.style.background = '#ffffff'; },
-          }, q.label);
-        })
-      ),
-
-      // Input
-      React.createElement('div', { style: { padding: '0 20px 16px' } },
+      // Input area (GitHub Primer) con auto-resize
+      React.createElement('div', { style: { padding: '0 20px 14px' } },
         React.createElement('div', {
           style: {
             display: 'flex', alignItems: 'flex-end', gap: '10px',
@@ -393,14 +473,16 @@ export function ChatView({ conversations, activeConv, onSelectConv, onCreateConv
           onBlur: function(e) { e.currentTarget.style.borderColor = '#d0d7de'; },
         },
           React.createElement('textarea', {
+            ref: taRef,
             value: text,
             onChange: function(e) { setText(e.target.value); textRef.current = e.target.value; },
-            placeholder: 'Escribe tu mensaje...',
+            placeholder: 'Escribe tu mensaje a ' + agent.name + '...',
             rows: 1,
             style: {
               flex: 1, border: 'none', outline: 'none', resize: 'none',
               fontSize: '14px', fontFamily: F, lineHeight: '1.5',
-              background: 'transparent', minHeight: '22px', maxHeight: '100px', color: '#1f2328',
+              background: 'transparent', minHeight: '22px', maxHeight: '120px', color: '#1f2328',
+              overflow: 'auto',
             },
             onKeyDown: function(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }
           }),

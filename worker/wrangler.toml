@@ -39,10 +39,12 @@ account_id = "130e823c470feb5c46d25d59a5f9bcd3"
 CF_ACCOUNT_ID = ""
 
 # Per-provider timeout. Total budget = PER_PROVIDER_MS * (chain length / parallelism).
-PER_PROVIDER_MS = "8000"
+# 8s era insuficiente para informes largos (analisis de repo, revision de PR)
+# que piden miles de tokens de salida — el modelo ni llega a generar en 8s.
+PER_PROVIDER_MS = "20000"
 
 # Total request budget across all providers in a cascade.
-TOTAL_BUDGET_MS = "25000"
+TOTAL_BUDGET_MS = "55000"
 
 # Circuit breaker: open the circuit after N consecutive failures per provider.
 BREAKER_FAILS = "3"

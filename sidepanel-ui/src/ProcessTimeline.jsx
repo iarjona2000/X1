@@ -119,3 +119,94 @@ export function ProcessTimeline({ steps = [] }) {
     })
   );
 }
+
+// ── ProcessLog: registro vertical y detallado del proceso (analisis de repo,
+// automatizacion). A diferencia de ProcessTimeline (fila horizontal compacta
+// para el chat), aqui cada paso lleva titulo + detalle/razon + linea vertical
+// conectora, al estilo del log de un GitHub Actions run. ──
+function LogDot({ status }) {
+  var isActive = status === 'active';
+  var isDone = status === 'done';
+  var isError = status === 'error';
+
+  var bg = '#f6f8fa', border = '#d0d7de';
+  if (isActive) { bg = '#0969da'; border = '#0969da'; }
+  if (isDone)   { bg = '#1a7f37'; border = '#1a7f37'; }
+  if (isError)  { bg = '#d1242f'; border = '#d1242f'; }
+
+  return React.createElement('div', {
+    style: {
+      width: '22px', height: '22px', borderRadius: '50%', flexShrink: 0,
+      background: bg, border: '2px solid ' + border,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      boxShadow: isActive ? '0 0 0 3px rgba(9,105,218,0.15)' : 'none',
+      animation: isActive ? 'breathe 1.2s ease-in-out infinite' : 'none',
+      transition: 'all 200ms ease',
+    }
+  },
+    isDone ? React.createElement(Tick, null)
+    : isError ? React.createElement(ErrorCross, null)
+    : isActive ? React.createElement(Spinner, null)
+    : React.createElement('div', { style: { width: '6px', height: '6px', borderRadius: '50%', background: '#818b98' } })
+  );
+}
+
+// Contador de tiempo en vivo mientras un paso esta 'active' — asi nunca
+// "parece colgado": aunque una consulta a la IA tarde 60s, el usuario ve los
+// segundos correr y sabe que sigue trabajando.
+function LiveElapsed({ startedAt }) {
+  var [now, setNow] = React.useState(Date.now());
+  React.useEffect(function () {
+    if (!startedAt) return;
+    var id = setInterval(function () { setNow(Date.now()); }, 1000);
+    return function () { clearInterval(id); };
+  }, [startedAt]);
+  if (!startedAt) return null;
+  var secs = Math.max(0, Math.round((now - startedAt) / 1000));
+  return React.createElement('span', { style: { color: '#0969da', fontWeight: '600' } }, ' · ' + secs + 's');
+}
+
+function LogStep({ step, index, total }) {
+  var isActive = step.status === 'active';
+  var isDone = step.status === 'done';
+  var isError = step.status === 'error';
+  var titleColor = isError ? '#d1242f' : isActive ? '#0969da' : '#1f2328';
+
+  return React.createElement('div', { style: { display: 'flex', gap: '10px' } },
+    React.createElement('div', { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 } },
+      React.createElement(LogDot, { status: step.status }),
+      index < total - 1 ? React.createElement('div', {
+        style: { width: '2px', flex: 1, minHeight: '14px', background: isDone ? '#1a7f37' : '#d0d7de', margin: '2px 0', transition: 'background 200ms' }
+      }) : null
+    ),
+    React.createElement('div', { style: { paddingBottom: index < total - 1 ? '14px' : '2px', minWidth: 0, flex: 1 } },
+      React.createElement('div', { style: { fontSize: '13px', fontWeight: isActive || isDone ? '600' : '500', color: titleColor, lineHeight: '1.4' } },
+        step.title,
+        isActive ? React.createElement(LiveElapsed, { startedAt: step.startedAt }) : null
+      ),
+      step.detail ? React.createElement('div', {
+        style: { fontSize: '12px', color: '#59636e', lineHeight: '1.5', marginTop: '2px', wordBreak: 'break-word' }
+      }, step.detail) : null,
+      step.why ? React.createElement('div', {
+        style: { fontSize: '11px', color: '#818b98', lineHeight: '1.5', marginTop: '3px', fontStyle: 'italic' }
+      }, step.why) : null
+    )
+  );
+}
+
+export function ProcessLog({ steps = [], title }) {
+  if (!steps.length) return null;
+  return React.createElement('div', {
+    style: {
+      padding: '14px 16px', border: '1px solid #d0d7de', borderRadius: '6px',
+      background: '#ffffff', fontFamily: F,
+    }
+  },
+    title ? React.createElement('div', {
+      style: { fontSize: '12px', fontWeight: '600', color: '#59636e', textTransform: 'uppercase', letterSpacing: '0.02em', marginBottom: '12px' }
+    }, title) : null,
+    steps.map(function(step, i) {
+      return React.createElement(LogStep, { key: step.id || i, step: step, index: i, total: steps.length });
+    })
+  );
+}

@@ -171,21 +171,28 @@ function buildSmartResponse(query, results) {
 
 // Un intento de enviar la consulta al SW. Resuelve {text} o {woke:true} si el
 // puerto se cerro (SW dormido) para poder reintentar, o null si falla de verdad.
-function engineAttempt(query) {
+// opts.forceJudge activa panel+juez con timeout largo (informes exhaustivos);
+// opts.clientTimeoutMs ajusta cuanto espera este lado antes de rendirse.
+function engineAttempt(query, opts) {
+  opts = opts || {};
   return new Promise(function(resolve) {
     if (typeof chrome === 'undefined' || !chrome.runtime || !chrome.runtime.sendMessage) {
       resolve({ text: null }); return;
     }
     var settled = false;
+    var clientTimeoutMs = opts.clientTimeoutMs || 24000;
     var timer = setTimeout(function() {
       if (settled) return; settled = true; resolve({ text: null });
-    }, 24000);
+    }, clientTimeoutMs);
     try {
-      chrome.runtime.sendMessage({ type: 'VOICE_COMMAND_EXEC', command: query, wantsText: true }, function(resp) {
+      chrome.runtime.sendMessage({
+        type: 'VOICE_COMMAND_EXEC', command: query, wantsText: true,
+        forceJudge: !!opts.forceJudge, timeoutMs: opts.timeoutMs, maxTokens: opts.maxTokens,
+      }, function(resp) {
         if (settled) return; settled = true; clearTimeout(timer);
         if (chrome.runtime.lastError) { resolve({ text: null, woke: true }); return; }
         var text = resp && (resp.text || resp.error);
-        resolve({ text: text ? String(text) : null });
+        resolve({ text: text ? String(text) : null, provider: resp && resp.provider, attempts: resp && resp.attempts });
       });
     } catch (e) {
       if (!settled) { settled = true; clearTimeout(timer); resolve({ text: null, woke: true }); }
@@ -193,17 +200,25 @@ function engineAttempt(query) {
   });
 }
 
-// Envia la consulta al motor real (service-worker via VOICE_COMMAND_EXEC).
-// Reintenta una vez si el primer intento fallo por SW dormido (puerto cerrado).
-export async function sendToEngine(query) {
-  var first = await engineAttempt(query);
-  if (first.text) return first.text;
+// Igual que sendToEngine pero devuelve tambien metadata de que IA respondio
+// (backend.js._provider / _attempts, ver firstWins() en service-worker.js),
+// para poder explicar en la UI quien contesto exactamente.
+export async function sendToEngineMeta(query, opts) {
+  var first = await engineAttempt(query, opts);
+  if (first.text) return { text: first.text, provider: first.provider, attempts: first.attempts };
   if (first.woke) {
     await new Promise(function(r) { setTimeout(r, 500); });
-    var second = await engineAttempt(query);
-    if (second.text) return second.text;
+    var second = await engineAttempt(query, opts);
+    if (second.text) return { text: second.text, provider: second.provider, attempts: second.attempts };
   }
-  return null;
+  return { text: null, provider: null, attempts: null };
+}
+
+// Envia la consulta al motor real (service-worker via VOICE_COMMAND_EXEC).
+// Reintenta una vez si el primer intento fallo por SW dormido (puerto cerrado).
+export async function sendToEngine(query, opts) {
+  var r = await sendToEngineMeta(query, opts);
+  return r.text;
 }
 
 export async function smartQuery(query, agentId) {
@@ -213,68 +228,94 @@ export async function smartQuery(query, agentId) {
   if (isGreeting(query)) {
     var hour = new Date().getHours();
     var saludo = hour < 12 ? 'Buenos dias' : hour < 20 ? 'Buenas tardes' : 'Buenas noches';
-    var greet = saludo + '! Soy X1, tu asistente de IA. Puedo ayudarte a buscar repositorios en GitHub, paquetes npm, soluciones en Stack Overflow y mas. En que puedo ayudarte?';
+    var greet = saludo + '! Soy System X1. Tengo 8 agentes especializados (Research, Writer, Developer, Marketing, Finance, Legal, Email, Meeting). En que puedo ayudarte?';
     T.addMemory('assistant', greet);
     return { response: greet, tools: [], judgeReason: null, sector: sector };
   }
 
   var judgeReason = getJudgeReason(query, agentId);
 
-  // 1) Motor real (cascada de IA + juez del backend).
+  // 1) Motor real (cascada de IA + juez del backend via VOICE_COMMAND_EXEC).
   var engineText = await sendToEngine(query);
-  if (engineText && engineText.trim()) {
+  if (engineText && engineText.trim() && !/^(Procesando\.\.\.|Tiempo de espera|Error de conexion)/.test(engineText.trim())) {
     T.addMemory('assistant', engineText);
     return { response: engineText, tools: [], judgeReason: judgeReason, sector: sector };
   }
 
-  // 2) Fallback local inteligente: aunque no haya motor, damos una respuesta util.
+  // 2) Tools integradas: si el agente o la query sugieren herramientas, ejecutarlas.
+  var toolResults = null;
+  try { toolResults = await T.executeTools(query, agentId); } catch (e) { toolResults = null; }
+  var toolText = null;
+  try { toolText = T.formatToolResults(query, toolResults || {}); } catch (e) { toolText = null; }
+
+  if (toolText) {
+    var toolsUsed = T.toolsUsedList(toolResults || {});
+    T.addMemory('assistant', toolText);
+    var intro = 'No tengo motor de IA activo, pero encontre esto con mis herramientas:\n\n';
+    return { response: intro + toolText, tools: toolsUsed, judgeReason: judgeReason, sector: sector };
+  }
+
+  // 3) Fallback local ultimo recurso
   var localFallback = buildLocalFallback(query, agentId, sector);
   T.addMemory('assistant', localFallback);
   return { response: localFallback, tools: [], judgeReason: judgeReason, sector: sector };
 }
 
 // Respuesta local cuando el motor de IA no esta disponible.
-// Analiza la consulta y produce una respuesta util basada en patrones.
 function buildLocalFallback(query, agentId, sector) {
   var t = query.toLowerCase().trim();
   var agent = AGENTS.find(function(a) { return a.id === agentId; });
   var agentName = agent ? agent.name : 'X1';
 
-  // Saludo
   if (isGreeting(query)) {
-    return 'Hola. Soy X1 en modo local (sin conexion al motor de IA). Puedo orientarte mientras se restablece el motor. En que puedo ayudarte?';
+    return 'Hola. Soy System X1 en modo local (motor de IA offline). Puedo orientarte. En que puedo ayudarte?';
   }
 
-  // Pregunta de identidad o ayuda
   if (/^(quien eres|que eres|como te llamas|que puedes hacer|que sabes hacer|ayuda|help|que haces)/.test(t)) {
-    return 'Soy System X1, un asistente multi-agente. Cada agente esta especializado en un sector (Desarrollo, Email, Reuniones, Marketing, Finanzas, Legal, Redaccion, Investigacion). El agente ' + agentName + ' esta activo ahora. Cuando el motor de IA este disponible, podre darte respuestas completas; mientras tanto, puedo orientarte.';
+    return 'Soy System X1, asistente multi-agente con 8 especialistas: Research (Gemini), Writer (Claude), Developer (GPT-4o), Marketing (Gemini), Finance (Claude), Legal (Mistral), Email (Llama), Meeting (Gemini). Actualmente el agente ' + agentName + ' esta activo para el sector ' + sector + '. Cuando el motor este disponible, hare analisis completos. Mientras, puedo buscar en GitHub, npm, Stack Overflow si incluyes keywords como "github", "npm" o "error".';
   }
 
-  // Intenta busqueda en herramientas aunque no parezca obvio
-  var searchTools = T.detectTools(query);
-  if (searchTools.length > 0) {
-    // Dejamos que executeTools haga su trabajo en la rama offline original
-    // (este path no se ejecuta porque smartQuery ya retorno antes si habia tools)
-    return null;
-  }
-
-  // Pregunta general de programacion -> sugerir busqueda
   if (/codigo|code|programa|funcion|componente|react|debug|script|api|html|css|bug|error/.test(t)) {
-    return 'Modo local activo. Para tu consulta de desarrollo, te sugiero buscar en GitHub o npm. Prueba: "busca repositorios de ' + query.replace(/^(busca|buscar|encuentra|encuentrame)\s+/i, '').slice(0, 60) + ' en github" o "busca paquetes npm de ' + query.replace(/^(busca|buscar|encuentra|encuentrame)\s+/i, '').slice(0, 60) + '".';
+    return 'Consulta de desarrollo detectada (sector ' + sector + ', agente ' + agentName + '). El motor de IA esta offline. Para resultados inmediatos puedo buscar en GitHub y npm. Prueba con: **"busca en github ' + query.replace(/^(busca|buscar|encuentra|encuentrame|necesito|quiero|dame)\s+/i, '').slice(0, 50) + '"** o **"busca paquetes npm de ' + query.replace(/^(busca|buscar|encuentra|encuentrame|necesito|quiero|dame)\s+/i, '').slice(0, 50) + '"**.';
   }
 
-  // Pregunta de email -> sugerir gmail
+  // Email
   if (/email|correo|gmail|mensaje|redacta/.test(t)) {
-    return 'Modo local. Para emails puedo acceder a Gmail si inicias sesion. Prueba a conectarte desde la pestana de Ajustes. Mientras tanto, dime el destinatario y el tema y preparo un borrador.';
+    return 'Modo local activo. Para emails puedo acceder a Gmail si inicias sesion con Google (pestana Ajustes). Mientras, dime el destinatario y tema y preparo un borrador aqui mismo.';
   }
 
-  // Redaccion / Writer -> crear documento en modo local
-  if (/documento|doc|writer|redaccion|redactar|escribir|texto|informe|propuesta|carta|ensayo|articulo|plantilla/.test(t)) {
-    return 'Modo local activo. Writer esta seleccionado para el sector Redaccion. Puedo ayudarte a estructurar el documento ahora mismo. Dime el tipo de documento y el tema, y te genero un borrador listo para copiar.';
+  // Redaccion / Writer
+  if (/documento|doc|writer|redaccion|redactar|escribir|texto|informe|propuesta|carta|ensayo|articulo|plantilla|resume|resumen|ensayo|guion|presentacion|slide/.test(t)) {
+    return 'Modo local. ' + agentName + ' esta seleccionado para Redaccion. Dime el tipo de documento y el tema, y te genero un borrador estructurado ahora mismo. Ejemplo: "escribe un email de seguimiento para un cliente".';
   }
 
-  // Respuesta generica orientada
-  return 'Modo local activo (motor de IA temporalmente no disponible). ' + agentName + ' esta seleccionado para el sector ' + sector + '. Para consultas de busqueda, prueba con palabras como "github", "npm" o "stackoverflow" para que use las herramientas disponibles. Ejemplo: "busca en github ' + query.slice(0, 50) + '".';
+  // Marketing
+  if (/marketing|ventas|campana|seo|anuncio|ad|estrategia/.test(t)) {
+    return 'Sector Marketing, agente ' + agentName + '. Motor offline. Dime el producto/servicio y el objetivo, y te propongo una estructura de campana.';
+  }
+
+  // Finance
+  if (/finanzas|inversion|budget|dinero|stock|cotizacion|mercado/.test(t)) {
+    return 'Sector Finanzas, agente ' + agentName + '. Motor offline. Para cotizaciones en tiempo real necesito conexion. Dime que activo te interesa y te doy contexto general.';
+  }
+
+  // Legal
+  if (/legal|contrato|ley|clausula|terminos/.test(t)) {
+    return 'Sector Legal, agente ' + agentName + '. Motor offline. Puedo orientarte con clausulas tipo o estructura contractual. Dime el tipo de contrato.';
+  }
+
+  // Reuniones
+  if (/reunion|meeting|calendario|agenda|preparar|prepara/.test(t)) {
+    return 'Sector Reuniones, agente ' + agentName + '. Motor offline. Para integracion con Calendar necesitas iniciar sesion Google. Mientras, dime que reunion quieres preparar y hago agenda.';
+  }
+
+  // Pregunta conceptual -> guiar
+  if (/^(que es|que son|define|definicion|explica|explicame|cual es|cuales son|como funciona|como se hace|por que|para que)/.test(t)) {
+    return 'Pregunta conceptual en modo local. Motor offline. Para buscar informacion, reformula con "github", "npm" o "busca" en tu consulta.';
+  }
+
+  // Generica orientada
+  return 'Modo local (motor offline). Agente ' + agentName + ', sector ' + sector + '. Para mejores resultados:\n- Codigo/busqueda: incluye "github", "npm" o "error" en tu consulta\n- Redaccion: dime tipo de documento y tema\n- Emails: "destinatario+tema"\nCuando el motor este activo, dare respuestas completas.';
 }
 
 export function getMemoryContext() { return T.getMemoryContext(); }
