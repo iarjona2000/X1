@@ -1369,18 +1369,54 @@ readPageEnhanced = readPage;
 // GOOGLE AUTH
 // ═══════════════════════════════════════════
 
+var GOOGLE_CLIENT_ID = '653077619345-erf587evo9le3t8p9ku5i8t485rdo6lc.apps.googleusercontent.com';
+var GOOGLE_SCOPES = 'https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.compose https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/documents https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile';
+
 function loginGoogle() {
   return new Promise(function(resolve, reject) {
     chrome.identity.getAuthToken({interactive:true}, function(token) {
-      if (chrome.runtime.lastError) return reject(new Error(chrome.runtime.lastError.message));
-      if (!token) return reject(new Error('No se obtuvo token'));
+      if (chrome.runtime.lastError || !token) {
+        // Fallback: launchWebAuthFlow manual OAuth
+        return loginGoogleWebFlow().then(resolve).catch(function(err2) {
+          reject(new Error((chrome.runtime.lastError && chrome.runtime.lastError.message) || err2.message || 'No se pudo conectar Google'));
+        });
+      }
       chrome.storage.local.set({google_token:token});
       fetch('https://www.googleapis.com/oauth2/v2/userinfo', {headers:{Authorization:'Bearer '+token}})
         .then(function(r){return r.json();})
         .then(function(info){
           chrome.storage.local.set({google_user:{email:info.email,name:info.name,picture:info.picture}});
           resolve(info);
-        }).catch(reject);
+        }).catch(function(err) {
+          // If token is invalid, try web flow
+          loginGoogleWebFlow().then(resolve).catch(reject);
+        });
+    });
+  });
+}
+
+function loginGoogleWebFlow() {
+  return new Promise(function(resolve, reject) {
+    var redirectUri = chrome.identity.getRedirectURL();
+    var authUrl = 'https://accounts.google.com/o/oauth2/v2/auth?client_id=' + GOOGLE_CLIENT_ID + '&redirect_uri=' + encodeURIComponent(redirectUri) + '&response_type=token&scope=' + encodeURIComponent(GOOGLE_SCOPES) + '&prompt=consent';
+    chrome.identity.launchWebAuthFlow({url:authUrl, interactive:true}, function(responseUrl) {
+      if (chrome.runtime.lastError) return reject(new Error(chrome.runtime.lastError.message));
+      if (!responseUrl) return reject(new Error('No se obtuvo respuesta'));
+      var hash = responseUrl.split('#')[1];
+      if (!hash) return reject(new Error('Sin token en respuesta'));
+      var params = {};
+      hash.split('&').forEach(function(p) { var kv = p.split('='); params[kv[0]] = decodeURIComponent(kv[1] || ''); });
+      var token = params.access_token;
+      if (!token) return reject(new Error('No se obtuvo access_token'));
+      chrome.storage.local.set({google_token:token});
+      fetch('https://www.googleapis.com/oauth2/v2/userinfo', {headers:{Authorization:'Bearer '+token}})
+        .then(function(r){return r.json();})
+        .then(function(info){
+          chrome.storage.local.set({google_user:{email:info.email,name:info.name,picture:info.picture}});
+          resolve(info);
+        }).catch(function(err) {
+          reject(new Error('Error al obtener info de usuario: ' + (err && err.message || 'desconocido')));
+        });
     });
   });
 }

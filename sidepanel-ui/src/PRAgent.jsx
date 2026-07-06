@@ -6,7 +6,7 @@ import {
 } from './github-agent.js';
 import { ProcessLog } from './ProcessTimeline.jsx';
 import { DiffView } from './DiffView.jsx';
-import { FileIcon, FileAddedIcon, FileDiffIcon, ChevronDownIcon, ChevronUpIcon, GitBranchIcon } from '@primer/octicons-react';
+import { FileAddedIcon, FileDiffIcon, ChevronDownIcon, ChevronUpIcon, GitBranchIcon } from '@primer/octicons-react';
 
 const F = "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif";
 const MONO = "'SF Mono', 'Cascadia Code', Consolas, monospace";
@@ -174,9 +174,7 @@ function BranchTag({ children }) {
       padding: '2px 8px', borderRadius: '6px', background: C.neutralSubtle, color: C.fg,
     },
   },
-    React.createElement('svg', { viewBox: '0 0 16 16', width: '12', height: '12', fill: C.fgMuted },
-      React.createElement('path', { d: 'M9.5 3.25a2.25 2.25 0 113 2.122V6A2.5 2.5 0 0110 8.5H6a1 1 0 00-1 1v1.128a2.251 2.251 0 11-1.5 0V5.372a2.25 2.25 0 111.5 0v1.836A2.492 2.492 0 016 7h4a1 1 0 001-1v-.628A2.25 2.25 0 019.5 3.25zm-6 0a.75.75 0 101.5 0 .75.75 0 00-1.5 0zm8.25-.75a.75.75 0 100 1.5.75.75 0 000-1.5zM4.25 12a.75.75 0 100 1.5.75.75 0 000-1.5z' })
-    ),
+    React.createElement(GitBranchIcon, { size: 12, fill: C.fgMuted }),
     children
   );
 }
@@ -320,18 +318,19 @@ export function PRAgent({ githubUser, onGoToRepo }) {
 
             proposalFiles.map(function (f) {
               var open = expandedFile === f.path;
-              return React.createElement('div', { key: f.path, style: { border: '1px solid ' + C.border, borderRadius: '6px', marginBottom: '8px', overflow: 'hidden' } },
+              var FileGlyph = f.exists ? FileDiffIcon : FileAddedIcon;
+              return React.createElement('div', { key: f.path, style: { border: '1px solid ' + C.border, borderRadius: '6px', marginBottom: '6px', overflow: 'hidden' } },
                 React.createElement('div', {
                   onClick: function () { setExpandedFile(open ? null : f.path); },
-                  style: { display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px', background: C.canvasSubtle, cursor: 'pointer' },
+                  style: { display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 10px', background: C.canvasSubtle, cursor: 'pointer' },
                 },
-                  React.createElement('span', { style: { fontFamily: MONO, fontSize: '12px', color: C.fg, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, f.path),
-                  React.createElement(Label, { variant: f.exists ? 'attention' : 'success' }, f.exists ? 'modifica' : 'nuevo'),
-                  React.createElement('span', { style: { fontSize: '11px', color: C.fgSubtle } }, open ? '▲' : '▼')
+                  React.createElement(FileGlyph, { size: 12, fill: f.exists ? C.attention : C.success }),
+                  React.createElement('span', { style: { fontFamily: MONO, fontSize: '11px', color: C.fg, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, f.path),
+                  React.createElement((open ? ChevronUpIcon : ChevronDownIcon), { size: 12, fill: C.fgSubtle })
                 ),
-                open && React.createElement('div', { style: { padding: '10px 12px' } },
-                  f.motivo && React.createElement('div', { style: { fontSize: '12px', color: C.fgMuted, marginBottom: '8px', fontStyle: 'italic' } }, f.motivo),
-                  React.createElement(CodeBlock, null, f.contenido)
+                open && React.createElement('div', { style: { padding: '8px 10px' } },
+                  f.motivo && React.createElement('div', { style: { fontSize: '11px', color: C.fgMuted, marginBottom: '6px', fontStyle: 'italic' } }, f.motivo),
+                  React.createElement(DiffView, { oldText: f.current, newText: f.contenido })
                 )
               );
             }),

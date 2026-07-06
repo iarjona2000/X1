@@ -197,6 +197,7 @@ export function ChatView({ conversations, activeConv, onSelectConv, onCreateConv
   var msgs = (activeConv && activeConv.messages) || [];
   var [googleOk, setGoogleOk] = React.useState(null);
   var [googleUser, setGoogleUser] = React.useState(null);
+  var [googleError, setGoogleError] = React.useState(null);
   var [showGoogleMenu, setShowGoogleMenu] = React.useState(false);
   React.useEffect(function() { if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) { chrome.runtime.sendMessage({ type: 'X1_AUTH_CHECK_GOOGLE' }, function(r) { if (!chrome.runtime.lastError && r) { setGoogleOk(r.logged); if (r.user) setGoogleUser(r.user); } }); } }, []);
 
@@ -378,7 +379,7 @@ export function ChatView({ conversations, activeConv, onSelectConv, onCreateConv
               border: '1px solid', borderColor: googleOk ? '#b7e1c0' : 'transparent',
               transition: 'all 80ms',
             },
-            onClick: googleOk ? function() { setShowGoogleMenu(function(v) { return !v; }); } : async function() { var r = await B.loginGoogle(); if (r) { setGoogleOk(true); setGoogleUser({email:r.email,name:r.name,picture:r.picture}); } },
+            onClick: googleOk ? function() { setShowGoogleMenu(function(v) { return !v; }); setGoogleError(null); } : async function() { setGoogleError(null); var r = await B.loginGoogle(); if (r) { setGoogleOk(true); setGoogleUser({email:r.email,name:r.name,picture:r.picture}); } else { setGoogleError('No se pudo conectar. Prueba en chrome://extensions > X1 > Inspect > Console para ver errores.'); setTimeout(function() { setGoogleError(null); }, 6000); } },
             title: googleOk && googleUser ? googleUser.email : 'Conectar Google',
             onMouseEnter: function(e) { e.currentTarget.style.borderColor = googleOk ? '#b7e1c0' : '#d0d7de'; },
             onMouseLeave: function(e) { e.currentTarget.style.borderColor = googleOk ? '#b7e1c0' : 'transparent'; },
@@ -443,12 +444,14 @@ export function ChatView({ conversations, activeConv, onSelectConv, onCreateConv
         )
       ),
 
+      googleError ? React.createElement('div', { style: { padding: '6px 20px', background: '#fff0ee', color: '#d1242f', fontSize: '12px', borderBottom: '1px solid #ffc2c2', fontFamily: F } }, googleError) : null,
+
       // Mensajes (ProcessTimeline eliminado de aqui, ahora por cada respuesta abajo)
       React.createElement('div', { ref: logRef, style: { flex: 1, overflow: 'auto', padding: '20px' } },
         msgs.length === 0 ?
           React.createElement('div', { style: { height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '12px' } },
             React.createElement('div', { style: { width: '56px', height: '56px', borderRadius: '50%', background: '#f6f8fa', border: '1px solid #d0d7de', display: 'flex', alignItems: 'center', justifyContent: 'center' } },
-              React.createElement('img', { src: 'dist/x1-logo.png', alt: 'X1', style: { width: '32px', height: '32px', borderRadius: '4px' }, onError: function(e) { e.currentTarget.style.display = 'none'; } })
+              React.createElement('img', { src: 'dist/x1-logo.png', alt: 'X1', style: { width: '32px', height: '32px', borderRadius: '4px', objectFit: 'contain' }, onError: function(e) { e.currentTarget.style.display = 'none'; } })
             ),
             React.createElement('div', { style: { fontSize: '17px', fontWeight: '600', color: '#1f2328', fontFamily: F } }, 'System X1'),
             React.createElement('div', { style: { fontSize: '14px', color: '#59636e', maxWidth: '300px', textAlign: 'center', lineHeight: '1.7', fontFamily: F } },
