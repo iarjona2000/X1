@@ -1495,11 +1495,28 @@ function logoutGoogle() {
 
 function getGoogleToken() {
   return new Promise(function(resolve, reject) {
+    // First try non-interactive (faster if token is cached)
     chrome.identity.getAuthToken({interactive:false}, function(token) {
       if (chrome.runtime.lastError || !token) {
-        return reject(new Error('No autenticado. Di "conecta Google".'));
+        // Token not cached — try reading from chrome.storage.local
+        chrome.storage.local.get('google_token', function(data) {
+          if (data && data.google_token) {
+            resolve(data.google_token);
+          } else {
+            // No token at all — try interactive login
+            chrome.identity.getAuthToken({interactive:true}, function(token2) {
+              if (chrome.runtime.lastError || !token2) {
+                reject(new Error(chrome.runtime.lastError ? chrome.runtime.lastError.message : 'No se pudo obtener token de Google'));
+              } else {
+                chrome.storage.local.set({google_token:token2});
+                resolve(token2);
+              }
+            });
+          }
+        });
+      } else {
+        resolve(token);
       }
-      resolve(token);
     });
   });
 }
@@ -1651,6 +1668,16 @@ var SYSTEM_PROMPT = [
 'FINANZAS: stockQuote(symbol), marketSummary, companyNews(symbol,days?), cryptoQuote(symbol) — datos en tiempo real via Finnhub/Alpha Vantage',
 'IMAGEN: generateImage(prompt,provider?:auto|cloudflare|openai) — genera imagen con Flux/DALL-E',
 'INVESTIGACION: deepResearch(query,depth?:standard|deep|thorough,maxSteps?) — busqueda multi-fuente con sintesis IA',
+'DEX BY THIRDLAYER — FUNCIONES COMPLETAS:',
+'  CONTACTOS: contactAdd(name,email?,company?,title?,phone?,linkedin?,notes?) — guarda contacto local. contactSearch(query) — busca. contactList — lista todos. contactTimeline(id) — historial. contactExport — exporta a Google Sheets.',
+'  LINKEDIN: linkedinScrape — extrae perfil LinkedIn actual Y lo guarda como contacto. linkedinSearch(query) — abre busqueda en LinkedIn.',
+'  NOTAS: noteAdd(title,content?,type?,tags?) — guarda nota local. noteSearch(query) — busca notas.',
+'  MEETINGS: meetingBrief(eventId?) — briefing de reunion con asistentes + contexto email. meetingFollowUp(eventId?) — envia follow-up email a todos los asistentes.',
+'  EMAIL: emailTriage — clasifica bandeja (urgente, importante, leer, archivar). emailAutoDrafts — crea borradores para emails que necesitan respuesta. emailMassSend(sheetId) — envio masivo desde Google Sheets.',
+'  TABS: tabZero — agrupa pestanas por dominio. workspaceSave(name) — guarda todas las pestanas como workspace. workspaceRestore(name) — restaura workspace.',
+'  SCRAPE: scrapeToSheet — extrae tablas/listas/enlaces de la pagina actual a Google Sheets.',
+'  IMPORT: importGmail — importa contactos desde Gmail. importCalendar — importa contactos desde Calendar.',
+'  PRIVACY: blockSite(url) — bloquea sitio. unblockSite(url) — desbloquea.',
 'SKILLS: runSkill(name,params?), registerSkill(name,trigger,steps,description?), listSkills — flujos reutilizables',
 'MCP: mcpCall(server,tool,params?), mcpListServers, mcpAddServer(name,url) — Model Context Protocol',
 'DEBATE: debate(topic,providers?:[],rounds?) — debate multi-modelo paralelo',
@@ -6829,6 +6856,14 @@ chrome.runtime.onInstalled.addListener(function(){
 });
 
 try { ensureOffscreen(); } catch(e) { console.error('[X1] ensureOffscreen (top) failed:', e && e.message); }
+
+// Pre-warm Google token on boot
+try { chrome.storage.local.get(['google_token','google_user'], function(d) {
+  if (d.google_token) {
+    // Probe the token to populate in-memory auth cache
+    googleApi('https://www.googleapis.com/oauth2/v2/tokeninfo?access_token=' + d.google_token.substring(0,10)).catch(function(){});
+  }
+}); } catch(e) {}
 
 console.log('[X1] SW Ready — AMI Architecture Active');
 
@@ -21265,6 +21300,16 @@ var X1_SECTOR_PROMPTS = {
   developer: 'Eres X1 en el sector Desarrollo, un arquitecto de software senior. Escribe codigo production-ready, completo y funcional. Responde EN ESPAÑOL solo con el JSON exacto que se te pida, sin texto ni markdown alrededor.',
   reviewer: 'Eres X1 en el sector Auditoria de Codigo, un revisor senior extremadamente riguroso. Busca bugs, vulnerabilidades, malas practicas, casos sin cubrir y codigo incompleto en lo que te pasen. Responde EN ESPAÑOL de forma directa: una lista breve de problemas concretos, o "Sin problemas relevantes" si esta bien.',
   refiner: 'Eres X1 en el sector Refinamiento, encargado de incorporar el feedback de una auditoria en la version final del codigo. Responde EN ESPAÑOL solo con el JSON exacto que se te pida, sin texto ni markdown alrededor.',
+  director: 'Eres X1 en el sector Direccion — el rol que supervisa y da el visto bueno final sobre el trabajo de los demas sectores antes de publicarse. No repites su trabajo: JUZGAS si es publicable. Responde EN ESPAÑOL solo con el JSON exacto que se te pida.',
+};
+
+// Mismo criterio que en el sidepanel (ver SECTOR_PREFERRED_PROVIDER en
+// github-agent.js): cada sector pide primero el modelo mas adecuado a su
+// rol. Si ese proveedor no tiene clave configurada, el proxy cae en la
+// cascada normal (Groq) sin romper nada.
+var X1_SECTOR_PREFERRED_PROVIDER = {
+  strategist: 'kimi-together', developer: 'nvidia-qwen', reviewer: 'nvidia-nemotron',
+  refiner: 'nvidia-qwen', director: 'kimi-together',
 };
 
 function x1GetQueue() {
@@ -21282,13 +21327,14 @@ function x1GhHeaders(token) {
   return { 'Authorization': 'Bearer ' + token, 'Accept': 'application/vnd.github+json' };
 }
 
-function x1AiCall(prompt, systemPrompt, maxTokens, timeoutMs) {
+function x1AiCall(prompt, systemPrompt, maxTokens, timeoutMs, preferProvider) {
   return fetch(X1_PROXY_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-X1-Auth': X1_PROXY_SECRET },
     body: JSON.stringify({
       messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: prompt }],
       max_tokens: maxTokens || 3000,
+      prefer_provider: preferProvider || undefined,
     }),
     signal: AbortSignal.timeout(timeoutMs || 35000),
   }).then(function (r) { return r.ok ? r.json() : null; })
@@ -21304,12 +21350,12 @@ function x1AiCall(prompt, systemPrompt, maxTokens, timeoutMs) {
 // concreta. Si el modelo "hedgea" con texto en vez del JSON pedido,
 // reintenta UNA vez con un recordatorio explicito de formato — evita que un
 // fallo de formato de 2-3s tumbe un ciclo entero que deberia seguir horas.
-function x1AiCallJson(prompt, systemPrompt, maxTokens, timeoutMs, validate) {
-  return x1AiCall(prompt, systemPrompt, maxTokens, timeoutMs).then(function (res) {
+function x1AiCallJson(prompt, systemPrompt, maxTokens, timeoutMs, validate, preferProvider) {
+  return x1AiCall(prompt, systemPrompt, maxTokens, timeoutMs, preferProvider).then(function (res) {
     var parsed = x1ExtractJSON(res.text);
     if (parsed && (!validate || validate(parsed))) return { parsed: parsed, provider: res.provider, model: res.model };
     var repairPrompt = prompt + '\n\nTu respuesta debe ser UNICAMENTE el JSON pedido arriba, sin explicaciones ni markdown. Responde de nuevo, solo el JSON.';
-    return x1AiCall(repairPrompt, systemPrompt, maxTokens, timeoutMs).then(function (res2) {
+    return x1AiCall(repairPrompt, systemPrompt, maxTokens, timeoutMs, preferProvider).then(function (res2) {
       var parsed2 = x1ExtractJSON(res2.text);
       var ok2 = parsed2 && (!validate || validate(parsed2));
       return { parsed: ok2 ? parsed2 : null, provider: res2.provider, model: res2.model };
@@ -21424,6 +21470,21 @@ function x1PublishTask(token, owner, repo, branch, prop) {
 // objetivo, ciclo tras ciclo, sin fin). goalLabel describe el objetivo para
 // el prompt de borrador; sectorsOut acumula que IA respondio en cada fase
 // para mostrarlo en la UI.
+// Comprobacion de cordura antes de publicar — no es un linter real, solo un
+// filtro barato contra la forma mas comun de que un ciclo nocturno sin
+// supervision publique basura: la IA corta la respuesta a mitad de generar
+// un fichero (llaves/parentesis/corchetes muy desbalanceados) o devuelve
+// contenido vacio/irrisoriamente corto. Los ficheros que no la pasan se
+// descartan de la publicacion en vez de comitearse tal cual.
+function x1SanityCheckFile(content) {
+  var c = String(content || '');
+  if (c.trim().length < 3) return false;
+  var opens = (c.match(/[{(\[]/g) || []).length;
+  var closes = (c.match(/[})\]]/g) || []).length;
+  if (Math.abs(opens - closes) > Math.max(3, c.length / 200)) return false;
+  return true;
+}
+
 function x1RunCodePipeline(goalLabel, tarea, filesWithState, researchBlock, sectorsOut) {
   var draftValid = function (p) { return Array.isArray(p.archivos) && p.archivos.length > 0; };
   var draftPrompt = 'Objetivo: "' + goalLabel + '"\nTarea: ' + tarea.titulo + '\nMotivo: ' + tarea.motivo +
@@ -21431,7 +21492,7 @@ function x1RunCodePipeline(goalLabel, tarea, filesWithState, researchBlock, sect
     filesWithState.map(function (f) { return '=== ' + f.path + ' (' + (f.exists ? 'existente' : 'nuevo') + ') ===\n' + (f.current || '(vacio, fichero nuevo)').slice(0, 1500); }).join('\n\n') +
     '\n\nResponde SOLO con JSON: {"archivos":[{"path":"ruta","contenido":"contenido COMPLETO del fichero"}]}';
 
-  return x1AiCallJson(draftPrompt, X1_SECTOR_PROMPTS.developer, 3000, 35000, draftValid).then(function (draftRes) {
+  return x1AiCallJson(draftPrompt, X1_SECTOR_PROMPTS.developer, 3000, 35000, draftValid, X1_SECTOR_PREFERRED_PROVIDER.developer).then(function (draftRes) {
     sectorsOut.push({ fase: 'Borrador', sector: 'Desarrollo', provider: draftRes.provider, model: draftRes.model });
     if (!draftRes.parsed) throw new Error('El sector Desarrollo no genero un borrador valido ni tras reintentar');
     var draft = draftRes.parsed;
@@ -21439,21 +21500,37 @@ function x1RunCodePipeline(goalLabel, tarea, filesWithState, researchBlock, sect
     var reviewPrompt = 'Revisa este codigo generado para la tarea "' + tarea.titulo + '". Busca bugs, seguridad, malas practicas y casos sin cubrir.\n\n' +
       draft.archivos.map(function (f) { return '=== ' + f.path + ' ===\n' + String(f.contenido || '').slice(0, 3000); }).join('\n\n');
 
-    return x1AiCall(reviewPrompt, X1_SECTOR_PROMPTS.reviewer, 1200, 25000).then(function (reviewRes) {
+    return x1AiCall(reviewPrompt, X1_SECTOR_PROMPTS.reviewer, 1200, 25000, X1_SECTOR_PREFERRED_PROVIDER.reviewer).then(function (reviewRes) {
       sectorsOut.push({ fase: 'Auditoria', sector: 'Auditoria de codigo', provider: reviewRes.provider, model: reviewRes.model });
 
       var refinePrompt = 'Codigo original:\n' + draft.archivos.map(function (f) { return '=== ' + f.path + ' ===\n' + f.contenido; }).join('\n\n') +
         '\n\nAuditoria recibida:\n' + (reviewRes.text || '(sin observaciones)') +
         '\n\nCorrige el codigo segun la auditoria (si no hay problemas reales, deja el codigo igual). Responde SOLO con JSON: {"titulo_pr":"titulo corto","descripcion_pr":"descripcion en espanol","archivos":[{"path":"ruta","contenido":"contenido FINAL completo del fichero"}]}';
 
-      return x1AiCallJson(refinePrompt, X1_SECTOR_PROMPTS.refiner, 3000, 35000, draftValid).then(function (refineRes) {
+      return x1AiCallJson(refinePrompt, X1_SECTOR_PROMPTS.refiner, 3000, 35000, draftValid, X1_SECTOR_PREFERRED_PROVIDER.refiner).then(function (refineRes) {
         sectorsOut.push({ fase: 'Refinamiento', sector: 'Refinamiento', provider: refineRes.provider, model: refineRes.model });
         var final = refineRes.parsed || draft;
         var finalFiles = final.archivos.map(function (f) {
           var match = filesWithState.filter(function (e) { return e.path === f.path; })[0];
           return Object.assign({}, f, { sha: match ? match.sha : null, exists: match ? match.exists : false, current: match ? match.current : '' });
         });
-        return { titulo_pr: final.titulo_pr || tarea.titulo, descripcion_pr: final.descripcion_pr || tarea.motivo, archivos: finalFiles };
+        var sane = finalFiles.filter(function (f) { return x1SanityCheckFile(f.contenido); });
+        if (sane.length === 0) throw new Error('Ningun fichero paso la comprobacion de cordura (contenido vacio o cortado a mitad) — no se publica nada');
+        if (sane.length < finalFiles.length) sectorsOut.push({ fase: 'Cordura', sector: 'Verificacion', provider: null, model: (finalFiles.length - sane.length) + ' fichero(s) descartado(s) por parecer incompletos' });
+
+        // ── Fase 5: Direccion — IA que supervisa a las demas y da el
+        // veredicto final. Nada se publica sin su aprobacion explicita. ──
+        var directorPrompt = 'Tarea: ' + tarea.titulo + '\nMotivo: ' + tarea.motivo +
+          '\n\nAuditoria de Codigo encontro: ' + (reviewRes.text || '(sin observaciones)') +
+          '\n\nFicheros finales a publicar: ' + sane.map(function (f) { return f.path; }).join(', ') +
+          '\n\nDecide si esto es publicable tal cual como Pull Request. Responde SOLO con JSON: {"aprobado": true/false, "razon": "una frase"}';
+
+        return x1AiCallJson(directorPrompt, X1_SECTOR_PROMPTS.director, 300, 20000, function (p) { return typeof p.aprobado === 'boolean'; }, X1_SECTOR_PREFERRED_PROVIDER.director).then(function (dirRes) {
+          var veredicto = dirRes.parsed || { aprobado: true, razon: 'Direccion no respondio a tiempo; se publica por defecto (fail-open).' };
+          sectorsOut.push({ fase: 'Direccion', sector: veredicto.aprobado ? 'Aprobado' : 'RECHAZADO: ' + veredicto.razon, provider: dirRes.provider, model: dirRes.model });
+          if (!veredicto.aprobado) throw new Error('Direccion rechazo el ciclo: ' + veredicto.razon);
+          return { titulo_pr: final.titulo_pr || tarea.titulo, descripcion_pr: final.descripcion_pr || tarea.motivo, archivos: sane };
+        });
       });
     });
   });
@@ -21532,38 +21609,78 @@ function x1DecideNextObjective(queue) {
     'Repositorio: ' + queue.owner + '/' + queue.name + '\nInforme de analisis:\n' + (queue.analysisReport || '(sin informe)') + '\n\n' +
     (recent ? 'Ya se hizo (NO repitas esto, elige algo distinto):\n' + recent + '\n\n' : '(Primer ciclo de autopiloto, sin historial previo.)\n\n') +
     'Responde SOLO con JSON: {"titulo":"titulo corto de la mejora elegida","motivo":"por que es la mas valiosa ahora","busquedas":["hasta 2 terminos de busqueda utiles"],"archivos":[{"path":"ruta","motivo":"..."}]}\nMaximo 3 archivos.';
-  return x1AiCallJson(prompt, X1_SECTOR_PROMPTS.strategist, 1200, 25000, function (p) { return !!p.titulo; }).then(function (r) {
+  return x1AiCallJson(prompt, X1_SECTOR_PROMPTS.strategist, 1200, 25000, function (p) { return !!p.titulo; }, X1_SECTOR_PREFERRED_PROVIDER.strategist).then(function (r) {
     var tarea = r.parsed || { titulo: 'Mejora general de calidad', motivo: 'El sector Estrategia no pudo decidir un objetivo especifico esta vez.', busquedas: ['buenas practicas de codigo'], archivos: [] };
     return { tarea: tarea, sector: { fase: 'Estrategia', sector: 'Estrategia', provider: r.provider, model: r.model } };
+  });
+}
+
+// Cada 5 ciclos, refresca queue.analysisReport con un resumen ligero del
+// estado actual (arbol + lo hecho recientemente) — sin esto, el autopiloto
+// decidiria toda la noche basandose SOLO en el informe del primer momento,
+// cada vez mas desfasado a medida que sus propios PRs cambian el repo.
+function x1GhFetchTree(token, owner, repo, branch) {
+  return fetch(X1_GH_API + '/repos/' + owner + '/' + repo + '/git/trees/' + encodeURIComponent(branch) + '?recursive=1', { headers: x1GhHeaders(token) })
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (d) { return (d && d.tree || []).filter(function (n) { return n.type === 'blob'; }).map(function (n) { return n.path; }); })
+    .catch(function () { return []; });
+}
+
+function x1RefreshAnalysis(queue, token) {
+  return x1GhFetchTree(token, queue.owner, queue.name, queue.branch).then(function (paths) {
+    var recentTitles = (queue.history || []).slice(-10).map(function (h) { return h.titulo; }).join(', ');
+    var prompt = 'Arbol de ficheros ACTUAL del repositorio ' + queue.owner + '/' + queue.name + ' (tras varios ciclos de autopiloto):\n' +
+      paths.slice(0, 150).join('\n') + '\n\nCambios recientes ya aplicados por autopiloto: ' + (recentTitles || '(ninguno aun)') +
+      '\n\nAnalisis original (referencia, puede estar desfasado):\n' + (queue.analysisReport || '') +
+      '\n\nResponde en espanol, MARKDOWN, con "## Estado actual" (3-5 bullets sobre el estado real del repo ahora mismo) y "## Prioridades" (3-5 bullets de lo mas valioso a construir a continuacion, evitando repetir lo ya hecho).';
+    return x1AiCall(prompt, X1_SECTOR_PROMPTS.strategist, 900, 22000, X1_SECTOR_PREFERRED_PROVIDER.strategist).then(function (r) {
+      if (r.text) queue.analysisReport = r.text;
+      return queue;
+    });
   });
 }
 
 function x1ProcessAutopilotCycle(queue) {
   return x1GetGithubToken().then(function (token) {
     if (!token) throw new Error('Sin sesion de GitHub');
-    return x1DecideNextObjective(queue).then(function (decision) {
-      var tarea = decision.tarea;
-      tarea.sectors = [decision.sector];
-      return x1PrepareTask(token, queue.owner, queue.name, tarea).then(function (prep) {
-        return x1RunCodePipeline(tarea.titulo, tarea, prep.filesWithState, prep.researchBlock, tarea.sectors).then(function (proposal) {
-          return x1PublishAndCount(token, queue.owner, queue.name, queue.branch, proposal).then(function (result) {
-            tarea.status = 'done';
-            tarea.result = result;
-            return tarea;
+    // Re-analisis periodico: cada 5 ciclos completados, antes de decidir el
+    // siguiente objetivo, para no trabajar toda la noche sobre un informe
+    // que el propio autopiloto ya dejo desfasado.
+    var cycleCount = (queue.history || []).length;
+    var refresh = (cycleCount > 0 && cycleCount % 5 === 0) ? x1RefreshAnalysis(queue, token) : Promise.resolve(queue);
+
+    return refresh.then(function () {
+      return x1DecideNextObjective(queue).then(function (decision) {
+        var tarea = decision.tarea;
+        tarea.sectors = [decision.sector];
+        return x1PrepareTask(token, queue.owner, queue.name, tarea).then(function (prep) {
+          return x1RunCodePipeline(tarea.titulo, tarea, prep.filesWithState, prep.researchBlock, tarea.sectors).then(function (proposal) {
+            return x1PublishAndCount(token, queue.owner, queue.name, queue.branch, proposal).then(function (result) {
+              tarea.status = 'done';
+              tarea.result = result;
+              return tarea;
+            });
           });
+        }).catch(function (e) {
+          tarea.status = 'error';
+          tarea.result = { error: (e && e.message) || 'Error desconocido', completedAt: Date.now() };
+          return tarea;
         });
-      }).catch(function (e) {
-        tarea.status = 'error';
-        tarea.result = { error: (e && e.message) || 'Error desconocido', completedAt: Date.now() };
-        return tarea;
       });
     });
   }).then(function (tarea) {
     queue.history = (queue.history || []).concat([tarea]).slice(-40);
+    // Circuit breaker: cuenta fallos consecutivos. Sin esto, un fallo
+    // persistente (token de GitHub caducado, repo borrado, etc.) haria que
+    // el autopiloto reintentase toda la noche sin avisar a nadie, gastando
+    // ciclos de IA para nada.
+    queue.consecutiveFailures = tarea.status === 'error' ? (queue.consecutiveFailures || 0) + 1 : 0;
     queue.updatedAt = Date.now();
     return x1SaveQueue(queue).then(function () { return queue; });
   });
 }
+
+var X1_AUTOPILOT_MAX_CONSECUTIVE_FAILURES = 3;
 
 chrome.alarms.onAlarm.addListener(function (alarm) {
   if (alarm.name !== X1_AUTOMATION_ALARM) return;
@@ -21571,9 +21688,20 @@ chrome.alarms.onAlarm.addListener(function (alarm) {
     if (!queue || queue.status === 'paused') return;
 
     if (queue.mode === 'autopilot') {
-      x1ProcessAutopilotCycle(queue).then(function () {
+      x1ProcessAutopilotCycle(queue).then(function (updatedQueue) {
+        if ((updatedQueue.consecutiveFailures || 0) >= X1_AUTOPILOT_MAX_CONSECUTIVE_FAILURES) {
+          updatedQueue.status = 'paused';
+          x1SaveQueue(updatedQueue);
+          try {
+            chrome.notifications.create('x1-autopilot-paused-' + Date.now(), {
+              type: 'basic', iconUrl: 'assets/icon-128.png', title: 'X1 puso en pausa el autopiloto',
+              message: X1_AUTOPILOT_MAX_CONSECUTIVE_FAILURES + ' ciclos seguidos fallaron en ' + updatedQueue.owner + '/' + updatedQueue.name + ' — revisa el sidepanel antes de reactivarlo.',
+            });
+          } catch (e) {}
+          return; // no programa el siguiente tick: se queda pausado hasta que el usuario reactive
+        }
         var mins = 15 + Math.floor(Math.random() * 10);
-        chrome.alarms.create(X1_AUTOMATION_ALARM, { delayInMinutes: mins }); // sin fin: el autopiloto no termina nunca por si solo
+        chrome.alarms.create(X1_AUTOMATION_ALARM, { delayInMinutes: mins }); // sin fin: el autopiloto no termina nunca por si solo (salvo pausa por fallos)
       });
       return;
     }
@@ -21622,6 +21750,22 @@ chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
   if (msg.type === 'X1_AUTOMATION_QUEUE_CANCEL') {
     chrome.alarms.clear(X1_AUTOMATION_ALARM);
     chrome.storage.local.remove('x1_automation_queue').then(function () { sendResponse({ ok: true }); });
+    return true;
+  }
+  // Reactiva una cola de autopiloto pausada por el circuit breaker (N ciclos
+  // seguidos fallidos) — resetea el contador y vuelve a programar el tick.
+  if (msg.type === 'X1_AUTOMATION_QUEUE_RESUME') {
+    x1GetQueue().then(function (queue) {
+      if (!queue) { sendResponse({ ok: false }); return; }
+      queue.status = 'running';
+      queue.consecutiveFailures = 0;
+      queue.updatedAt = Date.now();
+      x1SaveQueue(queue).then(function () {
+        var mins = 15 + Math.floor(Math.random() * 10);
+        chrome.alarms.create(X1_AUTOMATION_ALARM, { delayInMinutes: mins });
+        sendResponse({ ok: true });
+      });
+    });
     return true;
   }
 });

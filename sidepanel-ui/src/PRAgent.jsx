@@ -3,13 +3,13 @@ import * as B from './backend.js';
 import {
   fetchOpenPRs, fetchPRDiff, reviewPRDiff, publishPRComment,
   loadRepoAnalysis, runAutoBuild, runAutopilot, publishAutoBuild,
-  getBackgroundQueue, cancelBackgroundQueue,
+  getBackgroundQueue, cancelBackgroundQueue, resumeBackgroundQueue,
 } from './github-agent.js';
 import { ProcessLog } from './ProcessTimeline.jsx';
-import { DiffView } from './DiffView.jsx';
+import { DiffView, diffCounts } from './DiffView.jsx';
 import { FileAddedIcon, FileDiffIcon, ChevronDownIcon, ChevronUpIcon, GitBranchIcon, ClockIcon, SyncIcon, RocketIcon } from '@primer/octicons-react';
 
-const F = "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif";
+const F = "'Segoe UI', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif";
 const MONO = "'SF Mono', 'Cascadia Code', Consolas, monospace";
 
 // ── Tokens de color de Primer (github.com), replicados a mano sin el runtime
@@ -17,12 +17,12 @@ const MONO = "'SF Mono', 'Cascadia Code', Consolas, monospace";
 // sidepanel de extension. Ver ProcessTimeline.jsx para los mismos tokens
 // aplicados al Timeline. ──
 const C = {
-  border: '#d0d7de', canvasSubtle: '#f6f8fa', fg: '#1f2328', fgMuted: '#59636e', fgSubtle: '#818b98',
-  accent: '#0969da', accentSubtle: '#ddf4ff',
-  success: '#1a7f37', successEmphasis: '#1f883d', successSubtle: '#dafbe1', successBorder: '#4ac26b',
-  danger: '#d1242f', dangerEmphasis: '#cf222e', dangerSubtle: '#ffebe9', dangerBorder: '#ff8182',
-  attention: '#9a6700', attentionSubtle: '#fff8c5', attentionBorder: '#d4a72c',
-  neutralSubtle: '#eaeef2',
+  border: '#F2F1ED', canvasSubtle: '#F2F1ED', fg: '#26251E', fgMuted: '#9E94D5', fgSubtle: '#9E94D5',
+  accent: '#26251E', accentSubtle: '#F2F1ED', agentDot: '#9B99C4',
+  success: '#1A7F5A', successEmphasis: '#166B4C', successSubtle: '#E1F2EA', successBorder: '#3FA377',
+  danger: '#C4383A', dangerEmphasis: '#A32E30', dangerSubtle: '#FBEAEA', dangerBorder: '#E3A8A9',
+  attention: '#8A6432', attentionSubtle: '#F3E4CC', attentionBorder: '#C08532',
+  neutralSubtle: '#F2F1ED',
 };
 
 const H3 = { fontSize: '14px', fontWeight: '600', color: C.fg, margin: '0 0 8px', padding: '0 0 8px', borderBottom: '1px solid ' + C.border };
@@ -144,9 +144,9 @@ function startAutopilot(repoCtx) {
 
 var FLASH_PALETTE = {
   default: { bg: C.canvasSubtle, border: C.border, fg: C.fg },
-  success: { bg: C.successSubtle, border: C.successBorder, fg: '#116329' },
-  danger: { bg: C.dangerSubtle, border: C.dangerBorder, fg: '#82071e' },
-  attention: { bg: C.attentionSubtle, border: C.attentionBorder, fg: '#4d3800' },
+  success: { bg: C.successSubtle, border: C.successBorder, fg: '#0F5C3E' },
+  danger: { bg: C.dangerSubtle, border: C.dangerBorder, fg: '#7A2323' },
+  attention: { bg: C.attentionSubtle, border: C.attentionBorder, fg: '#4A3418' },
 };
 
 function Flash({ variant = 'default', children, action }) {
@@ -154,7 +154,7 @@ function Flash({ variant = 'default', children, action }) {
   return React.createElement('div', {
     style: {
       display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '12px 16px',
-      borderRadius: '6px', border: '1px solid ' + p.border, background: p.bg, color: p.fg,
+      borderRadius: '4px', border: '1px solid ' + p.border, background: p.bg, color: p.fg,
       fontSize: '13px', lineHeight: '1.6', fontFamily: F,
     },
   },
@@ -184,7 +184,7 @@ function BranchTag({ children }) {
   return React.createElement('span', {
     style: {
       display: 'inline-flex', alignItems: 'center', gap: '4px', fontFamily: MONO, fontSize: '12px',
-      padding: '2px 8px', borderRadius: '6px', background: C.neutralSubtle, color: C.fg,
+      padding: '2px 8px', borderRadius: '4px', background: C.neutralSubtle, color: C.fg,
     },
   },
     React.createElement(GitBranchIcon, { size: 12, fill: C.fgMuted }),
@@ -196,7 +196,7 @@ function CodeBlock({ children, maxHeight }) {
   return React.createElement('pre', {
     style: {
       margin: 0, padding: '12px 14px', background: C.canvasSubtle, border: '1px solid ' + C.border,
-      borderRadius: '6px', fontFamily: MONO, fontSize: '12px', lineHeight: '1.6', color: C.fg,
+      borderRadius: '4px', fontFamily: MONO, fontSize: '12px', lineHeight: '1.6', color: C.fg,
       whiteSpace: 'pre-wrap', wordBreak: 'break-word', overflow: 'auto', maxHeight: maxHeight || '260px',
     },
   }, children);
@@ -216,7 +216,7 @@ function timeAgo(ts) {
 // Refinamiento), los ficheros tocados, lineas +/- y el enlace al PR — asi
 // queda claro que no es una sola llamada a IA sino una orquestacion real que
 // se reparte en el tiempo.
-function BackgroundQueueView({ queue, onCancel, cancelling }) {
+function BackgroundQueueView({ queue, onCancel, onResume, cancelling }) {
   var isAutopilot = queue.mode === 'autopilot';
   var list = isAutopilot ? (queue.history || []) : (queue.tareas || []);
   var done = list.filter(function (t) { return t.status === 'done'; }).length;
@@ -224,6 +224,7 @@ function BackgroundQueueView({ queue, onCancel, cancelling }) {
   var pending = isAutopilot ? 0 : list.filter(function (t) { return t.status === 'pending'; }).length;
   var active = list.filter(function (t) { return t.status === 'active'; }).length;
   var finished = !isAutopilot && pending === 0 && active === 0;
+  var isPaused = queue.status === 'paused';
   // El historial de autopiloto se muestra del mas reciente al mas antiguo
   // (lo que se acaba de hacer importa mas que el primer ciclo de hace horas).
   var displayList = isAutopilot ? list.slice().reverse() : list;
@@ -231,10 +232,19 @@ function BackgroundQueueView({ queue, onCancel, cancelling }) {
   return React.createElement('div', { style: { marginBottom: '16px' } },
     React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' } },
       React.createElement('h3', { style: Object.assign({}, H3, { flex: 1, border: 'none', margin: 0, padding: 0 }) }, isAutopilot ? 'Autopiloto — historial de ciclos' : 'Cola de automatizacion en segundo plano'),
+      isPaused && React.createElement('button', {
+        onClick: onResume,
+        style: { fontSize: '11px', color: C.accent, background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: F, fontWeight: '600' },
+      }, 'Reactivar'),
       React.createElement('button', {
         onClick: onCancel, disabled: cancelling,
         style: { fontSize: '11px', color: C.danger, background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: F },
       }, cancelling ? 'Cancelando…' : (isAutopilot ? 'Desactivar autopiloto' : 'Cancelar cola'))
+    ),
+    isPaused && React.createElement('div', { style: { marginBottom: '10px' } },
+      React.createElement(Flash, { variant: 'attention' },
+        'Autopiloto en pausa: ' + (queue.consecutiveFailures || 0) + ' ciclos seguidos fallaron (circuit breaker de seguridad, para no gastar llamadas de IA toda la noche en un fallo persistente). Revisa el ultimo error abajo y pulsa "Reactivar" cuando este resuelto.'
+      )
     ),
     React.createElement('div', { style: { fontSize: '11px', color: C.fgMuted, marginBottom: '10px', lineHeight: '1.6' } },
       isAutopilot
@@ -243,7 +253,7 @@ function BackgroundQueueView({ queue, onCancel, cancelling }) {
           ? ('Cola completada: ' + done + ' Pull Request(s) creados' + (errored ? ', ' + errored + ' con error' : '') + '.')
           : (done + ' completada(s) · ' + pending + ' pendiente(s) · X1 procesa una tarea cada 15-25 min, siga o no el sidepanel abierto — ultima actividad hace ' + timeAgo(queue.updatedAt) + '.')
     ),
-    React.createElement('div', { style: { border: '1px solid ' + C.border, borderRadius: '6px', overflow: 'hidden' } },
+    React.createElement('div', { style: { border: '1px solid ' + C.border, borderRadius: '4px', overflow: 'hidden' } },
       displayList.map(function (t, i) {
         return React.createElement(QueueTaskRow, { key: i, tarea: t, index: isAutopilot ? (displayList.length - i) : i, isLast: i === displayList.length - 1 });
       })
@@ -255,7 +265,7 @@ function QueueTaskRow({ tarea, index, isLast }) {
   var color = tarea.status === 'done' ? C.success : tarea.status === 'error' ? C.danger : tarea.status === 'active' ? C.accent : C.fgSubtle;
   var statusLabel = tarea.status === 'done' ? 'completada' : tarea.status === 'error' ? 'error' : tarea.status === 'active' ? 'en curso' : 'en cola';
 
-  return React.createElement('div', { style: { padding: '8px 10px', borderBottom: isLast ? 'none' : '1px solid ' + C.border } },
+  return React.createElement('div', { style: { padding: '8px 12px', borderBottom: isLast ? 'none' : '1px solid ' + C.border } },
     React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '6px' } },
       tarea.status === 'active'
         ? React.createElement(SyncIcon, { size: 12, fill: color, style: { animation: 'spin 1s linear infinite' } })
@@ -270,8 +280,11 @@ function QueueTaskRow({ tarea, index, isLast }) {
       tarea.sectors.map(function (s, i) {
         return React.createElement('span', {
           key: i, title: s.model || s.provider || '',
-          style: { fontSize: '10px', padding: '1px 6px', borderRadius: '999px', background: C.neutralSubtle, color: C.fgMuted },
-        }, s.fase + ': ' + (s.model || s.provider || 'IA'));
+          style: { display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '10px', padding: '1px 6px', borderRadius: '999px', background: C.neutralSubtle, color: C.fgMuted },
+        },
+          React.createElement('span', { style: { width: '5px', height: '5px', borderRadius: '50%', background: C.agentDot, flexShrink: 0 } }),
+          s.fase + ': ' + (s.model || s.provider || 'IA')
+        );
       })
     ),
 
@@ -316,6 +329,10 @@ export function PRAgent({ githubUser, onGoToRepo }) {
   function handleCancelQueue() {
     setCancelling(true);
     cancelBackgroundQueue().then(function () { setQueue(null); setCancelling(false); });
+  }
+
+  function handleResumeQueue() {
+    resumeBackgroundQueue().then(function () { getBackgroundQueue().then(setQueue); });
   }
 
   React.useEffect(function () { setRepoCtx(loadRepoAnalysis()); }, []);
@@ -392,7 +409,7 @@ export function PRAgent({ githubUser, onGoToRepo }) {
 
     // ── Autopiloto: sin objetivo, sin fin ──
     (!queue || queue.mode !== 'autopilot')
-      ? React.createElement('div', { style: { marginTop: '14px', padding: '12px 14px', border: '1px solid ' + C.border, borderRadius: '6px', background: C.canvasSubtle } },
+      ? React.createElement('div', { style: { marginTop: '14px', padding: '12px 14px', border: '1px solid ' + C.border, borderRadius: '4px', background: C.canvasSubtle } },
           React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' } },
             React.createElement(RocketIcon, { size: 14, fill: C.accent }),
             React.createElement('span', { style: { fontSize: '13px', fontWeight: '600', color: C.fg } }, 'Autopiloto')
@@ -403,10 +420,10 @@ export function PRAgent({ githubUser, onGoToRepo }) {
           React.createElement('button', {
             onClick: function () { startAutopilot(repoCtx); }, disabled: s.building || !repoCtx,
             style: {
-              display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 16px', borderRadius: '6px', border: '1px solid rgba(27,31,36,0.15)',
+              display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '5.6px 15px', borderRadius: '4px', border: '1px solid rgba(27,31,36,0.15)',
               background: s.building || !repoCtx ? C.canvasSubtle : C.accent,
               color: s.building || !repoCtx ? C.fgSubtle : '#ffffff',
-              fontSize: '13px', fontWeight: '600', cursor: s.building || !repoCtx ? 'default' : 'pointer', fontFamily: F,
+              fontSize: '14px', fontWeight: '500', cursor: s.building || !repoCtx ? 'default' : 'pointer', fontFamily: F,
             },
           }, React.createElement(RocketIcon, { size: 12, fill: 'currentColor' }), s.building ? 'Decidiendo…' : 'Activar autopiloto')
         )
@@ -426,7 +443,7 @@ export function PRAgent({ githubUser, onGoToRepo }) {
         placeholder: 'Que quieres que X1 construya o investigue? Ej: "anade tests unitarios a github-agent.js", "investiga como integrar Stripe", "arregla el bug de login"…',
         rows: 3,
         style: {
-          width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: '6px', border: '1px solid ' + C.border,
+          width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: '4px', border: '1px solid ' + C.border,
           fontSize: '13px', fontFamily: F, resize: 'vertical', outline: 'none', color: C.fg, lineHeight: '1.5',
         },
       }),
@@ -434,10 +451,10 @@ export function PRAgent({ githubUser, onGoToRepo }) {
         React.createElement('button', {
           onClick: function () { build(repoCtx); }, disabled: s.building || !s.goal.trim(),
           style: {
-            padding: '6px 16px', borderRadius: '6px', border: '1px solid rgba(27,31,36,0.15)',
+            padding: '5.6px 15px', borderRadius: '4px', border: '1px solid rgba(27,31,36,0.15)',
             background: s.building || !s.goal.trim() ? C.canvasSubtle : C.successEmphasis,
             color: s.building || !s.goal.trim() ? C.fgSubtle : '#ffffff',
-            fontSize: '13px', fontWeight: '600', cursor: s.building || !s.goal.trim() ? 'default' : 'pointer', fontFamily: F,
+            fontSize: '14px', fontWeight: '500', cursor: s.building || !s.goal.trim() ? 'default' : 'pointer', fontFamily: F,
           },
         }, s.building ? 'Construyendo…' : 'Construir y publicar solo, sin preguntar'),
         React.createElement('span', { style: { fontSize: '11px', color: C.fgSubtle } }, 'GitHub · npm · Stack Overflow · lectura de paginas web · panel de IAs'),
@@ -454,7 +471,11 @@ export function PRAgent({ githubUser, onGoToRepo }) {
     proposal && React.createElement('div', { style: { marginBottom: '16px' } },
       proposalFiles.length === 0
         ? React.createElement(Flash, { variant: proposal.error ? 'danger' : 'default' },
-            proposal.error ? 'El panel de IA no devolvio una propuesta valida para ninguna tarea. Reintenta describiendo el objetivo con mas detalle, o analiza primero el repositorio para que X1 tenga mas contexto.' : (proposal.resumen || 'Investigacion completada — revisa los resultados en el proceso de arriba.')
+            proposal.directorRazon
+              ? 'El sector Direccion rechazo publicar este ciclo: ' + proposal.directorRazon
+              : proposal.error
+                ? 'El panel de IA no devolvio una propuesta valida para ninguna tarea. Reintenta describiendo el objetivo con mas detalle, o analiza primero el repositorio para que X1 tenga mas contexto.'
+                : (proposal.resumen || 'Investigacion completada — revisa los resultados en el proceso de arriba.')
           )
         : React.createElement(React.Fragment, null,
             React.createElement('h3', { style: H3 }, 'Propuesta de X1'),
@@ -464,16 +485,22 @@ export function PRAgent({ githubUser, onGoToRepo }) {
             proposalFiles.map(function (f) {
               var open = expandedFile === f.path;
               var FileGlyph = f.exists ? FileDiffIcon : FileAddedIcon;
-              return React.createElement('div', { key: f.path, style: { border: '1px solid ' + C.border, borderRadius: '6px', marginBottom: '6px', overflow: 'hidden' } },
+              var counts = diffCounts(f.current, f.contenido);
+              return React.createElement('div', {
+                key: f.path,
+                style: { border: '1px solid ' + C.border, borderRadius: '8px', marginBottom: '6px', overflow: 'hidden', background: '#FFFFFF' },
+              },
                 React.createElement('div', {
                   onClick: function () { setExpandedFile(open ? null : f.path); },
-                  style: { display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 10px', background: C.canvasSubtle, cursor: 'pointer' },
+                  style: { display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 12px', cursor: 'pointer' },
                 },
-                  React.createElement(FileGlyph, { size: 12, fill: f.exists ? C.attention : C.success }),
+                  React.createElement(FileGlyph, { size: 12, fill: C.fgMuted }),
                   React.createElement('span', { style: { fontFamily: MONO, fontSize: '11px', color: C.fg, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, f.path),
+                  React.createElement('span', { style: { fontFamily: MONO, fontSize: '11px', color: C.success, fontWeight: '600' } }, '+' + counts.added),
+                  React.createElement('span', { style: { fontFamily: MONO, fontSize: '11px', color: C.danger, fontWeight: '600' } }, '-' + counts.removed),
                   React.createElement((open ? ChevronUpIcon : ChevronDownIcon), { size: 12, fill: C.fgSubtle })
                 ),
-                open && React.createElement('div', { style: { padding: '8px 10px' } },
+                open && React.createElement('div', { style: { padding: '8px 12px' } },
                   f.motivo && React.createElement('div', { style: { fontSize: '11px', color: C.fgMuted, marginBottom: '6px', fontStyle: 'italic' } }, f.motivo),
                   React.createElement(DiffView, { oldText: f.current, newText: f.contenido })
                 )
@@ -492,7 +519,7 @@ export function PRAgent({ githubUser, onGoToRepo }) {
               React.createElement(Flash, { variant: 'danger' }, s.publishError),
               React.createElement('button', {
                 onClick: function () { publish(repoCtx); },
-                style: { marginTop: '8px', padding: '5px 14px', borderRadius: '6px', border: '1px solid ' + C.border, background: C.canvasSubtle, color: C.fg, fontSize: '12px', fontWeight: '500', cursor: 'pointer', fontFamily: F },
+                style: { marginTop: '8px', padding: '5.6px 15px', borderRadius: '4px', border: '1px solid ' + C.border, background: C.canvasSubtle, color: C.fg, fontSize: '12px', fontWeight: '500', cursor: 'pointer', fontFamily: F },
               }, 'Reintentar publicacion')
             ),
 
@@ -504,7 +531,7 @@ export function PRAgent({ githubUser, onGoToRepo }) {
     ),
 
     // ── Cola de automatizacion en segundo plano ──
-    queue && ((queue.mode === 'autopilot') || (queue.tareas && queue.tareas.length > 0)) && React.createElement(BackgroundQueueView, { queue: queue, onCancel: handleCancelQueue, cancelling: cancelling }),
+    queue && ((queue.mode === 'autopilot') || (queue.tareas && queue.tareas.length > 0)) && React.createElement(BackgroundQueueView, { queue: queue, onCancel: handleCancelQueue, onResume: handleResumeQueue, cancelling: cancelling }),
 
     // ── Revision de PRs abiertos (secundario) ──
     React.createElement('div', { style: { marginTop: '24px', paddingTop: '16px', borderTop: '1px solid ' + C.border } },
@@ -519,7 +546,7 @@ export function PRAgent({ githubUser, onGoToRepo }) {
                   var isSel = selectedPr && selectedPr.number === pr.number && selectedPr.repo === pr.repo;
                   return React.createElement('div', {
                     key: pr.repo + '#' + pr.number,
-                    style: { display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', border: '1px solid ' + (isSel ? C.accent : C.border), borderRadius: '6px', background: '#ffffff', marginBottom: '8px' },
+                    style: { display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 12px', border: '1px solid ' + (isSel ? C.accent : C.border), borderRadius: '4px', background: '#ffffff', marginBottom: '8px' },
                   },
                     React.createElement('span', { style: { width: '8px', height: '8px', borderRadius: '50%', background: C.success, flexShrink: 0 } }),
                     React.createElement('div', { style: { flex: 1, minWidth: 0 } },
@@ -528,7 +555,7 @@ export function PRAgent({ githubUser, onGoToRepo }) {
                     ),
                     React.createElement('button', {
                       onClick: function () { runReview(pr); }, disabled: reviewingPr,
-                      style: { flexShrink: 0, padding: '4px 10px', borderRadius: '6px', border: '1px solid rgba(27,31,36,0.15)', background: reviewingPr ? C.canvasSubtle : C.successEmphasis, color: reviewingPr ? C.fgSubtle : '#ffffff', fontSize: '11px', fontWeight: '600', cursor: reviewingPr ? 'default' : 'pointer', fontFamily: F },
+                      style: { flexShrink: 0, padding: '5.6px 15px', borderRadius: '4px', border: '1px solid rgba(27,31,36,0.15)', background: reviewingPr ? C.canvasSubtle : C.successEmphasis, color: reviewingPr ? C.fgSubtle : '#ffffff', fontSize: '12px', fontWeight: '500', cursor: reviewingPr ? 'default' : 'pointer', fontFamily: F },
                     }, 'Revisar')
                   );
                 }),
@@ -546,11 +573,11 @@ export function PRAgent({ githubUser, onGoToRepo }) {
                     React.createElement('div', { style: { display: 'flex', gap: '8px', marginTop: '10px' } },
                       React.createElement('button', {
                         onClick: publishComment, disabled: publishingComment || commentPublished,
-                        style: { padding: '5px 14px', borderRadius: '6px', border: '1px solid rgba(27,31,36,0.15)', background: commentPublished ? C.canvasSubtle : C.successEmphasis, color: commentPublished ? C.success : '#ffffff', fontSize: '12px', fontWeight: '600', cursor: commentPublished ? 'default' : 'pointer', fontFamily: F },
+                        style: { padding: '5.6px 15px', borderRadius: '4px', border: '1px solid rgba(27,31,36,0.15)', background: commentPublished ? C.canvasSubtle : C.successEmphasis, color: commentPublished ? C.success : '#ffffff', fontSize: '12px', fontWeight: '500', cursor: commentPublished ? 'default' : 'pointer', fontFamily: F },
                       }, commentPublished ? 'Publicado en el PR' : publishingComment ? 'Publicando…' : 'Publicar comentario'),
                       React.createElement('button', {
                         onClick: function () { runReview(selectedPr); }, disabled: reviewingPr,
-                        style: { padding: '5px 14px', borderRadius: '6px', border: '1px solid ' + C.border, background: C.canvasSubtle, color: C.fg, fontSize: '12px', fontWeight: '500', cursor: 'pointer', fontFamily: F },
+                        style: { padding: '5.6px 15px', borderRadius: '4px', border: '1px solid ' + C.border, background: C.canvasSubtle, color: C.fg, fontSize: '12px', fontWeight: '500', cursor: 'pointer', fontFamily: F },
                       }, 'Rehacer')
                     )
                   )

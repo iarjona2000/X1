@@ -5,26 +5,26 @@ import './backend.js';
 import './panel.css';
 
 const S = {
-  page: { height:'100vh', width:'100vw', display:'flex', alignItems:'center', justifyContent:'center', background:'#ffffff', fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans",Helvetica,Arial,sans-serif' },
-  card: { width:340, padding:'32px', background:'#ffffff', borderRadius:'6px', border:'1px solid #d0d7de', textAlign:'center' },
-  title: { fontSize:'24px', fontWeight:400, margin:'0 0 8px 0', color:'#1f2328', lineHeight:1.25 },
-  subtitle: { fontSize:'14px', color:'#59636e', margin:'0 0 24px 0', lineHeight:1.5 },
-  label: { display:'block', fontSize:'14px', fontWeight:400, margin:'14px 0 6px 0', color:'#1f2328', textAlign:'left' },
-  input: { width:'100%', padding:'5px 12px', border:'1px solid #d0d7de', borderRadius:'6px', fontSize:'14px', color:'#1f2328', background:'#ffffff', outline:'none', boxSizing:'border-box' },
-  btnPrimary: { width:'100%', padding:'9px 16px', borderRadius:'6px', border:'1px solid rgba(27,31,36,0.3)', background:'#1f883d', color:'#ffffff', fontSize:'14px', fontWeight:500, cursor:'pointer', marginTop:'16px', transition:'background 80ms', fontFamily:'inherit' },
-  btnGH: { width:'100%', padding:'9px 16px', borderRadius:'6px', border:'1px solid rgba(27,31,36,0.15)', background:'#24292f', color:'#ffffff', fontSize:'14px', fontWeight:500, cursor:'pointer', marginTop:'8px', display:'flex', alignItems:'center', justifyContent:'center', gap:'8px', transition:'background 80ms', fontFamily:'inherit' },
-  btnSecondary: { width:'100%', padding:'9px 16px', borderRadius:'6px', border:'1px solid #d0d7de', background:'#f6f8fa', color:'#24292f', fontSize:'14px', fontWeight:500, cursor:'pointer', marginTop:'8px', transition:'background 80ms', fontFamily:'inherit' },
-  error: { background:'#ffebe9', border:'1px solid rgba(255,129,130,0.4)', color:'#82071e', padding:'12px', borderRadius:'6px', fontSize:'13px', marginBottom:'16px', textAlign:'left', lineHeight:1.5 },
-  info: { background:'#ddf4ff', border:'1px solid rgba(9,105,218,0.3)', color:'#0550ae', padding:'12px', borderRadius:'6px', fontSize:'13px', marginBottom:'16px', textAlign:'left', lineHeight:1.5 },
-  deviceBox: { background:'#f6f8fa', border:'1px solid #d0d7de', borderRadius:'6px', padding:'16px', marginBottom:'16px', textAlign:'left' },
-  deviceCode: { fontSize:'24px', fontWeight:600, color:'#1f2328', textAlign:'center', letterSpacing:'2px', margin:'12px 0', padding:'12px', background:'#ffffff', border:'1px solid #d0d7de', borderRadius:'6px' },
-  divider: { display:'flex', alignItems:'center', gap:12, margin:'16px 0', color:'#59636e', fontSize:'12px' },
-  dividerLine: { flex:1, height:1, background:'#d0d7de' },
-  loading: { color:'#59636e', fontSize:'13px' },
-  footnote: { fontSize:'12px', color:'#59636e', marginTop:'24px', lineHeight:1.5 },
+  page: { height:'100vh', width:'100vw', display:'flex', alignItems:'center', justifyContent:'center', background:'#f2f1ed', fontFamily:'system-ui,-apple-system,Segoe UI,Helvetica Neue,Arial,sans-serif' },
+  card: { width:340, padding:'32px', background:'#f7f7f4', borderRadius:'8px', border:'1px solid rgba(38,37,30,0.1)', textAlign:'center' },
+  title: { fontSize:'24px', fontWeight:400, margin:'0 0 8px 0', color:'#26251e', lineHeight:1.25 },
+  subtitle: { fontSize:'14px', color:'rgba(38,37,30,0.55)', margin:'0 0 24px 0', lineHeight:1.5 },
+  label: { display:'block', fontSize:'14px', fontWeight:400, margin:'14px 0 6px 0', color:'#26251e', textAlign:'left' },
+  input: { width:'100%', padding:'8px 12px', border:'1px solid rgba(38,37,30,0.1)', borderRadius:'8px', fontSize:'14px', color:'#26251e', background:'#f2f1ed', outline:'none', boxSizing:'border-box' },
+  btnPrimary: { width:'100%', padding:'10px 14px', borderRadius:'8px', border:'none', background:'#1f8a65', color:'#ffffff', fontSize:'14px', fontWeight:500, cursor:'pointer', marginTop:'16px', transition:'background 150ms', fontFamily:'inherit' },
+  btnGH: { width:'100%', padding:'10px 14px', borderRadius:'8px', border:'none', background:'#26251e', color:'#ffffff', fontSize:'14px', fontWeight:500, cursor:'pointer', marginTop:'8px', display:'flex', alignItems:'center', justifyContent:'center', gap:'8px', transition:'background 150ms', fontFamily:'inherit' },
+  btnSecondary: { width:'100%', padding:'10px 14px', borderRadius:'8px', border:'1px solid rgba(38,37,30,0.1)', background:'#f7f7f4', color:'#26251e', fontSize:'14px', fontWeight:500, cursor:'pointer', marginTop:'8px', transition:'background 150ms', fontFamily:'inherit' },
+  error: { background:'#fbeaea', border:'1px solid rgba(207,45,86,0.3)', color:'#cf2d56', padding:'12px', borderRadius:'8px', fontSize:'13px', marginBottom:'16px', textAlign:'left', lineHeight:1.5 },
+  info: { background:'#e6e5e0', border:'1px solid rgba(245,78,0,0.2)', color:'#26251e', padding:'12px', borderRadius:'8px', fontSize:'13px', marginBottom:'16px', textAlign:'left', lineHeight:1.5 },
+  deviceBox: { background:'#f7f7f4', border:'1px solid rgba(38,37,30,0.1)', borderRadius:'8px', padding:'16px', marginBottom:'16px', textAlign:'left' },
+  deviceCode: { fontSize:'24px', fontWeight:600, color:'#26251e', textAlign:'center', letterSpacing:'2px', margin:'12px 0', padding:'12px', background:'#f2f1ed', border:'1px solid rgba(38,37,30,0.1)', borderRadius:'8px' },
+  divider: { display:'flex', alignItems:'center', gap:12, margin:'16px 0', color:'rgba(38,37,30,0.55)', fontSize:'12px' },
+  dividerLine: { flex:1, height:1, background:'rgba(38,37,30,0.1)' },
+  loading: { color:'rgba(38,37,30,0.55)', fontSize:'13px' },
+  footnote: { fontSize:'12px', color:'rgba(38,37,30,0.55)', marginTop:'24px', lineHeight:1.5 },
 };
 
-function OctocatIcon({ size = 56, fill = '#1f2328' }) {
+function OctocatIcon({ size = 56, fill = '#26251e' }) {
   return React.createElement('svg', { viewBox:'0 0 98 96', width: size, height: size, fill: fill },
     React.createElement('path', { d: 'M48.854 0C21.839 0 0 22 0 49.217c0 21.756 13.993 40.172 33.405 46.69 2.427.49 3.316-1.059 3.316-2.362 0-1.141-.08-5.052-.08-9.127-13.59 2.934-16.42-5.867-16.42-5.867-2.184-5.704-5.42-7.17-5.42-7.17-4.448-3.015.324-3.015.324-3.015 4.934.326 7.523 5.052 7.523 5.052 4.367 7.496 11.404 5.378 14.235 4.074.404-3.178 1.699-5.378 3.074-6.6-10.839-1.141-22.243-5.378-22.243-24.283 0-5.378 1.94-9.778 5.014-13.2-.485-1.222-2.184-6.275.486-13.038 0 0 4.125-1.304 13.426 5.052a46.97 46.97 0 0 1 12.214-1.63c4.125 0 8.33.571 12.213 1.63 9.302-6.356 13.427-5.052 13.427-5.052 2.67 6.763.97 11.816.485 13.038 3.155 3.422 5.015 7.822 5.015 13.2 0 18.905-11.404 23.06-22.324 24.283 1.78 1.548 3.316 4.481 3.316 9.126 0 6.6-.08 11.897-.08 13.526 0 1.304.89 2.853 3.316 2.364 19.412-6.52 33.405-24.935 33.405-46.691C97.707 22 75.788 0 48.854 0z' })
   );
@@ -51,8 +51,7 @@ function GithubLogin({ onUser, onGuest }) {
       const {
         startGithubDeviceFlow,
         pollGithubToken,
-        fetchGithubUser,
-        saveGithubUser
+        fetchGithubUser
       } = await import('./backend.js');
       const flow = await startGithubDeviceFlow();
       if (flow.error) {
@@ -65,7 +64,6 @@ function GithubLogin({ onUser, onGuest }) {
       try { chrome.tabs.create({ url: flow.verification_uri || 'https://github.com/login/device' }); } catch (e) {}
       const token = await pollGithubToken(flow.device_code);
       const user = await fetchGithubUser(token);
-      try { saveGithubUser(user, token); } catch (e) {}
       onUser(user);
     } catch (e) {
       setError((e && e.message) || 'Device Flow no disponible. Usa el token personal abajo (crea uno en github.com/settings/tokens).');
@@ -78,9 +76,8 @@ function GithubLogin({ onUser, onGuest }) {
     if (!pat.trim()) { setError('Pega un token personal primero.'); return; }
     setError(''); setLoading(true);
     try {
-      const { fetchGithubUser, saveGithubUser } = await import('./backend.js');
+      const { fetchGithubUser } = await import('./backend.js');
       const user = await fetchGithubUser(pat.trim());
-      try { saveGithubUser(user, pat.trim()); } catch (e) {}
       onUser(user);
     } catch (e) {
       setError('Token invalido o sin permisos. Genera uno nuevo en github.com/settings/tokens');
@@ -99,18 +96,18 @@ function GithubLogin({ onUser, onGuest }) {
         error && React.createElement('div', { style: S.error }, error),
 
         mode === 'device' && userCode && React.createElement('div', { style: S.deviceBox },
-          React.createElement('div', { style: { fontSize: '13px', fontWeight: 600, color: '#1f2328', marginBottom: '6px' } }, '1. Abre esta URL en tu navegador'),
-          React.createElement('div', { style: { fontSize: '14px', color: '#0969da', wordBreak: 'break-all', marginBottom: '12px' } }, verifyUrl),
-          React.createElement('div', { style: { fontSize: '13px', fontWeight: 600, color: '#1f2328', marginBottom: '6px' } }, '2. Ingresa este codigo'),
+          React.createElement('div', { style: { fontSize: '13px', fontWeight: 600, color: '#26251e', marginBottom: '6px' } }, '1. Abre esta URL en tu navegador'),
+          React.createElement('div', { style: { fontSize: '14px', color: '#26251e', wordBreak: 'break-all', marginBottom: '12px' } }, verifyUrl),
+          React.createElement('div', { style: { fontSize: '13px', fontWeight: 600, color: '#26251e', marginBottom: '6px' } }, '2. Ingresa este codigo'),
           React.createElement('div', { style: S.deviceCode }, userCode),
-          React.createElement('div', { style: { fontSize: '12px', color: '#59636e', textAlign: 'center' } }, 'Esperando autorizacion...'),
+          React.createElement('div', { style: { fontSize: '12px', color: 'rgba(38,37,30,0.55)', textAlign: 'center' } }, 'Esperando autorizacion...'),
         ),
 
         mode === 'none' && React.createElement('div', null,
           React.createElement('div', { style: S.label }, 'Personal Access Token (recomendado)'),
           React.createElement('input', { type: 'password', value: pat, onChange: function(e) { setPat(e.target.value); }, placeholder: 'ghp_xxxxxxxxxxxxxxxxxxxx', style: S.input }),
           React.createElement('button', { onClick: handlePat, disabled: loading || !pat.trim(), style: { ...S.btnPrimary, opacity: !pat.trim() ? 0.5 : 1 } }, 'Entrar con token'),
-          React.createElement('div', { style: { fontSize: '11px', color: '#818b98', marginTop: '6px' } }, 'Crea uno en github.com/settings/tokens (scope read:user user:email)'),
+          React.createElement('div', { style: { fontSize: '11px', color: 'rgba(38,37,30,0.55)', marginTop: '6px' } }, 'Crea uno en github.com/settings/tokens (scope read:user user:email)'),
           React.createElement('div', { style: S.divider }, React.createElement('div', { style: S.dividerLine }), React.createElement('span', null, 'o'), React.createElement('div', { style: S.dividerLine })),
           React.createElement('button', { onClick: onGuest, style: S.btnSecondary },
             'Continuar sin GitHub'
@@ -124,12 +121,6 @@ function GithubLogin({ onUser, onGuest }) {
   );
 }
 
-// Sin esto, un error de render en cualquier parte del arbol (p.ej. un dato
-// corrupto en localStorage de una version anterior del codigo) deja TODO el
-// sidepanel en negro, y como React desmonta el arbol entero, recargar la
-// extension no ayuda — el mismo dato corrupto revienta el mismo render otra
-// vez. Con el boundary, al menos queda un boton para limpiar el estado local
-// de X1 (no la sesion de GitHub) y reintentar.
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
@@ -145,8 +136,8 @@ class ErrorBoundary extends React.Component {
     if (!this.state.error) return this.props.children;
     return React.createElement('div', { style: S.page },
       React.createElement('div', { style: { ...S.card, textAlign: 'center' } },
-        React.createElement('div', { style: { fontSize: '15px', fontWeight: 600, color: '#1f2328', marginBottom: '8px' } }, 'Algo se rompio en X1'),
-        React.createElement('div', { style: { fontSize: '12px', color: '#59636e', marginBottom: '16px', lineHeight: 1.5 } },
+        React.createElement('div', { style: { fontSize: '15px', fontWeight: 600, color: '#26251e', marginBottom: '8px' } }, 'Algo se rompio en X1'),
+        React.createElement('div', { style: { fontSize: '12px', color: 'rgba(38,37,30,0.55)', marginBottom: '16px', lineHeight: 1.5 } },
           String((this.state.error && this.state.error.message) || this.state.error)),
         React.createElement('button', {
           onClick: function () {
@@ -183,7 +174,7 @@ function Root() {
   if (!ready) return (
     React.createElement('div', { style: S.page },
       React.createElement('div', { style: { textAlign: 'center' } },
-        React.createElement('div', { style: { fontSize: 32, marginBottom: 16, animation: 'breathe 2s infinite', color: '#59636e' } }, 'Cargando...'),
+        React.createElement('div', { style: { fontSize: 32, marginBottom: 16, animation: 'breathe 2s infinite', color: 'rgba(38,37,30,0.55)' } }, 'Cargando...'),
         React.createElement('div', { style: S.loading }, 'Iniciando System X1')
       )
     )

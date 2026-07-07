@@ -5,7 +5,7 @@ import {
   PencilIcon, AlertIcon,
 } from '@primer/octicons-react';
 
-const F = "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif";
+const F = "'Segoe UI', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif";
 const MONO = "'SF Mono', 'Cascadia Code', Consolas, monospace";
 
 // Iconos originales de las apps por las que pasa el proceso.
@@ -52,11 +52,11 @@ function StepCircle({ step, index, total }) {
 
   // Color del circulo segun estado.
   var bg = '#ffffff';
-  var border = '#d0d7de';
-  if (isPending) { bg = '#f6f8fa'; border = '#d0d7de'; }
-  if (isActive) { bg = '#0969da'; border = '#0969da'; }
-  if (isDone)   { bg = '#1a7f37'; border = '#1a7f37'; }
-  if (isError)  { bg = '#d1242f'; border = '#d1242f'; }
+  var border = '#F2F1ED';
+  if (isPending) { bg = '#FFFFFF'; border = '#F2F1ED'; }
+  if (isActive) { bg = '#26251E'; border = '#26251E'; }
+  if (isDone)   { bg = '#1A7F5A'; border = '#1A7F5A'; }
+  if (isError)  { bg = '#C4383A'; border = '#C4383A'; }
 
   return React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '6px' } },
     // Circulo rellenable (28px) con icono de la app o tick
@@ -66,7 +66,7 @@ function StepCircle({ step, index, total }) {
         background: bg, border: '2px solid ' + border,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         flexShrink: 0, transition: 'all 200ms ease',
-        boxShadow: isActive ? '0 0 0 3px rgba(9,105,218,0.2)' : 'none',
+        boxShadow: isActive ? '0 0 0 3px rgba(245,78,0,0.2)' : 'none',
         animation: isActive ? 'breathe 1.2s ease-in-out infinite' : 'none',
       }
     },
@@ -83,7 +83,7 @@ function StepCircle({ step, index, total }) {
             onError: function(e) { e.currentTarget.style.display = 'none'; }
           })
         : React.createElement('div', {
-            style: { width: '8px', height: '8px', borderRadius: '50%', background: '#818b98' }
+            style: { width: '8px', height: '8px', borderRadius: '50%', background: '#9E94D5' }
           })
     ),
     // Label del paso
@@ -91,18 +91,18 @@ function StepCircle({ step, index, total }) {
       React.createElement('span', {
         style: {
           fontSize: '12px', fontWeight: isDone || isActive ? '600' : '500',
-          color: isError ? '#d1242f' : isDone ? '#1a7f37' : isActive ? '#0969da' : '#59636e',
+          color: isError ? '#C4383A' : isDone ? '#1A7F5A' : isActive ? '#26251E' : '#9E94D5',
           whiteSpace: 'nowrap', lineHeight: '1.2', transition: 'color 200ms',
         }
       }, step.description || step.app || 'Procesando...'),
       // Sub-label opcional (p.ej. nombre IA)
-      step.sub ? React.createElement('span', { style: { fontSize: '10px', color: '#818b98', whiteSpace: 'nowrap' } }, step.sub) : null
+      step.sub ? React.createElement('span', { style: { fontSize: '10px', color: '#9E94D5', whiteSpace: 'nowrap' } }, step.sub) : null
     ),
     // Linea conectora entre circulos (excepto el ultimo)
     index < total - 1 ? React.createElement('div', {
       style: {
         width: '20px', height: '2px',
-        background: isDone ? '#1a7f37' : '#d0d7de',
+        background: isDone ? '#1A7F5A' : '#F2F1ED',
         margin: '0 4px', flexShrink: 0, transition: 'background 200ms',
       }
     }) : null
@@ -115,8 +115,8 @@ export function ProcessTimeline({ steps = [] }) {
   return React.createElement('div', {
     style: {
       display: 'flex', alignItems: 'center', gap: '0',
-      padding: '12px 16px', borderBottom: '1px solid #d0d7de',
-      background: '#f6f8fa', overflowX: 'auto',
+      padding: '12px 16px', borderBottom: '1px solid #F2F1ED',
+      background: '#FFFFFF', overflowX: 'auto',
       scrollbarWidth: 'thin', fontFamily: F,
     }
   },
@@ -160,7 +160,7 @@ function LiveElapsed({ startedAt }) {
   }, [startedAt]);
   if (!startedAt) return null;
   var secs = Math.max(0, Math.round((now - startedAt) / 1000));
-  return React.createElement('span', { style: { color: '#0969da' } }, ' (' + secs + 's)');
+  return React.createElement('span', { style: { color: '#26251E' } }, ' (' + secs + 's)');
 }
 
 // Un solo icono por linea (no dos): en pending/done es el icono de la
@@ -170,17 +170,17 @@ function LiveElapsed({ startedAt }) {
 // linea.
 function StepIcon({ step }) {
   var status = step.status;
-  if (status === 'active') return React.createElement(SyncIcon, { size: 12, fill: '#0969da', style: { animation: 'spin 1s linear infinite' } });
-  if (status === 'error') return React.createElement(XIcon, { size: 12, fill: '#d1242f' });
+  if (status === 'active') return React.createElement(SyncIcon, { size: 12, fill: '#26251E', style: { animation: 'spin 1s linear infinite' } });
+  if (status === 'error') return React.createElement(XIcon, { size: 12, fill: '#C4383A' });
   var Icon = actionIcon(step.id);
-  return React.createElement(Icon, { size: 12, fill: status === 'done' ? '#1a7f37' : '#818b98' });
+  return React.createElement(Icon, { size: 12, fill: status === 'done' ? '#1A7F5A' : '#9E94D5' });
 }
 
 function LogStep({ step }) {
   var isActive = step.status === 'active';
   var isError = step.status === 'error';
   var isDone = step.status === 'done';
-  var titleColor = isError ? '#d1242f' : isActive ? '#0969da' : isDone ? '#1f2328' : '#59636e';
+  var titleColor = isError ? '#C4383A' : isActive ? '#26251E' : isDone ? '#26251E' : '#9E94D5';
 
   return React.createElement('div', { style: { padding: '2px 0' } },
     React.createElement('div', { style: { display: 'flex', alignItems: 'flex-start', gap: '6px' } },
@@ -188,11 +188,11 @@ function LogStep({ step }) {
       React.createElement('div', { style: { minWidth: 0, flex: 1 } },
         React.createElement('span', { style: { fontSize: '12px', fontFamily: MONO, color: titleColor, lineHeight: '1.5' } },
           step.title,
-          step.detail ? React.createElement('span', { style: { color: '#818b98', fontFamily: F } }, ' — ' + step.detail) : null,
+          step.detail ? React.createElement('span', { style: { color: '#9E94D5', fontFamily: F } }, ' — ' + step.detail) : null,
           isActive ? React.createElement(LiveElapsed, { startedAt: step.startedAt }) : null
         ),
         step.why ? React.createElement('div', {
-          style: { fontSize: '11px', color: '#818b98', lineHeight: '1.4', marginTop: '1px', marginLeft: '2px' }
+          style: { fontSize: '11px', color: '#9E94D5', lineHeight: '1.4', marginTop: '1px', marginLeft: '2px' }
         }, step.why) : null
       )
     )
@@ -203,12 +203,12 @@ export function ProcessLog({ steps = [], title }) {
   if (!steps.length) return null;
   return React.createElement('div', {
     style: {
-      padding: '10px 12px', border: '1px solid #d0d7de', borderRadius: '6px',
-      background: '#f6f8fa', fontFamily: F,
+      padding: '10px 12px', border: '1px solid #F2F1ED', borderRadius: '4px',
+      background: '#FFFFFF', fontFamily: F,
     }
   },
     title ? React.createElement('div', {
-      style: { fontSize: '10px', fontWeight: '600', color: '#818b98', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '6px' }
+      style: { fontSize: '10px', fontWeight: '600', color: '#9E94D5', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '6px' }
     }, title) : null,
     steps.map(function(step, i) {
       return React.createElement(LogStep, { key: step.id || i, step: step });

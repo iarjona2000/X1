@@ -1,103 +1,98 @@
 import * as React from 'react';
 import * as B from './backend.js';
-import { ProcessTimeline } from './ProcessTimeline.jsx';
 import { Markdown } from './Markdown.jsx';
+import { FONT } from './theme.js';
 
-const F = "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif";
-const C = {
-  border: '#d0d7de', borderSubtle: '#d8dee4', bg: '#ffffff', bgSubtle: '#f6f8fa',
-  fg: '#1f2328', fgMuted: '#59636e', fgSubtle: '#818b98', fgAccent: '#0969da',
-  fgSuccess: '#1a7f37', fgDanger: '#d1242f', fgAttention: '#bf8700',
-  accentUnderline: '#fd8c73',
-};
+const F = FONT;
 
-function timeAgo(ts) {
-  var d = Date.now() - ts;
-  if (d < 60000) return 'ahora';
-  if (d < 3600000) return Math.floor(d / 60000) + 'm';
-  if (d < 86400000) return Math.floor(d / 3600000) + 'h';
-  return Math.floor(d / 86400000) + 'd';
-}
-
-const AGENTS = [
-  { id: 'auto',      name: 'AUTO',      ai: 'Automatico', letter: 'A', color: '#0969da', aiIcon: 'dist/x1-logo.png' },
-  { id: 'research',  name: 'Research',  ai: 'Gemini',    letter: 'R', color: '#4285f4', aiIcon: '../assets/ai/googlegemini.svg' },
-  { id: 'writer',    name: 'Writer',    ai: 'Claude',    letter: 'W', color: '#d97706', aiIcon: '../assets/ai/anthropic.svg' },
-  { id: 'developer', name: 'Developer', ai: 'GPT-4o',    letter: 'D', color: '#10a37f', aiIcon: '../assets/ai/openai.svg' },
-  { id: 'marketing', name: 'Marketing', ai: 'Gemini',    letter: 'M', color: '#4285f4', aiIcon: '../assets/ai/googlegemini.svg' },
-  { id: 'finance',   name: 'Finance',   ai: 'Claude',    letter: 'F', color: '#d97706', aiIcon: '../assets/ai/anthropic.svg' },
-  { id: 'legal',     name: 'Legal',     ai: 'Mistral',   letter: 'L', color: '#ff7000', aiIcon: '../assets/ai/mistralai.svg' },
-  { id: 'email',     name: 'Email',     ai: 'Llama',      letter: 'E', color: '#0668e1', aiIcon: '../assets/ai/meta.svg' },
-  { id: 'meeting',   name: 'Meeting',   ai: 'Gemini',    letter: 'G', color: '#4285f4', aiIcon: '../assets/ai/googlegemini.svg' },
-];
-
-function agentById(id) {
-  return AGENTS.find(function(a) { return a.id === id; }) || AGENTS[0];
-}
+const AGENTS = B.AGENTS;
+const agentById = B.agentById;
 
 function AgentAvatar({ agent, size }) {
   size = size || 20;
   if (agent.aiIcon) {
     return React.createElement('img', {
       src: agent.aiIcon, alt: '',
-      style: { width: size, height: size, borderRadius: '4px', objectFit: 'contain', flexShrink: 0 },
+      style: { width: size, height: size, borderRadius: '8px', objectFit: 'contain', flexShrink: 0 },
       onError: function(e) { e.currentTarget.style.display = 'none'; }
     });
   }
   return React.createElement('div', {
     style: {
-      width: size, height: size, borderRadius: '4px',
-      background: agent.color || '#0969da', color: '#fff',
+      width: size, height: size, borderRadius: '8px',
+      background: '#e6e5e0', color: '#26251e',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      fontSize: size * 0.55, fontWeight: '600', flexShrink: 0,
+      fontSize: size * 0.5, fontWeight: '600', flexShrink: 0,
     }
   }, agent.letter);
 }
 
-function ToolIcon({ tool, size }) {
-  size = size || 12;
-  var colors = { github: '#1f2328', npm: '#cb3837', stackoverflow: '#f48024', web: '#de5833' };
-  var letters = { github: 'G', npm: 'N', stackoverflow: 'S', web: 'W' };
-  return React.createElement('div', {
-    style: {
-      width: size, height: size, borderRadius: '3px',
-      background: colors[tool] || '#656d76', color: '#fff',
-      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-      fontSize: size * 0.5, fontWeight: '700', flexShrink: 0,
-    }
-  }, letters[tool] || '?');
+function ThinkingDots() {
+  return React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 0' } },
+    React.createElement('div', { style: { display: 'flex', gap: '4px' } },
+      React.createElement('span', { style: { width: '5px', height: '5px', borderRadius: '50%', background: '#f54e00', animation: 'pulse 1s infinite' } }),
+      React.createElement('span', { style: { width: '5px', height: '5px', borderRadius: '50%', background: '#f54e00', animation: 'pulse 1s infinite 0.2s' } }),
+      React.createElement('span', { style: { width: '5px', height: '5px', borderRadius: '50%', background: '#f54e00', animation: 'pulse 1s infinite 0.4s' } })
+    ),
+    React.createElement('span', { style: { fontSize: '13px', color: 'rgba(38,37,30,0.55)', fontFamily: F } }, 'Thinking...')
+  );
 }
 
-const QUICK = [
-  { label: 'Resumir',    prompt: 'Resume la pagina que tengo abierta' },
-  { label: 'Investigar', prompt: 'Investiga sobre esta pagina' },
-  { label: 'Codigo',     prompt: 'Escribe codigo para esto' },
-  { label: 'Email',      prompt: 'Redacta un email profesional' },
-];
+function ProcessSteps({ steps, expanded, onToggle }) {
+  if (!steps || steps.length === 0) return null;
+  return React.createElement('div', { style: { marginTop: '8px' } },
+    React.createElement('div', {
+      onClick: onToggle,
+      style: {
+        display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer',
+        padding: '4px 0', fontSize: '12px', color: 'rgba(38,37,30,0.55)', fontFamily: F,
+        userSelect: 'none',
+      }
+    },
+      React.createElement('svg', {
+        viewBox: '0 0 16 16', width: '10', height: '10', fill: 'rgba(38,37,30,0.55)',
+        style: { transition: 'transform 150ms', transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)' },
+      }, React.createElement('path', { d: 'M4.427 7.427l3.396 3.396a.25.25 0 00.354 0l3.396-3.396A.25.25 0 0011.396 7H4.604a.25.25 0 00-.177.427z' })),
+      React.createElement('span', null, expanded ? 'Hide process' : 'Show process')
+    ),
+    expanded && React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '3px', paddingTop: '4px', paddingBottom: '4px' } },
+      steps.map(function(ps, i) {
+        return React.createElement('div', { key: i, style: { display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px' } },
+          React.createElement('span', { style: { color: 'rgba(38,37,30,0.55)', flexShrink: 0, minWidth: '64px', fontWeight: 500 } }, ps.label),
+          React.createElement('span', { style: { color: '#26251e' } }, ps.detail)
+        );
+      })
+    )
+  );
+}
 
-export function ChatView({ conversations, activeConv, onSelectConv, onCreateConv, onEnsureConv, onUpdateConv }) {
+export function ChatView({ activeConv, onSelectConv, onEnsureConv, onUpdateConv }) {
   const [text, setText] = React.useState('');
   const textRef = React.useRef('');
   const taRef = React.useRef(null);
   const [busy, setBusy] = React.useState(false);
   const [activeAgent, setActiveAgent] = React.useState('auto');
   const [agentMenu, setAgentMenu] = React.useState(false);
-  const [procSteps, setProcSteps] = React.useState([]);
   const logRef = React.useRef(null);
   const safetyRef = React.useRef(null);
   const clearProcRef = React.useRef(null);
   const busyRef = React.useRef(false);
+  const [expandedSteps, setExpandedSteps] = React.useState({});
 
   React.useEffect(function() { busyRef.current = busy; }, [busy]);
 
-  // Auto-scroll suave al ultimo mensaje cuando llega.
   React.useEffect(function() {
     if (logRef.current) {
-      logRef.current.scrollTo({ top: logRef.current.scrollHeight, behavior: 'smooth' });
+      logRef.current.scrollTop = logRef.current.scrollHeight;
     }
   }, [activeConv && activeConv.messages && activeConv.messages.length, activeConv && activeConv.messages && activeConv.messages.length > 0 && activeConv.messages[activeConv.messages.length - 1].content]);
 
-  // Auto-resize del textarea segun contenido.
+  React.useEffect(function() {
+    if (logRef.current) {
+      requestAnimationFrame(function() { if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight; });
+    }
+  }, [activeConv && activeConv.id]);
+
   React.useEffect(function() {
     if (!taRef.current) return;
     var ta = taRef.current;
@@ -109,12 +104,6 @@ export function ChatView({ conversations, activeConv, onSelectConv, onCreateConv
     onUpdateConv(convId, { messages: function(prevMsgs) {
       return prevMsgs.map(function(m) { return m.id === msgId ? Object.assign({}, m, patch) : m; });
     }});
-  }
-
-  function setStep(id, status) {
-    setProcSteps(function(prev) {
-      return prev.map(function(s) { return s.id === id ? Object.assign({}, s, { status: status }) : s; });
-    });
   }
 
   function send(input) {
@@ -131,485 +120,233 @@ export function ChatView({ conversations, activeConv, onSelectConv, onCreateConv
     var sector = B.detectSector(q);
     var pickedAgent = agentById(agentId);
 
-    // Timeline del proceso: sector -> IA -> tools -> respuesta
-    var aiIcon = pickedAgent.aiIcon;
-    setProcSteps([
-      { id: 1, iconSrc: aiIcon, description: 'Sector: ' + sector,            sub: 'Clasificando tu consulta',   status: 'active' },
-      { id: 2, iconSrc: aiIcon, description: 'IA: ' + pickedAgent.ai,         sub: 'Agente ' + pickedAgent.name,   status: 'pending' },
-      { id: 3, iconSrc: aiIcon, description: 'Procesando',                    sub: 'Razonando + herramientas',     status: 'pending' },
-      { id: 4, iconSrc: aiIcon, description: 'Respuesta',                     sub: 'Redactando',                  status: 'pending' },
-    ]);
-    setTimeout(function() { setStep(1, 'done'); setStep(2, 'active'); }, 300);
-    setTimeout(function() { setStep(2, 'done'); setStep(3, 'active'); }, 700);
-
     var title = conv.messages.length === 0 ? q.slice(0, 42) : conv.title;
     var userMsg = { id: Date.now(), role: 'user', content: q, timestamp: Date.now() };
     var aiMsg = { id: Date.now() + 1, role: 'assistant', content: '', status: 'thinking', agent: agentId, toolsUsed: [], judgeReason: judgeReason, sector: sector, startedAt: Date.now() };
     var newMessages = conv.messages.concat([userMsg, aiMsg]);
     onUpdateConv(conv.id, { messages: newMessages, title: title, agent: agentId });
 
-    function finishProc(ok) {
-      setStep(3, 'done'); setStep(4, ok ? 'done' : 'error');
-      if (clearProcRef.current) clearTimeout(clearProcRef.current);
-      clearProcRef.current = setTimeout(function() { setProcSteps([]); }, 1600);
-    }
-
     safetyRef.current = setTimeout(function() {
       if (busyRef.current) {
-        patchMsg(conv.id, aiMsg.id, { content: 'Tiempo de espera agotado (24s). Intenta de nuevo.', status: 'done' });
-        finishProc(false);
+        patchMsg(conv.id, aiMsg.id, { content: 'Timeout (24s). Try again.', status: 'done' });
+        if (clearProcRef.current) clearTimeout(clearProcRef.current);
+        clearProcRef.current = setTimeout(function() { setExpandedSteps({}); }, 1600);
         setBusy(false);
       }
     }, 24000);
 
     B.smartQuery(q, agentId).then(function(result) {
       if (safetyRef.current) clearTimeout(safetyRef.current);
-      setStep(3, 'done'); setStep(4, 'active');
       if (result) {
         var processSteps = [
           { icon: 'sector', label: 'Sector',       detail: result.sector || sector },
-          { icon: 'agent',  label: 'Agente',        detail: (result.agentName || pickedAgent.name) + ' (' + (result.agentModel || pickedAgent.ai) + ')' },
-          { icon: 'repo',   label: 'Repo Open-Source', detail: result.agentRepo || pickedAgent.repo || '' },
-          { icon: 'ai',     label: 'Proveedor',     detail: (result.provider || 'proxy') + ' - ' + (result.model || 'desconocido') },
-          { icon: 'clock',  label: 'Latencia',      detail: (result.latencyMs || '?') + 'ms' },
+          { icon: 'agent',  label: 'Agent',         detail: (result.agentName || pickedAgent.name) + ' (' + (result.agentModel || pickedAgent.ai) + ')' },
+          { icon: 'ai',     label: 'Provider',      detail: (result.provider || 'proxy') + ' - ' + (result.model || 'unknown') },
+          { icon: 'clock',  label: 'Latency',       detail: (result.latencyMs || '?') + 'ms' },
         ];
+        var content = result.response || 'Done.';
+        if (result.error) {
+          content = '**Connection error:** ' + result.error + '\n\nTry again.';
+          processSteps = [{ icon: 'error', label: 'Error', detail: result.error + ' (' + (result.provider || 'proxy') + ')' }];
+        }
         patchMsg(conv.id, aiMsg.id, {
-          content: result.response || 'Completado.', status: 'done',
+          content: content, status: 'done',
           toolsUsed: result.tools || [], judgeReason: result.judgeReason || judgeReason,
           sector: result.sector || sector, model: result.model || null,
           provider: result.provider || null, latencyMs: result.latencyMs || 0,
           processSteps: processSteps, finishedAt: Date.now(),
         });
       } else {
-        patchMsg(conv.id, aiMsg.id, { content: 'No pude procesar eso.', status: 'done',
-          processSteps: [{ icon: 'error', label: 'Estado', detail: 'IA no disponible' }], finishedAt: Date.now() });
+        patchMsg(conv.id, aiMsg.id, { content: 'Could not process that.', status: 'done',
+          processSteps: [{ icon: 'error', label: 'Status', detail: 'AI unavailable' }], finishedAt: Date.now() });
       }
-      finishProc(true); setBusy(false);
+      if (clearProcRef.current) clearTimeout(clearProcRef.current);
+      clearProcRef.current = setTimeout(function() { setExpandedSteps({}); }, 1600);
+      setBusy(false);
     }).catch(function(err) {
       if (safetyRef.current) clearTimeout(safetyRef.current);
-      patchMsg(conv.id, aiMsg.id, { content: 'Error: ' + ((err && err.message) || 'desconocido'), status: 'done',
-        processSteps: [{ icon: 'error', label: 'Error', detail: (err && err.message) || 'desconocido' }], finishedAt: Date.now() });
-      finishProc(false); setBusy(false);
+      patchMsg(conv.id, aiMsg.id, { content: 'Error: ' + ((err && err.message) || 'unknown'), status: 'done',
+        processSteps: [{ icon: 'error', label: 'Error', detail: (err && err.message) || 'unknown' }], finishedAt: Date.now() });
+      if (clearProcRef.current) clearTimeout(clearProcRef.current);
+      clearProcRef.current = setTimeout(function() { setExpandedSteps({}); }, 1600);
+      setBusy(false);
     });
   }
 
   var agent = agentById(activeAgent);
   var msgs = (activeConv && activeConv.messages) || [];
-  var [googleOk, setGoogleOk] = React.useState(false);
-  var [googleUser, setGoogleUser] = React.useState(null);
-  var [googleError, setGoogleError] = React.useState(null);
-  var [showGoogleMenu, setShowGoogleMenu] = React.useState(false);
-  var [googleLoading, setGoogleLoading] = React.useState(false);
-  React.useEffect(function() {
-    if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-      chrome.storage.local.get(['google_token','google_user'], function(r) {
-        if (r && r.google_token) {
-          setGoogleOk(true);
-          if (r.google_user) setGoogleUser(r.google_user);
-        }
-      });
-    }
-  }, []);
 
-  // Panel de razonamiento del juez (estilo "Thinking" de Claude/o1).
-  function ReasoningPanel({ msg }) {
-    if (!msg.judgeReason) return null;
-    return React.createElement('div', {
-      style: {
-        marginBottom: '10px',
-        background: '#f6f8fa',
-        border: '1px solid #d0d7de',
-        borderRadius: '6px',
-        padding: '10px 12px',
-        fontSize: '12px',
-        color: '#59636e',
-        lineHeight: '1.6',
-        fontFamily: F,
-      }
-    },
-      React.createElement('div', {
-        style: {
-          display: 'flex', alignItems: 'center', gap: '6px',
-          marginBottom: '6px', paddingBottom: '6px',
-          borderBottom: '1px solid #d8dee4',
-        }
-      },
-        React.createElement('svg', { viewBox: '0 0 16 16', width: '13', height: '13', fill: '#59636e' },
-          React.createElement('path', { d: 'M8 0a8 8 0 110 16A8 8 0 018 0zM1.5 8a6.5 6.5 0 1013 0 6.5 6.5 0 00-13 0zm6.25-3.25v2.992l2.028.812a.75.75 0 01-.557 1.392l-2.5-1A.751.751 0 017.25 8.25v-3.5a.75.75 0 011.5 0z' })
-        ),
-        React.createElement('span', {
-          style: { fontWeight: '600', color: '#1f2328', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px' }
-        }, 'Razonamiento'),
-        msg.sector && React.createElement('span', {
-          style: {
-            fontSize: '10px', padding: '1px 8px', borderRadius: '999px',
-            background: '#ddf4ff', color: '#0969da', fontWeight: '600',
-          }
-        }, msg.sector)
-      ),
-      React.createElement('div', { style: { fontSize: '12px', color: '#59636e' } }, msg.judgeReason)
-    );
-  }
+  return React.createElement('div', { style: { display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden', fontFamily: F, background: '#f2f1ed' } },
 
-  // Indicador "Pensando..." con 3 puntos animados.
-  function ThinkingDots() {
-    return React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 0' } },
-      React.createElement('div', { style: { display: 'flex', gap: '4px' } },
-        React.createElement('span', { style: { width: '6px', height: '6px', borderRadius: '50%', background: '#0969da', animation: 'pulse 1s infinite' } }),
-        React.createElement('span', { style: { width: '6px', height: '6px', borderRadius: '50%', background: '#0969da', animation: 'pulse 1s infinite 0.2s' } }),
-        React.createElement('span', { style: { width: '6px', height: '6px', borderRadius: '50%', background: '#0969da', animation: 'pulse 1s infinite 0.4s' } })
-      ),
-      React.createElement('span', { style: { fontSize: '12px', color: '#818b98', fontFamily: F } }, 'Pensando...')
-    );
-  }
-
-  return React.createElement('div', { style: { display: 'flex', flex: 1, overflow: 'hidden', fontFamily: F } },
-
-    // Sidebar conversaciones (260px, GitHub Primer)
-    React.createElement('div', { style: { width: '260px', borderRight: '1px solid #d0d7de', display: 'flex', flexDirection: 'column', background: '#f6f8fa' } },
-      React.createElement('div', { style: { padding: '12px', borderBottom: '1px solid #d0d7de' } },
-        React.createElement('button', {
-          onClick: onCreateConv,
-          style: {
-            width: '100%', padding: '6px 12px', borderRadius: '6px',
-            border: '1px solid rgba(27,31,36,0.15)', background: '#2da44e', color: '#ffffff',
-            fontSize: '12px', fontWeight: '600', cursor: 'pointer', fontFamily: F,
-            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.25)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
-          }
-        }, '+ Nueva conversacion')
-      ),
-      React.createElement('div', { style: { flex: 1, overflow: 'auto', padding: '6px 8px' } },
-        conversations.map(function(c) {
-          var isActive = activeConv && activeConv.id === c.id;
-          var msgCount = c.messages ? c.messages.length : 0;
-          var lastMsg = c.messages && c.messages.length > 0 ? c.messages[c.messages.length - 1] : null;
-          var preview = lastMsg ? (lastMsg.content || '').slice(0, 60) : 'Sin mensajes';
-          var cAgent = agentById(c.agent || 'research');
-          return React.createElement('div', {
-            key: c.id, onClick: function() { onSelectConv(c.id); },
-            style: {
-              padding: '10px 12px', borderRadius: '6px', cursor: 'pointer', marginBottom: '4px',
-              background: isActive ? '#ddf4ff' : 'transparent',
-              border: isActive ? '1px solid rgba(9,105,218,0.2)' : '1px solid transparent',
-              transition: 'all 80ms',
-            },
-            onMouseEnter: function(e) { if (!isActive) e.currentTarget.style.background = '#eaeef2'; },
-            onMouseLeave: function(e) { if (!isActive) e.currentTarget.style.background = 'transparent'; },
-          },
-            React.createElement('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' } },
-              React.createElement('div', { style: { fontSize: '13px', fontWeight: isActive ? '600' : '500', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: isActive ? '#1f2328' : '#24292f', flex: 1 } }, c.title || 'Nueva conversacion'),
-              React.createElement('span', { style: { fontSize: '11px', color: '#818b98', flexShrink: 0, marginLeft: '6px' } }, timeAgo(c.updatedAt || c.createdAt))
-            ),
-            React.createElement('div', { style: { fontSize: '12px', color: '#59636e', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, preview),
-            React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px' } },
-              msgCount > 0 && React.createElement('span', { style: { fontSize: '11px', color: '#818b98' } }, msgCount + ' msg'),
-              React.createElement('span', {
-                style: {
-                  fontSize: '10px', padding: '1px 6px', borderRadius: '999px',
-                  background: '#ddf4ff', color: '#0969da', fontWeight: '500',
-                  display: 'inline-flex', alignItems: 'center', gap: '3px',
-                }
-              }, cAgent.name)
-            )
-          );
-        }),
-        conversations.length === 0 && React.createElement('div', { style: { padding: '24px 16px', textAlign: 'center', color: '#818b98', fontSize: '12px' } },
-          React.createElement('svg', { viewBox: '0 0 16 16', width: '22', height: '22', fill: '#afb8c1', style: { marginBottom: '8px' } },
-            React.createElement('path', { d: 'M1.75 1h8.5c.966 0 1.75.784 1.75 1.75v5.5A1.75 1.75 0 0 1 10.25 10H7.061l-2.574 2.573A1.458 1.458 0 0 1 2 11.543V10h-.25A1.75 1.75 0 0 1 0 8.25v-5.5C0 1.784.784 1 1.75 1ZM1.5 2.75v5.5c0 .138.112.25.25.25h1a.75.75 0 0 1 .75.75v2.19l2.72-2.72a.749.749 0 0 1 .53-.22h3.5a.25.25 0 0 0 .25-.25v-5.5a.25.25 0 0 0-.25-.25h-8.5a.25.25 0 0 0-.25.25Z' })
-          ),
-          React.createElement('div', null, 'No hay conversaciones')
-        )
+    // Header
+    React.createElement('div', { style: { padding: '10px 20px', borderBottom: '1px solid rgba(38,37,30,0.1)', display: 'flex', alignItems: 'center', gap: '8px', background: '#f2f1ed', minHeight: '42px' } },
+      React.createElement('div', { style: { flex: 1, fontSize: '14px', fontWeight: '500', color: '#26251e', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } },
+        activeConv ? (activeConv.title || 'New conversation') : 'System X1'
       )
     ),
 
-    // Chat area
-    React.createElement('div', { style: { flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 } },
-
-      // Header con selector de agente (UnderlineNav style)
-      React.createElement('div', { style: { padding: '8px 16px', borderBottom: '1px solid #d0d7de', display: 'flex', alignItems: 'center', gap: '12px', background: '#ffffff' } },
-        React.createElement('div', { style: { position: 'relative' } },
-          React.createElement('button', {
-            onClick: function() { setAgentMenu(function(v) { return !v; }); },
-            style: {
-              display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 10px',
-              background: '#f6f8fa', border: '1px solid #d0d7de', borderRadius: '6px',
-              fontSize: '13px', cursor: 'pointer', transition: 'border-color 80ms', fontFamily: F,
-            },
-            onMouseEnter: function(e) { e.currentTarget.style.borderColor = '#0969da'; },
-            onMouseLeave: function(e) { e.currentTarget.style.borderColor = '#d0d7de'; },
-          },
-            React.createElement(AgentAvatar, { agent: agent, size: 16 }),
-            React.createElement('span', { style: { fontWeight: '600', color: '#1f2328' } }, agent.name),
-            React.createElement('span', { style: { color: '#59636e', fontSize: '12px' } }, agent.ai),
-            React.createElement('svg', { viewBox: '0 0 16 16', width: '12', height: '12', fill: '#59636e' },
-              React.createElement('path', { d: 'M4.427 7.427l3.396 3.396a.25.25 0 00.354 0l3.396-3.396A.25.25 0 0011.396 7H4.604a.25.25 0 00-.177.427z' })
-            )
+    // Messages
+    React.createElement('div', { ref: logRef, style: { flex: 1, overflow: 'auto', padding: '24px 20px' } },
+      msgs.length === 0 ?
+        React.createElement('div', { style: { height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '12px' } },
+          React.createElement('div', { style: { width: '48px', height: '48px', borderRadius: '12px', background: '#e6e5e0', display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+            React.createElement('img', { src: 'dist/x1-logo.png', alt: 'X1', style: { width: '28px', height: '28px', borderRadius: '8px', objectFit: 'contain' }, onError: function(e) { e.currentTarget.style.display = 'none'; } })
           ),
-          agentMenu && React.createElement('div', {
-            style: {
-              position: 'absolute', top: '100%', left: 0, zIndex: 30, marginTop: '4px',
-              minWidth: '210px', background: '#ffffff', border: '1px solid #d0d7de',
-              borderRadius: '6px', boxShadow: '0 8px 24px rgba(140,149,159,0.2)', padding: '4px',
-            }
-          },
-            AGENTS.map(function(a) {
-              var isActive = activeAgent === a.id;
-              return React.createElement('div', {
-                key: a.id,
-                onClick: function() { setActiveAgent(a.id); setAgentMenu(false); },
-                style: {
-                  padding: '6px 8px', borderRadius: '4px', cursor: 'pointer',
-                  display: 'flex', alignItems: 'center', gap: '8px',
-                  background: isActive ? '#ddf4ff' : 'transparent',
-                  transition: 'background 80ms',
-                },
-                onMouseEnter: function(e) { if (!isActive) e.currentTarget.style.background = '#eaeef2'; },
-                onMouseLeave: function(e) { if (!isActive) e.currentTarget.style.background = isActive ? '#ddf4ff' : 'transparent'; },
-              },
-                React.createElement(AgentAvatar, { agent: a, size: 22 }),
-                React.createElement('div', { style: { flex: 1 } },
-                  React.createElement('div', { style: { fontSize: '13px', fontWeight: '600', color: '#1f2328' } }, a.name),
-                  React.createElement('div', { style: { fontSize: '11px', color: '#59636e' } }, a.ai)
-                ),
-                isActive && React.createElement('svg', { viewBox: '0 0 16 16', width: '14', height: '14', fill: '#0969da' },
-                  React.createElement('path', { d: 'M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z' })
-                )
-              );
-            })
-          )
-        ),
-        React.createElement('div', { style: { flex: 1 } }),
-        React.createElement('span', { style: { fontSize: '12px', color: '#818b98', fontWeight: '500' } }, 'System X1'),
-        React.createElement('div', { style: { position: 'relative' } },
-          React.createElement('div', {
-            onClick: function() {
-              if (googleOk) { setShowGoogleMenu(function(v) { return !v; }); }
-              else { setGoogleLoading(true); setGoogleError(null); B.loginGoogle().then(function(r) { setGoogleLoading(false); if (r) { setGoogleOk(true); setGoogleUser({email:r.email,name:r.name,picture:r.picture}); } else { var extId = typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.id ? chrome.runtime.id : '?'; setGoogleError('No se pudo conectar. Abre chrome://extensions > X1 > Inspect > Console para ver errores. Extension ID: ' + extId); setTimeout(function() { setGoogleError(null); }, 12000); } }); }
-            },
-            title: googleUser ? googleUser.email : 'Conectar Google',
-            style: { display: 'flex', alignItems: 'center', justifyContent: 'center', width: '24px', height: '24px', borderRadius: '50%', cursor: 'pointer', transition: 'background 80ms' },
-            onMouseEnter: function(e) { e.currentTarget.style.background = '#f1f3f4'; },
-            onMouseLeave: function(e) { e.currentTarget.style.background = 'transparent'; },
-          },
-            googleUser && googleUser.picture ?
-              React.createElement('img', { src: googleUser.picture, alt: '', style: { width: '20px', height: '20px', borderRadius: '50%' }, onError: function(e) { e.currentTarget.style.display = 'none'; } })
-            : googleLoading ?
-              React.createElement('div', { style: { width: '16px', height: '16px', borderRadius: '50%', border: '2px solid #dadce0', borderTopColor: '#4285f4', animation: 'spin 0.8s linear infinite' } })
-            :
-              React.createElement('svg', { viewBox: '0 0 48 48', width: '20', height: '20' },
-                React.createElement('path', { fill: '#EA4335', d: 'M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z' }),
-                React.createElement('path', { fill: '#4285F4', d: 'M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z' }),
-                React.createElement('path', { fill: '#FBBC05', d: 'M10.53 28.59A14.5 14.5 0 019.5 24c0-1.59.28-3.14.76-4.59l-7.98-6.19A23.99 23.99 0 000 24c0 3.77.87 7.35 2.56 10.56l7.97-5.97z' }),
-                React.createElement('path', { fill: '#34A853', d: 'M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 5.97C6.51 42.62 14.62 48 24 48z' })
-              )
-          ),
-          showGoogleMenu && googleOk && React.createElement('div', {
-            style: {
-              position: 'absolute', top: '100%', right: 0, zIndex: 30, marginTop: '4px',
-              width: '220px', background: '#ffffff', border: '1px solid #d0d7de',
-              borderRadius: '6px', boxShadow: '0 8px 24px rgba(140,149,159,0.2)', padding: '8px',
-            }
-          },
-            googleUser && React.createElement('div', { style: { padding: '6px 8px', borderBottom: '1px solid #d8dee4', marginBottom: '6px' } },
-              googleUser.picture && React.createElement('img', { src: googleUser.picture, alt: '', style: { width: '32px', height: '32px', borderRadius: '50%', marginBottom: '4px' }, onError: function(e) { e.currentTarget.style.display = 'none'; } }),
-              React.createElement('div', { style: { fontSize: '13px', fontWeight: '600', color: '#1f2328' } }, googleUser.name || 'Google'),
-              React.createElement('div', { style: { fontSize: '11px', color: '#59636e' } }, googleUser.email)
-            ),
-            React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '4px' } },
-              React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 8px', fontSize: '12px', color: '#1f2328' } },
-                React.createElement('svg', { viewBox: '0 0 16 16', width: '14', height: '14', fill: '#1a7f37' }, React.createElement('path', { d: 'M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z' })),
-                React.createElement('span', { style: { flex: 1 } }, 'Gmail'),
-                React.createElement('span', { style: { color: '#1a7f37', fontWeight: 500 } }, 'Conectado')
-              ),
-              React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 8px', fontSize: '12px', color: '#1f2328' } },
-                React.createElement('svg', { viewBox: '0 0 16 16', width: '14', height: '14', fill: '#1a7f37' }, React.createElement('path', { d: 'M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z' })),
-                React.createElement('span', { style: { flex: 1 } }, 'Calendar'),
-                React.createElement('span', { style: { color: '#1a7f37', fontWeight: 500 } }, 'Conectado')
-              ),
-              React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 8px', fontSize: '12px', color: '#1f2328' } },
-                React.createElement('svg', { viewBox: '0 0 16 16', width: '14', height: '14', fill: '#1a7f37' }, React.createElement('path', { d: 'M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z' })),
-                React.createElement('span', { style: { flex: 1 } }, 'Sheets'),
-                React.createElement('span', { style: { color: '#1a7f37', fontWeight: 500 } }, 'Conectado')
-              ),
-              React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 8px', fontSize: '12px', color: '#1f2328' } },
-                React.createElement('svg', { viewBox: '0 0 16 16', width: '14', height: '14', fill: '#1a7f37' }, React.createElement('path', { d: 'M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z' })),
-                React.createElement('span', { style: { flex: 1 } }, 'Docs'),
-                React.createElement('span', { style: { color: '#1a7f37', fontWeight: 500 } }, 'Conectado')
-              )
-            ),
-            React.createElement('div', { style: { borderTop: '1px solid #d8dee4', marginTop: '8px', paddingTop: '6px' } },
-              React.createElement('button', {
-                onClick: async function() { await B.logoutGoogle(); setGoogleOk(false); setGoogleUser(null); setShowGoogleMenu(false); },
-                style: { width: '100%', padding: '4px 8px', border: 'none', background: 'transparent', fontSize: '12px', color: '#d1242f', cursor: 'pointer', textAlign: 'left', borderRadius: '4px' },
-                onMouseEnter: function(e) { e.currentTarget.style.background = '#f6f8fa'; },
-                onMouseLeave: function(e) { e.currentTarget.style.background = 'transparent'; },
-              }, 'Desconectar Google')
-            )
+          React.createElement('div', { style: { fontSize: '16px', fontWeight: '500', color: '#26251e', fontFamily: F } }, 'System X1'),
+          React.createElement('div', { style: { fontSize: '14px', color: 'rgba(38,37,30,0.55)', maxWidth: '320px', textAlign: 'center', lineHeight: '1.5', fontFamily: F } },
+            'Ask me anything. I have 8 specialized agents. I can search GitHub, npm, Stack Overflow and more.'
           )
         )
-      ),
+      :
+        React.createElement('div', { style: { maxWidth: '680px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '20px' } },
+          msgs.map(function(m) {
+            var mAgent = agentById(m.agent || 'research');
+            var elapsed = m.finishedAt && m.startedAt ? Math.round((m.finishedAt - m.startedAt) / 100) / 10 : null;
+            var stepKey = m.id;
+            var isExpanded = !!expandedSteps[stepKey];
 
-      googleError ? React.createElement('div', { style: { padding: '6px 20px', background: '#fff0ee', color: '#d1242f', fontSize: '12px', borderBottom: '1px solid #ffc2c2', fontFamily: F } }, googleError) : null,
+            return React.createElement('div', { key: m.id, style: { display: 'flex', flexDirection: 'column', gap: '8px' } },
+              m.role === 'user' ?
+                React.createElement('div', { style: { display: 'flex', justifyContent: 'flex-end' } },
+                  React.createElement('div', {
+                    style: {
+                      maxWidth: '75%', padding: '10px 14px', borderRadius: '8px',
+                      background: '#e6e5e0', fontSize: '14px', lineHeight: '1.5', color: '#26251e',
+                      fontFamily: F, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+                      border: '1px solid rgba(38,37,30,0.1)',
+                    }
+                  }, m.content)
+                )
+              :
+                React.createElement('div', { style: { display: 'flex', gap: '10px', alignItems: 'flex-start' } },
+                  React.createElement(AgentAvatar, { agent: mAgent, size: 24 }),
+                  React.createElement('div', { style: { flex: 1, minWidth: 0 } },
+                    React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' } },
+                      React.createElement('span', { style: { fontSize: '13px', fontWeight: '500', color: '#26251e', fontFamily: F } }, mAgent.name),
+                      elapsed != null && React.createElement('span', { style: { fontSize: '11px', color: 'rgba(38,37,30,0.4)' } }, elapsed + 's')
+                    ),
+                    m.status === 'thinking' ?
+                      React.createElement(ThinkingDots, null)
+                    :
+                    m.status === 'done' && m.content ?
+                      React.createElement('div', null,
+                        m.judgeReason && React.createElement('div', { style: { fontSize: '12px', color: 'rgba(38,37,30,0.55)', lineHeight: '1.5', fontFamily: F, marginBottom: '6px', fontStyle: 'italic' } },
+                          (m.sector ? m.sector + ' — ' : '') + m.judgeReason.replace(/\*\*/g, '').replace(/\n/g, ' ').slice(0, 120)
+                        ),
+                        React.createElement('div', { style: { padding: '2px 0' } },
+                          React.createElement(Markdown, { text: m.content })
+                        ),
+                        m.processSteps ? React.createElement(ProcessSteps, {
+                          steps: m.processSteps,
+                          expanded: isExpanded,
+                          onToggle: function() { setExpandedSteps(function(prev) { var next = Object.assign({}, prev); if (next[stepKey]) delete next[stepKey]; else next[stepKey] = true; return next; }); }
+                        }) : null
+                      )
+                    : null
+                  )
+              )
+            );
+          })
+        )
+    ),
 
-      // Mensajes (ProcessTimeline eliminado de aqui, ahora por cada respuesta abajo)
-      React.createElement('div', { ref: logRef, style: { flex: 1, overflow: 'auto', padding: '20px' } },
-        msgs.length === 0 ?
-          React.createElement('div', { style: { height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '12px' } },
-            React.createElement('div', { style: { width: '56px', height: '56px', borderRadius: '50%', background: '#f6f8fa', border: '1px solid #d0d7de', display: 'flex', alignItems: 'center', justifyContent: 'center' } },
-              React.createElement('img', { src: 'dist/x1-logo.png', alt: 'X1', style: { width: '32px', height: '32px', borderRadius: '4px', objectFit: 'contain' }, onError: function(e) { e.currentTarget.style.display = 'none'; } })
-            ),
-            React.createElement('div', { style: { fontSize: '17px', fontWeight: '600', color: '#1f2328', fontFamily: F } }, 'System X1'),
-            React.createElement('div', { style: { fontSize: '14px', color: '#59636e', maxWidth: '300px', textAlign: 'center', lineHeight: '1.7', fontFamily: F } },
-              'Preguntame lo que quieras. Tengo 8 agentes especializados. Puedo buscar en GitHub, npm, Stack Overflow y mas.'
-            ),
-            React.createElement('div', { style: { display: 'flex', gap: '6px', marginTop: '8px', flexWrap: 'wrap', justifyContent: 'center', maxWidth: '320px' } },
-              QUICK.map(function(q) {
-                return React.createElement('button', {
-                  key: q.label,
-                  onClick: function() { send(q.prompt); },
+    // Input
+    React.createElement('div', { style: { padding: '0 20px 24px' } },
+      React.createElement('div', {
+        style: {
+          background: '#f7f7f4', borderRadius: '10px',
+          padding: '10px 10px 8px 10px',
+          border: '1px solid rgba(38,37,30,0.1)',
+          transition: 'border-color 150ms, box-shadow 150ms',
+        },
+        onFocus: function(e) { e.currentTarget.style.borderColor = 'rgba(38,37,30,0.2)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)'; },
+        onBlur: function(e) { e.currentTarget.style.borderColor = 'rgba(38,37,30,0.1)'; e.currentTarget.style.boxShadow = 'none'; },
+      },
+        React.createElement('textarea', {
+          ref: taRef,
+          value: text,
+          onChange: function(e) { setText(e.target.value); textRef.current = e.target.value; },
+          placeholder: 'Plan, search, build anything...',
+          rows: 1,
+          style: {
+            width: '100%', border: 'none', outline: 'none', resize: 'none',
+            fontSize: '14px', fontFamily: F, lineHeight: '1.5',
+            background: 'transparent', minHeight: '22px', maxHeight: '120px', color: '#26251e',
+            overflow: 'auto', padding: '0', display: 'block', boxSizing: 'border-box',
+          },
+          onKeyDown: function(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }
+        }),
+        React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '6px', marginTop: '8px' } },
+          // Agent picker
+          React.createElement('div', {
+            onClick: function() { setAgentMenu(function(v) { return !v; }); },
+            style: {
+              display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '3px 8px',
+              borderRadius: '9999px', background: '#e6e5e0', fontSize: '12px', color: 'rgba(38,37,30,0.6)',
+              cursor: 'pointer', fontFamily: F, position: 'relative',
+              transition: 'background 150ms',
+            },
+            onMouseEnter: function(e) { e.currentTarget.style.background = '#ebeae5'; },
+            onMouseLeave: function(e) { e.currentTarget.style.background = '#e6e5e0'; },
+          },
+            agent.name,
+            React.createElement('svg', { viewBox: '0 0 16 16', width: '8', height: '8', fill: 'rgba(38,37,30,0.55)' }, React.createElement('path', { d: 'M4.427 7.427l3.396 3.396a.25.25 0 00.354 0l3.396-3.396A.25.25 0 0011.396 7H4.604a.25.25 0 00-.177.427z' })),
+            agentMenu && React.createElement('div', {
+              style: {
+                position: 'absolute', bottom: '100%', left: 0, zIndex: 30, marginBottom: '6px',
+                minWidth: '200px', background: '#f7f7f4', border: '1px solid rgba(38,37,30,0.1)',
+                borderRadius: '8px', boxShadow: '0 28px 70px rgba(0,0,0,0.14), 0 14px 32px rgba(0,0,0,0.1), 0 0 0 1px rgba(38,37,30,0.1)', padding: '4px',
+              }
+            },
+              AGENTS.map(function(a) {
+                var isActive = activeAgent === a.id;
+                return React.createElement('div', {
+                  key: a.id,
+                  onClick: function(e) { e.stopPropagation(); setActiveAgent(a.id); setAgentMenu(false); },
                   style: {
-                    padding: '4px 12px', border: '1px solid #d0d7de', borderRadius: '999px',
-                    background: '#ffffff', fontSize: '12px', color: '#59636e', cursor: 'pointer',
-                    fontFamily: F, transition: 'all 80ms',
+                    padding: '6px 8px', borderRadius: '8px', cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', gap: '8px',
+                    background: isActive ? '#e6e5e0' : 'transparent',
+                    transition: 'background 150ms',
                   },
-                  onMouseEnter: function(e) { e.currentTarget.style.background = '#f6f8fa'; e.currentTarget.style.borderColor = '#0969da'; e.currentTarget.style.color = '#0969da'; },
-                  onMouseLeave: function(e) { e.currentTarget.style.background = '#ffffff'; e.currentTarget.style.borderColor = '#d0d7de'; e.currentTarget.style.color = '#59636e'; },
-                }, q.label);
+                  onMouseEnter: function(e) { if (!isActive) e.currentTarget.style.background = '#f2f1ed'; },
+                  onMouseLeave: function(e) { if (!isActive) e.currentTarget.style.background = 'transparent'; },
+                },
+                  React.createElement(AgentAvatar, { agent: a, size: 20 }),
+                  React.createElement('div', { style: { flex: 1 } },
+                    React.createElement('div', { style: { fontSize: '13px', fontWeight: '500', color: '#26251e' } }, a.name),
+                    React.createElement('div', { style: { fontSize: '11px', color: 'rgba(38,37,30,0.55)' } }, a.ai)
+                  ),
+                  isActive && React.createElement('svg', { viewBox: '0 0 16 16', width: '12', height: '12', fill: '#26251e' },
+                    React.createElement('path', { d: 'M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z' })
+                  )
+                );
               })
             )
-          )
-        :
-          React.createElement('div', { style: { maxWidth: '680px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '20px' } },
-            msgs.map(function(m) {
-              var mAgent = agentById(m.agent || 'research');
-              var elapsed = m.finishedAt && m.startedAt ? Math.round((m.finishedAt - m.startedAt) / 100) / 10 : null;
-              return React.createElement('div', { key: m.id, style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
-                m.role === 'user' ?
-                  React.createElement('div', { style: { display: 'flex', justifyContent: 'flex-end' } },
-                    React.createElement('div', {
-                      style: {
-                        maxWidth: '75%', padding: '10px 14px', borderRadius: '14px 14px 4px 14px',
-                        background: '#ddf4ff', fontSize: '14px', lineHeight: '1.6', color: '#1f2328',
-                        fontFamily: F, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-                      }
-                    }, m.content)
-                  )
-                :
-                  // Mensaje del asistente: avatar + nombre + razonamiento + respuesta + tools + meta
-                  React.createElement('div', { style: { display: 'flex', gap: '10px', alignItems: 'flex-start' } },
-                    React.createElement(AgentAvatar, { agent: mAgent, size: 22 }),
-                    React.createElement('div', { style: { flex: 1, minWidth: 0 } },
-                      // Nombre del agente + IA
-                      React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' } },
-                        React.createElement('span', { style: { fontSize: '13px', fontWeight: '600', color: '#1f2328', fontFamily: F } }, mAgent.name),
-                        React.createElement('span', { style: { fontSize: '11px', color: '#818b98' } }, mAgent.ai),
-                        elapsed != null && React.createElement('span', { style: { fontSize: '10px', color: '#818b98' } }, elapsed + 's')
-                      ),
-                      // Estado "thinking" -> puntos animados
-                      m.status === 'thinking' ?
-                        React.createElement(ThinkingDots, null)
-                      :
-                      // Estado "done" con contenido
-                      m.status === 'done' && m.content ?
-                        React.createElement('div', null,
-                          // Panel de razonamiento del juez (estilo Claude/o1 "Thinking")
-                          React.createElement(ReasoningPanel, { msg: m }),
-                          // Cuerpo de la respuesta (formato markdown)
-                          React.createElement('div', { style: { padding: '4px 0' } },
-                            React.createElement(Markdown, { text: m.content })
-                          ),
-                          // Badges de herramientas usadas
-                          m.toolsUsed && m.toolsUsed.length > 0 ?
-                            React.createElement('div', { style: { display: 'flex', gap: '4px', marginTop: '8px', flexWrap: 'wrap' } },
-                              m.toolsUsed.map(function(tool) {
-                                return React.createElement('span', {
-                                  key: tool,
-                                  style: {
-                                    display: 'inline-flex', alignItems: 'center', gap: '4px',
-                                    fontSize: '11px', padding: '2px 8px', borderRadius: '999px',
-                                    background: '#f6f8fa', border: '1px solid #d0d7de', color: '#59636e',
-                                    fontFamily: F,
-                                  }
-                                },
-                                  React.createElement(ToolIcon, { tool: tool, size: 12 }),
-                                  tool
-                                );
-                              })
-                            )
-                          : null,
-                          // Panel de proceso debajo de la respuesta
-                          m.processSteps ? React.createElement('div', {
-                            style: {
-                              marginTop: '12px', borderTop: '1px solid #d8dee4', paddingTop: '10px',
-                              display: 'flex', flexDirection: 'column', gap: '6px',
-                            }
-                          },
-                            React.createElement('div', { style: { fontSize: '11px', fontWeight: '600', color: '#59636e', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' } }, 'Proceso de ejecucion'),
-                            m.processSteps.map(function(ps, i) {
-                              var iconSvg = null;
-                              if (ps.icon === 'sector') iconSvg = React.createElement('svg', { viewBox: '0 0 16 16', width: '12', height: '12', fill: '#59636e' }, React.createElement('path', { d: 'M1.75 1h8.5c.966 0 1.75.784 1.75 1.75v5.5A1.75 1.75 0 0110.25 10H7.061l-2.574 2.573A1.458 1.458 0 012 11.543V10h-.25A1.75 1.75 0 010 8.25v-5.5C0 1.784.784 1 1.75 1z' }));
-                              else if (ps.icon === 'agent') iconSvg = React.createElement('svg', { viewBox: '0 0 16 16', width: '12', height: '12', fill: '#59636e' }, React.createElement('path', { d: 'M10.561 8.073a6.005 6.005 0 013.432 5.142.75.75 0 11-1.498.07 4.5 4.5 0 00-8.99 0 .75.75 0 11-1.498-.07 6.004 6.004 0 013.431-5.142 3.999 3.999 0 115.123 0zM10.5 5a2.5 2.5 0 10-5 0 2.5 2.5 0 005 0z' }));
-                              else if (ps.icon === 'repo') iconSvg = React.createElement('svg', { viewBox: '0 0 16 16', width: '12', height: '12', fill: '#59636e' }, React.createElement('path', { d: 'M2 2.5A2.5 2.5 0 014.5 0h8.75a.75.75 0 01.75.75v12.5a.75.75 0 01-.75.75h-2.5a.75.75 0 110-1.5h1.75v-2h-8a1 1 0 00-.714 1.7.75.75 0 01-1.072 1.05A2.495 2.495 0 012 11.5v-9z' }));
-                              else if (ps.icon === 'ai') iconSvg = React.createElement('svg', { viewBox: '0 0 16 16', width: '12', height: '12', fill: '#59636e' }, React.createElement('path', { d: 'M8 0a8 8 0 110 16A8 8 0 018 0zM1.5 8a6.5 6.5 0 1013 0 6.5 6.5 0 00-13 0zm6.25-3.25v2.992l2.028.812a.75.75 0 01-.557 1.392l-2.5-1A.751.751 0 017.25 8.25v-3.5a.75.75 0 011.5 0z' }));
-                              else if (ps.icon === 'clock') iconSvg = React.createElement('svg', { viewBox: '0 0 16 16', width: '12', height: '12', fill: '#59636e' }, React.createElement('path', { d: 'M8 0a8 8 0 110 16A8 8 0 018 0zM1.5 8a6.5 6.5 0 1013 0 6.5 6.5 0 00-13 0zm6.25-3.25v3a.75.75 0 01-.22.53l-2 2a.75.75 0 01-1.06-1.06l1.78-1.78V4.75a.75.75 0 111.5 0z' }));
-                              else iconSvg = React.createElement('svg', { viewBox: '0 0 16 16', width: '12', height: '12', fill: '#d1242f' }, React.createElement('path', { d: 'M3.72 3.72a.75.75 0 011.06 0L8 6.94l3.22-3.22a.75.75 0 111.06 1.06L9.06 8l3.22 3.22a.75.75 0 11-1.06 1.06L8 9.06l-3.22 3.22a.75.75 0 01-1.06-1.06L6.94 8 3.72 4.78a.75.75 0 010-1.06z' }));
-                              return React.createElement('div', { key: i, style: { display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px' } },
-                                iconSvg,
-                                React.createElement('span', { style: { color: '#59636e', flexShrink: 0, minWidth: '60px', fontWeight: 500 } }, ps.label),
-                                React.createElement('span', { style: { color: '#1f2328' } }, ps.detail)
-                              );
-                            })
-                          ) : null
-                        )
-                      : null
-                    )
-                  )
-              );
-            })
-          )
-      ),
-
-      // Input area (GitHub Primer) con auto-resize
-      React.createElement('div', { style: { padding: '0 20px 14px' } },
-        React.createElement('div', {
-          style: {
-            display: 'flex', alignItems: 'flex-end', gap: '10px',
-            background: '#ffffff', border: '1px solid #d0d7de', borderRadius: '6px',
-            padding: '10px 12px',
-            transition: 'border-color 80ms',
-          },
-          onFocus: function(e) { e.currentTarget.style.borderColor = '#0969da'; },
-          onBlur: function(e) { e.currentTarget.style.borderColor = '#d0d7de'; },
-        },
-          React.createElement('textarea', {
-            ref: taRef,
-            value: text,
-            onChange: function(e) { setText(e.target.value); textRef.current = e.target.value; },
-            placeholder: 'Escribe tu mensaje a ' + agent.name + '...',
-            rows: 1,
+          ),
+          // Model badge
+          React.createElement('div', {
             style: {
-              flex: 1, border: 'none', outline: 'none', resize: 'none',
-              fontSize: '14px', fontFamily: F, lineHeight: '1.5',
-              background: 'transparent', minHeight: '22px', maxHeight: '120px', color: '#1f2328',
-              overflow: 'auto',
+              display: 'inline-flex', alignItems: 'center', padding: '3px 8px',
+              borderRadius: '9999px', background: '#e6e5e0', fontSize: '12px', color: 'rgba(38,37,30,0.6)', fontFamily: F,
             },
-            onKeyDown: function(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }
-          }),
+          }, agent.ai),
+          React.createElement('div', { style: { flex: 1 } }),
+          // Send
           React.createElement('button', {
             onClick: function() { send(); },
             disabled: !text.trim() || busy,
             style: {
-              width: '28px', height: '28px', borderRadius: '6px',
+              width: '32px', height: '32px', borderRadius: '8px',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               border: 'none', cursor: text.trim() && !busy ? 'pointer' : 'default',
-              background: text.trim() && !busy ? '#2da44e' : '#f6f8fa',
-              color: text.trim() && !busy ? '#ffffff' : '#818b98',
-              flexShrink: 0, transition: 'background 80ms',
+              background: text.trim() && !busy ? '#f54e00' : '#e6e5e0',
+              color: text.trim() && !busy ? '#ffffff' : 'rgba(38,37,30,0.4)',
+              flexShrink: 0, transition: 'background 150ms, color 150ms',
             }
           },
-            React.createElement('svg', { viewBox: '0 0 16 16', width: '14', height: '14', fill: 'currentColor' },
-              React.createElement('path', { d: 'M.989 8 .064 2.68a1.342 1.342 0 0 1 1.85-1.462l13.402 5.744a1.13 1.13 0 0 1 0 2.076L1.913 14.782a1.343 1.343 0 0 1-1.85-1.463L.99 8Zm.603-5.288L2.38 7.25h4.87a.75.75 0 0 1 0 1.5H2.38l-.788 4.538L13.929 8Z' })
+            React.createElement('svg', { viewBox: '0 0 16 16', width: '16', height: '16', fill: 'currentColor' },
+              React.createElement('path', { d: 'M8 1.75a.75.75 0 01.75.75v8.69l2.72-2.72a.75.75 0 111.06 1.06l-4 4a.75.75 0 01-1.06 0l-4-4a.75.75 0 111.06-1.06l2.72 2.72V2.5A.75.75 0 018 1.75z', transform: 'rotate(180 8 8)' })
             )
           )
         )

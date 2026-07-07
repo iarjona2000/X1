@@ -56,6 +56,21 @@ var SECTOR_PROMPTS = {
   developer: 'Eres X1 en el sector Desarrollo, un arquitecto de software senior. Escribe codigo production-ready, completo y funcional. Responde EN ESPAÑOL solo con el JSON exacto que se te pida, sin texto ni markdown alrededor.',
   reviewer: 'Eres X1 en el sector Auditoria de Codigo, un revisor senior extremadamente riguroso. Busca bugs, vulnerabilidades, malas practicas, casos sin cubrir y codigo incompleto en lo que te pasen. Responde EN ESPAÑOL de forma directa: una lista breve de problemas concretos, o "Sin problemas relevantes" si esta bien.',
   refiner: 'Eres X1 en el sector Refinamiento, encargado de incorporar el feedback de una auditoria en la version final del codigo. Responde EN ESPAÑOL solo con el JSON exacto que se te pida, sin texto ni markdown alrededor.',
+  director: 'Eres X1 en el sector Direccion — el rol que supervisa y da el visto bueno final sobre el trabajo de los demas sectores (Estrategia, Desarrollo, Auditoria, Refinamiento) antes de publicarse. No repites su trabajo: JUZGAS si es publicable. Responde EN ESPAÑOL solo con el JSON exacto que se te pida.',
+};
+
+// Que proveedor pedir PRIMERO para cada sector (ver providers.config.js en
+// el worker) — cuando el usuario configure NVIDIA_KEY/TOGETHER_KEY, cada
+// sector empezara a usar automaticamente el modelo mas adecuado a su rol sin
+// tocar mas codigo. Mientras tanto, si ese proveedor no tiene clave, el
+// proxy sigue la cascada normal (Groq) sin romper nada — es una preferencia,
+// no una dependencia dura.
+var SECTOR_PREFERRED_PROVIDER = {
+  strategist: 'kimi-together',     // Kimi K2: fuerte en planificacion/razonamiento agentico
+  developer: 'nvidia-qwen',        // Qwen3 Coder 480B: especializado en codigo agentico
+  reviewer: 'nvidia-nemotron',     // Nemotron 3 Ultra: modelo de razonamiento para auditoria critica
+  refiner: 'nvidia-qwen',
+  director: 'kimi-together',
 };
 
 // Llama al proxy directamente (fetch desde el sidepanel, sin pasar por el
@@ -68,6 +83,7 @@ function askAI(prompt, opts) {
     maxTokens: opts.maxTokens,
     timeoutMs: opts.timeoutMs,
     systemPrompt: opts.systemPrompt || AGENT_SYSTEM_PROMPT,
+    preferProvider: opts.preferProvider,
   }).then(function (r) {
     var secs = Math.round((Date.now() - t0) / 1000);
     if (!r || !r.text) {
@@ -221,9 +237,43 @@ function fmtBytes(n) {
   return n + ' B';
 }
 
-// ── Analisis exhaustivo del repositorio (con proceso visible paso a paso) ──
-// El resultado se guarda para que lo use la seccion de Automatizacion como
-// contexto de un objetivo autonomo.
+// ── Escaneo estatico (sin IA, instantaneo, determinista) ──
+// Hechos concretos sobre el repo que luego se inyectan como contexto real en
+// los prompts de cada sector — evita que la IA "adivine" si hay tests, CI,
+// licencia, etc. cuando lo puede saber con certeza mirando el arbol.
+var TEST_PATTERN = /(^|\/)(test|tests|spec|specs|__tests__)(\/|$)|\.(test|spec)\.[a-z]+$/i;
+var CI_PATTERNS = ['.github/workflows', '.gitlab-ci.yml', '.circleci/config.yml', 'azure-pipelines.yml', '.travis.yml', 'Jenkinsfile'];
+var LICENSE_PATTERN = /^licen[cs]e(\.|$)/i;
+
+function staticScan(files) {
+  var testFiles = files.filter(function (f) { return TEST_PATTERN.test(f.path); });
+  var ciFile = files.find(function (f) { return CI_PATTERNS.some(function (p) { return f.path.indexOf(p) !== -1; }); });
+  var licenseFile = files.find(function (f) { return LICENSE_PATTERN.test(f.path.split('/').pop()); });
+  var largest = files.slice().sort(function (a, b) { return (b.size || 0) - (a.size || 0); }).slice(0, 6);
+  var byDir = {};
+  files.forEach(function (f) {
+    var dir = f.path.indexOf('/') !== -1 ? f.path.split('/')[0] : '(raiz)';
+    byDir[dir] = (byDir[dir] || 0) + 1;
+  });
+  var dirBreakdown = Object.keys(byDir).sort(function (a, b) { return byDir[b] - byDir[a]; }).slice(0, 10)
+    .map(function (d) { return d + ' (' + byDir[d] + ')'; }).join(', ');
+
+  return {
+    testFiles: testFiles, hasTests: testFiles.length > 0,
+    ciFile: ciFile, hasCI: !!ciFile,
+    licenseFile: licenseFile, hasLicense: !!licenseFile,
+    largest: largest, dirBreakdown: dirBreakdown,
+  };
+}
+
+// ── Analisis exhaustivo y multi-sector del repositorio (con proceso visible
+// paso a paso). En vez de una unica llamada a IA produciendo un resumen
+// generico, cada sector (Arquitectura, Seguridad, Calidad y Pruebas,
+// Recomendaciones) es su propia consulta independiente, alimentada con
+// hechos reales detectados en el arbol (tests, CI, licencia, ficheros mas
+// grandes) y con mas ficheros de codigo real leidos (no solo configuracion
+// de la raiz). El resultado se guarda para que lo use la seccion de
+// Automatizacion (y el autopiloto) como contexto. ──
 export function analyzeRepo(token, owner, repo, meta, files, onStep) {
   var langs = languageStats(files);
   var stats = {
@@ -231,76 +281,109 @@ export function analyzeRepo(token, owner, repo, meta, files, onStep) {
     languages: langs,
     totalSize: files.reduce(function (a, f) { return a + (f.size || 0); }, 0),
   };
+  var scan = staticScan(files);
 
   emit(onStep, {
     id: 'tree', title: 'Arbol de ficheros leido', status: 'done',
     detail: files.length + ' ficheros · ' + Object.keys(langs).slice(0, 4).join(', ') + (Object.keys(langs).length > 4 ? '…' : ''),
     why: 'Necesario para conocer la estructura de carpetas y el stack antes de leer nada en detalle.',
   });
+  emit(onStep, {
+    id: 'scan', title: 'Escaneo estatico completado', status: 'done',
+    detail: (scan.hasTests ? scan.testFiles.length + ' ficheros de test' : 'sin tests detectados') + ' · ' +
+      (scan.hasCI ? 'CI configurado' : 'sin CI') + ' · ' + (scan.hasLicense ? 'con licencia' : 'sin licencia'),
+    why: 'Hechos verificables (tests, CI, licencia, ficheros mas grandes, distribucion por carpeta) que alimentan el analisis de cada sector — no son suposiciones de la IA.',
+  });
 
   var keyNames = ['README.md', 'readme.md', 'README', 'package.json', 'requirements.txt', 'go.mod', 'Cargo.toml', 'pom.xml', 'tsconfig.json', 'manifest.json', 'Dockerfile', 'pyproject.toml'];
   var keyFiles = files
     .filter(function (f) { return keyNames.indexOf(f.path.split('/').pop()) !== -1 && f.path.split('/').length <= 2; })
+    .slice(0, 3);
+  // Ademas de config de la raiz, lee un puñado de ficheros de codigo REAL —
+  // los mas grandes de hasta 3 carpetas distintas, para que Seguridad/Calidad
+  // hablen de codigo de verdad, no solo de metadatos.
+  var codeSample = scan.largest
+    .filter(function (f) { return keyFiles.indexOf(f) === -1 && !/\.(png|jpg|jpeg|gif|svg|ico|lock|min\.js)$/i.test(f.path); })
     .slice(0, 4);
+  var toRead = keyFiles.concat(codeSample);
 
-  if (keyFiles.length === 0) {
-    emit(onStep, { id: 'nokeys', title: 'Sin ficheros clave en la raiz', status: 'done', detail: 'No hay README/package.json/etc en el nivel superior; X1 analizara solo con el arbol de ficheros.' });
+  if (toRead.length === 0) {
+    emit(onStep, { id: 'nokeys', title: 'Sin ficheros legibles relevantes', status: 'done', detail: 'X1 analizara solo con el arbol de ficheros y el escaneo estatico.' });
   }
 
-  var readSteps = keyFiles.map(function (f) { return { id: 'read:' + f.path, title: 'Leyendo ' + f.path, status: 'active' }; });
-  readSteps.forEach(function (s) { emit(onStep, s); });
+  toRead.forEach(function (f) { emit(onStep, { id: 'read:' + f.path, title: 'Leyendo ' + f.path, status: 'active' }); });
 
   return Promise.all(
-    keyFiles.map(function (f, i) {
+    toRead.map(function (f) {
       return fetchFileContent(token, owner, repo, f.path).then(function (c) {
         emit(onStep, {
           id: 'read:' + f.path, title: 'Leido ' + f.path, status: 'done',
           detail: fmtBytes((c || '').length),
           why: readWhy(f.path),
         });
-        // Cap a 1500 chars: el objetivo es que la IA entienda el rol del
-        // fichero, no que reciba el fuente entero — cada caracter de mas aqui
-        // es tiempo de espera de mas para el usuario, multiplicado por
-        // cada fichero clave.
         return { path: f.path, content: (c || '').slice(0, 1500) };
       });
     })
   ).then(function (contents) {
-    emit(onStep, {
-      id: 'ai', title: 'Consultando panel de IA (varios modelos + arbitro)', status: 'active',
-      why: 'Con el arbol y los ficheros clave ya leidos, X1 pide un informe conciso: proposito, stack, arquitectura, riesgos y recomendaciones.',
-    });
-    var tree = files.slice(0, 100).map(function (f) { return f.path; }).join('\n');
-    var prompt =
-      'Analiza este repositorio de GitHub y devuelve un informe en espanol, en formato MARKDOWN, con EXACTAMENTE estas 6 secciones (usa "## " para cada titulo):\n' +
-      '## Proposito\n## Stack\n## Arquitectura\n## Ficheros clave\n## Riesgos\n## Recomendaciones\n\n' +
-      'Reglas: se CONCISO y directo (3-5 frases o 3-6 bullets por seccion, nunca mas). ' +
-      'En "Riesgos" y "Recomendaciones" nombra ficheros y acciones CONCRETAS (nada de generalidades tipo "mejorar el codigo"), usa listas con "- ". ' +
-      '"Recomendaciones" es la seccion mas importante: el usuario la usara para decidir que construir despues, cada punto debe ser una accion accionable por si sola.\n\n' +
-      'Repo: ' + owner + '/' + repo + '\nDescripcion: ' + ((meta && meta.description) || 'N/A') +
+    var tree = files.slice(0, 150).map(function (f) { return f.path; }).join('\n');
+    var contentsBlock = contents.map(function (c) { return '=== ' + c.path + ' ===\n' + c.content; }).join('\n\n');
+    var factsBlock = 'Hechos verificados del repositorio (no son suposiciones):\n' +
+      '- Tests: ' + (scan.hasTests ? scan.testFiles.length + ' ficheros (' + scan.testFiles.slice(0, 5).map(function (f) { return f.path; }).join(', ') + ')' : 'NINGUNO detectado') + '\n' +
+      '- CI/CD: ' + (scan.hasCI ? scan.ciFile.path : 'NINGUNO detectado') + '\n' +
+      '- Licencia: ' + (scan.hasLicense ? scan.licenseFile.path : 'NINGUNA detectada') + '\n' +
+      '- Ficheros mas grandes: ' + scan.largest.map(function (f) { return f.path + ' (' + fmtBytes(f.size) + ')'; }).join(', ') + '\n' +
+      '- Distribucion por carpeta: ' + scan.dirBreakdown;
+    var baseBlock = 'Repo: ' + owner + '/' + repo + '\nDescripcion: ' + ((meta && meta.description) || 'N/A') +
       '\nLenguaje principal: ' + ((meta && meta.language) || 'N/A') + '\nFicheros: ' + files.length + '\n\n' +
-      'Arbol (parcial):\n' + tree + '\n\nContenido de ficheros clave (resumido):\n' +
-      contents.map(function (c) { return '=== ' + c.path + ' ===\n' + c.content; }).join('\n\n');
+      factsBlock + '\n\nArbol (parcial):\n' + tree + '\n\nContenido de ficheros leidos:\n' + contentsBlock;
 
-    return askAI(prompt, { timeoutMs: 25000, maxTokens: 1800 }).then(function (r) {
-      var report = r.text;
-      var ok = !!(report && report.trim());
-      emit(onStep, {
-        id: 'ai', title: ok ? 'Informe generado' : 'El panel de IA no respondio a tiempo', status: ok ? 'done' : 'error',
-        detail: ok ? (report.length + ' caracteres · respondido por ' + r.label) : ('Fallo tras ' + r.label + ' — pulsa "Analizar a fondo" para reintentar'),
+    // ── 4 sectores independientes, cada uno su propia consulta a IA ──
+    emit(onStep, { id: 'sec-arch', title: 'Sector Arquitectura: analizando proposito y stack', status: 'active', why: 'Primer pase: que es este proyecto, con que tecnologia esta hecho y como esta organizado.' });
+    var archPrompt = baseBlock + '\n\nAnaliza SOLO proposito, stack y arquitectura. Responde en espanol, MARKDOWN, con "## Proposito", "## Stack" y "## Arquitectura". Se concreto (3-5 frases o bullets por seccion), nombra ficheros y carpetas reales.';
+
+    return askAI(archPrompt, { timeoutMs: 22000, maxTokens: 900, systemPrompt: SECTOR_PROMPTS.strategist, preferProvider: SECTOR_PREFERRED_PROVIDER.strategist }).then(function (archRes) {
+      emit(onStep, { id: 'sec-arch', title: 'Sector Arquitectura: completado', status: archRes.text ? 'done' : 'error', detail: (archRes.text ? archRes.text.length + ' caracteres' : 'sin respuesta') + ' · ' + archRes.label });
+
+      emit(onStep, { id: 'sec-sec', title: 'Sector Seguridad: buscando riesgos', status: 'active', why: 'Segundo pase, con un rol distinto: busca secretos expuestos, validacion de inputs, permisos excesivos y dependencias sin fijar.' });
+      var secPrompt = baseBlock + '\n\nAnaliza SOLO seguridad. Responde en espanol, MARKDOWN, con "## Seguridad". Busca: claves/secretos hardcodeados, falta de validacion de inputs, permisos excesivos, dependencias sin version fijada. Cita ficheros y lineas concretas si las ves en el contenido de arriba. Si no encuentras riesgos reales, dilo explicitamente en vez de inventar generalidades.';
+
+      return askAI(secPrompt, { timeoutMs: 22000, maxTokens: 700, systemPrompt: SECTOR_PROMPTS.reviewer, preferProvider: SECTOR_PREFERRED_PROVIDER.reviewer }).then(function (secRes) {
+        emit(onStep, { id: 'sec-sec', title: 'Sector Seguridad: completado', status: secRes.text ? 'done' : 'error', detail: (secRes.text ? secRes.text.length + ' caracteres' : 'sin respuesta') + ' · ' + secRes.label });
+
+        emit(onStep, { id: 'sec-qual', title: 'Sector Calidad y Pruebas: evaluando', status: 'active', why: 'Tercer pase: usa los hechos verificados (tests/CI detectados de verdad) para juzgar cobertura, mantenibilidad y practicas de calidad.' });
+        var qualPrompt = baseBlock + '\n\nAnaliza SOLO calidad y pruebas. Responde en espanol, MARKDOWN, con "## Calidad y Pruebas". Usa los hechos verificados de arriba (tests/CI reales, no supongas). Evalua cobertura de tests, complejidad de los ficheros mas grandes, y practicas de calidad (o su ausencia). Se especifico.';
+
+        return askAI(qualPrompt, { timeoutMs: 22000, maxTokens: 700, systemPrompt: SECTOR_PROMPTS.reviewer, preferProvider: SECTOR_PREFERRED_PROVIDER.reviewer }).then(function (qualRes) {
+          emit(onStep, { id: 'sec-qual', title: 'Sector Calidad y Pruebas: completado', status: qualRes.text ? 'done' : 'error', detail: (qualRes.text ? qualRes.text.length + ' caracteres' : 'sin respuesta') + ' · ' + qualRes.label });
+
+          emit(onStep, { id: 'sec-rec', title: 'Sector Recomendaciones: sintetizando plan de accion', status: 'active', why: 'Cuarto pase: combina lo que dijeron Arquitectura, Seguridad y Calidad en una lista priorizada de acciones concretas — esto es lo que usara despues la Automatizacion.' });
+          var recPrompt = 'Con estos 3 analisis independientes de un repositorio:\n\n[ARQUITECTURA]\n' + (archRes.text || '') + '\n\n[SEGURIDAD]\n' + (secRes.text || '') + '\n\n[CALIDAD Y PRUEBAS]\n' + (qualRes.text || '') +
+            '\n\nSintetiza una lista de RECOMENDACIONES priorizadas y accionables (cada una una accion concreta, citando ficheros, que la Automatizacion de X1 pueda ejecutar por si sola despues). Responde en espanol, MARKDOWN, con "## Recomendaciones", lista numerada de maximo 10 puntos, ordenados de mas a menos importante.';
+
+          return askAI(recPrompt, { timeoutMs: 22000, maxTokens: 900, systemPrompt: SECTOR_PROMPTS.strategist, preferProvider: SECTOR_PREFERRED_PROVIDER.strategist }).then(function (recRes) {
+            emit(onStep, { id: 'sec-rec', title: 'Sector Recomendaciones: completado', status: recRes.text ? 'done' : 'error', detail: (recRes.text ? recRes.text.length + ' caracteres' : 'sin respuesta') + ' · ' + recRes.label });
+
+            var sections = [archRes.text, secRes.text, qualRes.text, recRes.text].filter(Boolean);
+            var report = sections.length
+              ? sections.join('\n\n')
+              : 'El motor de IA no devolvio analisis ahora mismo. Reintentalo en unos segundos.';
+            var ok = sections.length > 0;
+
+            emit(onStep, {
+              id: 'ai', title: ok ? 'Informe multi-sector completado' : 'El panel de IA no respondio a tiempo', status: ok ? 'done' : 'error',
+              detail: ok ? (sections.length + '/4 sectores respondieron · ' + report.length + ' caracteres') : 'Reintenta el analisis',
+            });
+
+            var analysis = {
+              repo: owner + '/' + repo, owner: owner, name: repo, meta: meta, stats: stats, files: files,
+              scan: { hasTests: scan.hasTests, hasCI: scan.hasCI, hasLicense: scan.hasLicense, testCount: scan.testFiles.length },
+              report: report, at: Date.now(),
+            };
+            saveRepoAnalysis(analysis);
+            return analysis;
+          });
+        });
       });
-      var analysis = {
-        repo: owner + '/' + repo,
-        owner: owner,
-        name: repo,
-        meta: meta,
-        stats: stats,
-        files: files,
-        report: report || 'El motor de IA no devolvio analisis ahora mismo. Reintentalo en unos segundos.',
-        at: Date.now(),
-      };
-      saveRepoAnalysis(analysis);
-      return analysis;
     });
   });
 }
@@ -360,6 +443,19 @@ function extractJSON(txt) {
       return JSON.parse(fixed);
     } catch (e2) { return null; }
   }
+}
+
+// Comprobacion de cordura antes de publicar (no un linter real): descarta
+// ficheros con contenido vacio o con llaves/parentesis/corchetes muy
+// desbalanceados — la señal mas barata de que la IA corto la respuesta a
+// mitad de generar el fichero. Evita publicar codigo roto sin supervision.
+function sanityCheckFile(content) {
+  var c = String(content || '');
+  if (c.trim().length < 3) return false;
+  var opens = (c.match(/[{(\[]/g) || []).length;
+  var closes = (c.match(/[})\]]/g) || []).length;
+  if (Math.abs(opens - closes) > Math.max(3, c.length / 200)) return false;
+  return true;
 }
 
 // ── Constructor autonomo ──
@@ -460,7 +556,7 @@ export function runAutopilot(repoCtx, onStep) {
     '(Primer ciclo de autopiloto, sin historial previo.)\n\n' +
     'Responde SOLO con JSON: {"titulo":"titulo corto de la mejora elegida","motivo":"por que es la mas valiosa ahora, citando el informe","busquedas":["hasta 2 terminos de busqueda utiles"],"leer_url":"URL relevante o null","archivos":[{"path":"ruta","motivo":"..."}]}\nMaximo 3 archivos.';
 
-  return askAIJson(strategyPrompt, { timeoutMs: 25000, maxTokens: 1200, systemPrompt: SECTOR_PROMPTS.strategist }, function (p) { return !!p.titulo; }).then(function (stratRes) {
+  return askAIJson(strategyPrompt, { timeoutMs: 25000, maxTokens: 1200, systemPrompt: SECTOR_PROMPTS.strategist, preferProvider: SECTOR_PREFERRED_PROVIDER.strategist }, function (p) { return !!p.titulo; }).then(function (stratRes) {
     var tarea = stratRes.parsed || {
       titulo: 'Mejora general de calidad', motivo: 'El sector Estrategia no pudo decidir un objetivo especifico; se hace una pasada general.',
       busquedas: ['buenas practicas de codigo'], leer_url: null, archivos: [],
@@ -487,7 +583,8 @@ export function runAutopilot(repoCtx, onStep) {
         branch: (repoCtx.meta && repoCtx.meta.default_branch) || 'main',
         analysisReport: String(repoCtx.report || '').slice(0, 5000),
         history: [firstCycleEntry],
-        status: 'running', createdAt: Date.now(), updatedAt: Date.now(),
+        status: 'running', consecutiveFailures: firstCycleStatus === 'error' ? 1 : 0,
+        createdAt: Date.now(), updatedAt: Date.now(),
       };
       return startBackgroundQueue(queue).then(function () {
         emit(onStep, {
@@ -523,6 +620,15 @@ export function getBackgroundQueue() {
 export function cancelBackgroundQueue() {
   return new Promise(function (resolve) {
     try { chrome.runtime.sendMessage({ type: 'X1_AUTOMATION_QUEUE_CANCEL' }, function () { resolve(); }); }
+    catch (e) { resolve(); }
+  });
+}
+
+// Reactiva el autopiloto tras una pausa por circuit breaker (3 ciclos
+// seguidos fallidos) — resetea el contador de fallos y vuelve a programar.
+export function resumeBackgroundQueue() {
+  return new Promise(function (resolve) {
+    try { chrome.runtime.sendMessage({ type: 'X1_AUTOMATION_QUEUE_RESUME' }, function () { resolve(); }); }
     catch (e) { resolve(); }
   });
 }
@@ -650,7 +756,7 @@ function proposeChanges(goal, tarea, research, repoCtx, onStep, taskIdx) {
       '"archivos":[{"path":"mismo path de arriba","contenido":"contenido COMPLETO del fichero tras el cambio"}]}';
 
     var draftValid = function (p) { return Array.isArray(p.archivos) && p.archivos.length > 0; };
-    return askAIJson(draftPrompt, { timeoutMs: 35000, maxTokens: 3500, systemPrompt: SECTOR_PROMPTS.developer }, draftValid).then(function (draftRes) {
+    return askAIJson(draftPrompt, { timeoutMs: 35000, maxTokens: 3500, systemPrompt: SECTOR_PROMPTS.developer, preferProvider: SECTOR_PREFERRED_PROVIDER.developer }, draftValid).then(function (draftRes) {
       var draft = draftRes.parsed;
       var draftOk = !!draft;
       emit(onStep, {
@@ -665,7 +771,7 @@ function proposeChanges(goal, tarea, research, repoCtx, onStep, taskIdx) {
       var reviewPrompt = 'Revisa este codigo generado para la tarea "' + tarea.titulo + '". Busca bugs, seguridad, malas practicas y casos sin cubrir.\n\n' +
         draft.archivos.map(function (f) { return '=== ' + f.path + ' ===\n' + String(f.contenido || '').slice(0, 3000); }).join('\n\n');
 
-      return askAI(reviewPrompt, { timeoutMs: 25000, maxTokens: 1200, systemPrompt: SECTOR_PROMPTS.reviewer }).then(function (reviewRes) {
+      return askAI(reviewPrompt, { timeoutMs: 25000, maxTokens: 1200, systemPrompt: SECTOR_PROMPTS.reviewer, preferProvider: SECTOR_PREFERRED_PROVIDER.reviewer }).then(function (reviewRes) {
         emit(onStep, {
           id: tagPrefix + 'review', title: 'Sector Auditoria de Codigo: revision completada', status: 'done',
           detail: (reviewRes.text || 'sin observaciones').slice(0, 160) + ' · ' + reviewRes.label,
@@ -677,7 +783,7 @@ function proposeChanges(goal, tarea, research, repoCtx, onStep, taskIdx) {
           '\n\nAuditoria recibida:\n' + (reviewRes.text || '(sin observaciones)') +
           '\n\nCorrige el codigo segun la auditoria (si no hay problemas reales, deja el codigo igual). Responde SOLO con JSON: {"titulo_pr":"titulo corto","descripcion_pr":"descripcion en espanol","archivos":[{"path":"mismo path de arriba","contenido":"contenido FINAL completo del fichero"}]}';
 
-        return askAIJson(refinePrompt, { timeoutMs: 35000, maxTokens: 3500, systemPrompt: SECTOR_PROMPTS.refiner }, draftValid).then(function (refineRes) {
+        return askAIJson(refinePrompt, { timeoutMs: 35000, maxTokens: 3500, systemPrompt: SECTOR_PROMPTS.refiner, preferProvider: SECTOR_PREFERRED_PROVIDER.refiner }, draftValid).then(function (refineRes) {
           var final = refineRes.parsed;
           var finalOk = !!final;
           emit(onStep, {
@@ -693,7 +799,35 @@ function proposeChanges(goal, tarea, research, repoCtx, onStep, taskIdx) {
               current: match ? match.current : '',
             });
           });
-          return { titulo_pr: chosen.titulo_pr || tarea.titulo, descripcion_pr: chosen.descripcion_pr || tarea.motivo, archivos: withSha };
+          var sane = withSha.filter(function (f) { return sanityCheckFile(f.contenido); });
+          if (sane.length < withSha.length) {
+            emit(onStep, {
+              id: tagPrefix + 'sanity', title: 'Verificacion de cordura: ' + (withSha.length - sane.length) + ' fichero(s) descartado(s)', status: 'done',
+              detail: 'Contenido vacio o con llaves/parentesis muy desbalanceados — probable corte a mitad de generacion. No se publican.',
+            });
+          }
+          if (sane.length === 0) return { titulo_pr: null, descripcion_pr: null, archivos: [], error: true };
+
+          // ── Fase 5: Direccion — la IA que supervisa a las demas y da el
+          // veredicto final. Ninguna tarea se publica sin su aprobacion
+          // explicita: esto es lo que hace que el pipeline sea una
+          // orquestacion real (Estrategia/Desarrollo/Auditoria/Refinamiento
+          // reportando a un rol que los revisa), no una unica llamada. ──
+          emit(onStep, { id: tagPrefix + 'director', title: 'Sector Direccion: revisando el ciclo completo', status: 'active', why: 'Nada se publica sin que la Direccion revise el objetivo, la auditoria y el resultado final y de su aprobacion explicita.' });
+          var directorPrompt = 'Tarea: ' + tarea.titulo + '\nMotivo: ' + tarea.motivo +
+            '\n\nAuditoria de Codigo encontro: ' + (reviewRes.text || '(sin observaciones)') +
+            '\n\nFicheros finales a publicar: ' + sane.map(function (f) { return f.path + ' (' + fmtBytes((f.contenido || '').length) + ')'; }).join(', ') +
+            '\n\nDecide si esto es publicable tal cual como Pull Request. Responde SOLO con JSON: {"aprobado": true/false, "razon": "una frase"}';
+
+          return askAIJson(directorPrompt, { timeoutMs: 20000, maxTokens: 300, systemPrompt: SECTOR_PROMPTS.director, preferProvider: SECTOR_PREFERRED_PROVIDER.director }, function (p) { return typeof p.aprobado === 'boolean'; }).then(function (dirRes) {
+            var veredicto = dirRes.parsed || { aprobado: true, razon: 'Direccion no respondio a tiempo; se publica por defecto (fail-open) para no bloquear el ciclo.' };
+            emit(onStep, {
+              id: tagPrefix + 'director', title: 'Sector Direccion: ' + (veredicto.aprobado ? 'aprobado' : 'RECHAZADO'), status: veredicto.aprobado ? 'done' : 'error',
+              detail: veredicto.razon + ' · ' + dirRes.label,
+            });
+            if (!veredicto.aprobado) return { titulo_pr: null, descripcion_pr: null, archivos: [], error: true, directorRazon: veredicto.razon };
+            return { titulo_pr: chosen.titulo_pr || tarea.titulo, descripcion_pr: chosen.descripcion_pr || tarea.motivo, archivos: sane };
+          });
         });
       });
     });

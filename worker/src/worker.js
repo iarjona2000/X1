@@ -7,6 +7,7 @@ import { PROVIDERS, activeProviders, byTier } from './providers.config.js';
 import {
   cascade,
   createBreaker,
+  callProvider,
   CORS_HEADERS,
   jsonResponse
 } from './lib.js';
@@ -48,6 +49,19 @@ async function handleRequest(request, env, ctx) {
     });
   }
 
+  // Test a single provider in isolation (does not touch the main cascade or
+  // any other provider) — useful whenever a new provider/model id is added
+  // to providers.config.js, to verify it actually resolves before trusting
+  // it in the live cascade. e.g. /debug/provider?name=kimi-together once
+  // TOGETHER_KEY is set.
+  if (url.pathname === '/debug/provider' && request.method === 'GET') {
+    var name = url.searchParams.get('name');
+    var target = PROVIDERS.find(function(p) { return p.name === name; });
+    if (!target) return jsonResponse({ error: 'unknown_provider', name: name }, 404);
+    var r = await callProvider(target, [{ role: 'user', content: 'say hi in one word' }], { max_tokens: 20 }, env);
+    return jsonResponse(r);
+  }
+
   // External command reception (B.14) — lets n8n/Zapier queue a command for
   // X1 to pick up on its next poll, without X1 needing a public URL of its own.
   if (url.pathname === '/commands/queue' && request.method === 'POST') {
@@ -72,8 +86,20 @@ async function handleRequest(request, env, ctx) {
     return jsonResponse({ error: 'messages array required' }, 400);
   }
 
-  // Build provider chain — fast tier first, then slow.
+  // Build provider chain — fast tier first, then slow. If the caller names a
+  // preferred provider (each "sector" of X1's pipeline asks for the model
+  // best suited to its role — e.g. nvidia-qwen for coding, kimi-together for
+  // planning), that one is tried FIRST regardless of tier/cost, as long as
+  // it's active. It's still just a preference: if that provider has no key
+  // configured or fails, the normal cascade continues exactly as before.
   var chain = byTier(activeProviders());
+  if (body.prefer_provider) {
+    var idx = chain.findIndex(function(p) { return p.name === body.prefer_provider; });
+    if (idx > 0) {
+      var preferred = chain.splice(idx, 1)[0];
+      chain.unshift(preferred);
+    }
+  }
 
   // Cascade with breaker
   var breaker = getOrCreateBreaker(ctx);

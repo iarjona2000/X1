@@ -38,6 +38,10 @@ export function clearMemory() {
   saveMemory();
 }
 
+export function getMemoryStore() {
+  return memoryStore.slice(-10);
+}
+
 export async function githubSearch(query) {
   try {
     const r = await fetch(SEARCH_API + '/repositories?q=' + encodeURIComponent(query) + '&sort=stars&per_page=5');

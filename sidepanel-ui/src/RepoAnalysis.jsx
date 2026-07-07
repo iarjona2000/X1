@@ -4,8 +4,8 @@ import { fetchRepoMeta, fetchRepoTree, analyzeRepo, languageStats, loadRepoAnaly
 import { ProcessLog } from './ProcessTimeline.jsx';
 import { MarkdownReport } from './MarkdownReport.jsx';
 
-const F = "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif";
-const H3 = { fontSize: '14px', fontWeight: '600', color: '#1f2328', margin: '0 0 8px', padding: '0 0 8px', borderBottom: '1px solid #d0d7de' };
+const F = "'Segoe UI', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif";
+const H3 = { fontSize: '14px', fontWeight: '600', color: '#26251E', margin: '0 0 8px', padding: '0 0 8px', borderBottom: '1px solid #F2F1ED' };
 
 function fmtBytes(n) {
   if (!n) return '0 B';
@@ -175,26 +175,26 @@ export function RepoAnalysis({ githubUser }) {
   if (!isGh) {
     if (showManualToken) {
       return React.createElement('div', { style: { padding: '32px 16px', textAlign: 'center', fontFamily: F } },
-        React.createElement('div', { style: { fontSize: '15px', fontWeight: '600', color: '#1f2328', marginBottom: '12px' } }, 'Conectar con token personal'),
-        connectError && React.createElement('div', { style: { padding: '12px', background: '#ffebe6', border: '1px solid #ff7f50', borderRadius: '6px', color: '#e85c47', fontSize: '12px', marginBottom: '12px', lineHeight: '1.6' } }, connectError),
+        React.createElement('div', { style: { fontSize: '15px', fontWeight: '600', color: '#26251E', marginBottom: '12px' } }, 'Conectar con token personal'),
+        connectError && React.createElement('div', { style: { padding: '12px', background: '#FBEAEA', border: '1px solid #E3A8A9', borderRadius: '4px', color: '#C4383A', fontSize: '12px', marginBottom: '12px', lineHeight: '1.6' } }, connectError),
         React.createElement('input', {
           type: 'password', placeholder: 'github_pat_xxxxx',
           value: manualToken, onChange: function (e) { setManualToken(e.target.value); }, disabled: verifying,
-          style: { width: '100%', padding: '10px 12px', borderRadius: '6px', border: '1px solid #d0d7de', background: '#f6f8fa', fontSize: '13px', fontFamily: F, marginBottom: '12px', boxSizing: 'border-box' },
+          style: { width: '100%', padding: '10px 12px', borderRadius: '4px', border: '1px solid #F2F1ED', background: '#FFFFFF', fontSize: '13px', fontFamily: F, marginBottom: '12px', boxSizing: 'border-box' },
         }),
-        React.createElement('div', { style: { fontSize: '11px', color: '#59636e', marginBottom: '12px', lineHeight: '1.5' } }, 'Genera en github.com/settings/tokens con permisos: read:user, user:email'),
+        React.createElement('div', { style: { fontSize: '11px', color: '#9E94D5', marginBottom: '12px', lineHeight: '1.5' } }, 'Genera en github.com/settings/tokens con permisos: read:user, user:email'),
         React.createElement('button', {
           onClick: handleTokenSubmit, disabled: verifying || !manualToken.trim(),
-          style: { display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '8px 18px', borderRadius: '6px', border: '1px solid rgba(27,31,36,0.15)', background: '#24292f', color: '#fff', fontSize: '14px', fontWeight: '600', cursor: verifying || !manualToken.trim() ? 'default' : 'pointer', fontFamily: F, opacity: verifying || !manualToken.trim() ? 0.6 : 1 },
+          style: { display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '5.6px 15px', borderRadius: '4px', border: '1px solid rgba(27,31,36,0.15)', background: '#26251E', color: '#fff', fontSize: '14px', fontWeight: '500', cursor: verifying || !manualToken.trim() ? 'default' : 'pointer', fontFamily: F, opacity: verifying || !manualToken.trim() ? 0.6 : 1 },
         }, verifying ? 'Validando…' : 'Conectar')
       );
     }
     return React.createElement('div', { style: { padding: '32px 16px', textAlign: 'center', fontFamily: F } },
-      React.createElement('div', { style: { fontSize: '15px', fontWeight: '600', color: '#1f2328', marginBottom: '6px' } }, 'Analiza el estado de tus repositorios'),
-      React.createElement('div', { style: { fontSize: '13px', color: '#59636e', marginBottom: '20px', lineHeight: '1.6' } }, 'Conecta tu cuenta de GitHub para elegir un repositorio y obtener un analisis exhaustivo.'),
+      React.createElement('div', { style: { fontSize: '15px', fontWeight: '600', color: '#26251E', marginBottom: '6px' } }, 'Analiza el estado de tus repositorios'),
+      React.createElement('div', { style: { fontSize: '13px', color: '#9E94D5', marginBottom: '20px', lineHeight: '1.6' } }, 'Conecta tu cuenta de GitHub para elegir un repositorio y obtener un analisis exhaustivo.'),
       React.createElement('button', {
         onClick: connectGithub, disabled: connecting,
-        style: { display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '8px 18px', borderRadius: '6px', border: '1px solid rgba(27,31,36,0.15)', background: '#24292f', color: '#fff', fontSize: '14px', fontWeight: '600', cursor: connecting ? 'default' : 'pointer', fontFamily: F },
+        style: { display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '5.6px 15px', borderRadius: '4px', border: '1px solid rgba(27,31,36,0.15)', background: '#26251E', color: '#fff', fontSize: '14px', fontWeight: '500', cursor: connecting ? 'default' : 'pointer', fontFamily: F },
       }, connecting ? 'Conectando…' : 'Conectar GitHub')
     );
   }
@@ -207,40 +207,40 @@ export function RepoAnalysis({ githubUser }) {
     selected
       ? React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' } },
           React.createElement('div', { style: { flex: 1 } },
-            React.createElement('div', { style: { fontSize: '15px', fontWeight: '600', color: '#0969da' } }, selected.owner + '/' + selected.name),
-            meta && React.createElement('div', { style: { fontSize: '12px', color: '#59636e', marginTop: '2px' } }, meta.description || 'Sin descripcion')
+            React.createElement('div', { style: { fontSize: '15px', fontWeight: '600', color: '#26251E' } }, selected.owner + '/' + selected.name),
+            meta && React.createElement('div', { style: { fontSize: '12px', color: '#9E94D5', marginTop: '2px' } }, meta.description || 'Sin descripcion')
           ),
           React.createElement('button', {
             onClick: function () { setStore({ selected: null, meta: null, files: [], steps: [] }); },
-            style: { padding: '5px 12px', borderRadius: '6px', border: '1px solid #d0d7de', background: '#f6f8fa', fontSize: '12px', fontWeight: '500', cursor: 'pointer', color: '#24292f', fontFamily: F },
+            style: { padding: '5.6px 15px', borderRadius: '4px', border: '1px solid #F2F1ED', background: '#FFFFFF', fontSize: '12px', fontWeight: '500', cursor: 'pointer', color: '#26251E', fontFamily: F },
           }, 'Cambiar')
         )
       : React.createElement('div', null,
           React.createElement('input', {
             value: filter, onChange: function (e) { setFilter(e.target.value); },
             placeholder: 'Filtrar repositorios…',
-            style: { width: '100%', boxSizing: 'border-box', padding: '6px 12px', borderRadius: '6px', border: '1px solid #d0d7de', fontSize: '13px', marginBottom: '12px', fontFamily: F, outline: 'none', color: '#1f2328' },
+            style: { width: '100%', boxSizing: 'border-box', padding: '8px 12px', borderRadius: '4px', border: '1px solid #F2F1ED', fontSize: '13px', marginBottom: '14px', fontFamily: F, outline: 'none', color: '#26251E' },
           }),
           loadingRepos
-            ? React.createElement('div', { style: { padding: '24px 0', textAlign: 'center', color: '#59636e', fontSize: '13px' } }, 'Cargando repositorios…')
-            : React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px' } },
+            ? React.createElement('div', { style: { padding: '24px 0', textAlign: 'center', color: '#9E94D5', fontSize: '13px' } }, 'Cargando repositorios…')
+            : React.createElement('div', { style: { display: 'flex', flexDirection: 'column' } },
                 visibleRepos.map(function (r) {
                   return React.createElement('div', {
                     key: r.name,
                     onClick: function () { pick(r); },
-                    style: { padding: '12px 14px', border: '1px solid #d0d7de', borderRadius: '6px', background: '#fff', cursor: 'pointer', transition: 'border-color 80ms' },
-                    onMouseEnter: function (e) { e.currentTarget.style.borderColor = '#0969da'; },
-                    onMouseLeave: function (e) { e.currentTarget.style.borderColor = '#d0d7de'; },
+                    style: { padding: '8px 12px', borderRadius: '4px', cursor: 'pointer', transition: 'background 80ms' },
+                    onMouseEnter: function (e) { e.currentTarget.style.background = '#F2F1ED'; },
+                    onMouseLeave: function (e) { e.currentTarget.style.background = 'transparent'; },
                   },
                     React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
-                      React.createElement('span', { style: { fontSize: '14px', fontWeight: '600', color: '#0969da', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, r.name),
-                      r.private && React.createElement('span', { style: { fontSize: '10px', padding: '1px 8px', borderRadius: '999px', border: '1px solid #d0d7de', color: '#59636e' } }, 'Privado'),
-                      r.language && React.createElement('span', { style: { fontSize: '12px', color: '#59636e' } }, r.language)
+                      React.createElement('span', { style: { fontSize: '13px', fontWeight: '600', color: '#26251E', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, r.name),
+                      r.private && React.createElement('span', { style: { fontSize: '10px', padding: '1px 8px', borderRadius: '999px', background: '#F2F1ED', color: '#9E94D5' } }, 'Privado'),
+                      r.language && React.createElement('span', { style: { fontSize: '11px', color: '#9E94D5' } }, r.language)
                     ),
-                    r.description && React.createElement('div', { style: { fontSize: '12px', color: '#59636e', marginTop: '6px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: '1.5' } }, r.description)
+                    r.description && React.createElement('div', { style: { fontSize: '12px', color: '#9E94D5', marginTop: '3px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: '1.5' } }, r.description)
                   );
                 }),
-                visibleRepos.length === 0 && React.createElement('div', { style: { padding: '24px 0', textAlign: 'center', color: '#818b98', fontSize: '13px' } }, 'No se encontraron repositorios.')
+                visibleRepos.length === 0 && React.createElement('div', { style: { padding: '24px 0', textAlign: 'center', color: '#9E94D5', fontSize: '13px' } }, 'No se encontraron repositorios.')
               )
         ),
 
@@ -248,15 +248,16 @@ export function RepoAnalysis({ githubUser }) {
     selected && React.createElement('div', null,
 
       loadingRepo
-        ? React.createElement('div', { style: { padding: '24px 0', textAlign: 'center', color: '#59636e', fontSize: '13px' } }, 'Leyendo el repositorio…')
+        ? React.createElement('div', { style: { padding: '24px 0', textAlign: 'center', color: '#9E94D5', fontSize: '13px' } }, 'Leyendo el repositorio…')
         : React.createElement(React.Fragment, null,
 
-            // Estadisticas
-            React.createElement('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', marginBottom: '16px' } },
-              [['Ficheros', String(files.length)], ['Tamano', fmtBytes(files.reduce(function (a, f) { return a + (f.size || 0); }, 0))], ['Estrellas', String((meta && meta.stargazers_count) || 0)]].map(function (s) {
-                return React.createElement('div', { key: s[0], style: { padding: '10px 12px', border: '1px solid #d0d7de', borderRadius: '6px', background: '#f6f8fa', textAlign: 'center' } },
-                  React.createElement('div', { style: { fontSize: '16px', fontWeight: '700', color: '#1f2328' } }, s[1]),
-                  React.createElement('div', { style: { fontSize: '11px', color: '#59636e', marginTop: '2px' } }, s[0])
+            // Estadisticas — sin cajas ni bordes, solo numero + etiqueta con
+            // divisores finos entre columnas (nada de tarjetas por todos lados).
+            React.createElement('div', { style: { display: 'flex', marginBottom: '20px' } },
+              [['Ficheros', String(files.length)], ['Tamano', fmtBytes(files.reduce(function (a, f) { return a + (f.size || 0); }, 0))], ['Estrellas', String((meta && meta.stargazers_count) || 0)]].map(function (s, i) {
+                return React.createElement('div', { key: s[0], style: { flex: 1, textAlign: 'center', borderLeft: i > 0 ? '1px solid #F2F1ED' : 'none' } },
+                  React.createElement('div', { style: { fontSize: '14px', fontWeight: '600', color: '#26251E' } }, s[1]),
+                  React.createElement('div', { style: { fontSize: '11px', color: '#9E94D5', marginTop: '2px' } }, s[0])
                 );
               })
             ),
@@ -264,41 +265,39 @@ export function RepoAnalysis({ githubUser }) {
             // Lenguajes
             langList.length > 0 && React.createElement('div', { style: { display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '16px' } },
               langList.map(function (l) {
-                return React.createElement('span', { key: l, style: { fontSize: '11px', padding: '3px 10px', borderRadius: '999px', background: '#ddf4ff', color: '#0969da', fontWeight: '500' } }, l + ' · ' + langs[l]);
+                return React.createElement('span', { key: l, style: { fontSize: '11px', padding: '3px 10px', borderRadius: '999px', background: '#F2F1ED', color: '#26251E', fontWeight: '500' } }, l + ' · ' + langs[l]);
               })
             ),
 
             // Boton de analisis
             React.createElement('button', {
               onClick: function () { runAnalysis(function (a) { setAnalysis(a); }); }, disabled: st.analyzing,
-              style: { width: '100%', padding: '8px 16px', borderRadius: '6px', border: '1px solid rgba(27,31,36,0.15)', background: st.analyzing ? '#f6f8fa' : '#1f883d', color: st.analyzing ? '#818b98' : '#fff', fontSize: '14px', fontWeight: '600', cursor: st.analyzing ? 'default' : 'pointer', marginBottom: st.steps.length ? '12px' : '16px', fontFamily: F },
+              style: { width: '100%', padding: '5.6px 15px', borderRadius: '4px', border: 'none', background: st.analyzing ? '#F2F1ED' : '#C08532', color: st.analyzing ? '#9E94D5' : '#fff', fontSize: '14px', fontWeight: '500', cursor: st.analyzing ? 'default' : 'pointer', marginBottom: st.steps.length ? '12px' : '16px', fontFamily: F },
             }, st.analyzing ? 'Analizando…' : 'Analizar a fondo'),
 
-            st.analyzing && React.createElement('div', { style: { fontSize: '11px', color: '#0969da', marginTop: '-8px', marginBottom: '12px' } }, 'Sigue corriendo aunque cambies de pestana'),
+            st.analyzing && React.createElement('div', { style: { fontSize: '11px', color: '#26251E', marginTop: '-8px', marginBottom: '12px' } }, 'Sigue corriendo aunque cambies de pestana'),
 
             // Proceso en vivo: que esta haciendo X1 y por que, paso a paso.
             st.steps.length > 0 && React.createElement('div', { style: { marginBottom: '16px' } },
               React.createElement(ProcessLog, { steps: st.steps, title: st.analyzing ? 'Analizando en directo' : 'Ultimo analisis' })
             ),
 
-            // Arbol de ficheros
+            // Arbol de ficheros — lista plana, sin caja envolvente
             React.createElement('h3', { style: H3 }, 'Ficheros (' + files.length + ')'),
-            React.createElement('div', { style: { maxHeight: '180px', overflow: 'auto', border: '1px solid #d0d7de', borderRadius: '6px', background: '#fff', marginBottom: '16px' } },
+            React.createElement('div', { style: { maxHeight: '180px', overflow: 'auto', marginBottom: '20px' } },
               files.slice(0, 300).map(function (f, i) {
-                return React.createElement('div', { key: i, style: { display: 'flex', justifyContent: 'space-between', padding: '5px 12px', borderBottom: i < files.length - 1 ? '1px solid #f0f2f4' : 'none', fontSize: '12px', fontFamily: "'SF Mono', Consolas, monospace" } },
-                  React.createElement('span', { style: { color: '#1f2328', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, f.path),
-                  React.createElement('span', { style: { color: '#818b98', flexShrink: 0, marginLeft: '8px' } }, fmtBytes(f.size))
+                return React.createElement('div', { key: i, style: { display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: '12px', fontFamily: "'SF Mono', Consolas, monospace" } },
+                  React.createElement('span', { style: { color: '#26251E', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, f.path),
+                  React.createElement('span', { style: { color: '#9E94D5', flexShrink: 0, marginLeft: '8px' } }, fmtBytes(f.size))
                 );
               })
             ),
 
-            // Informe
+            // Informe — sin caja envolvente, solo el titulo de seccion como separador
             analysis && analysis.repo === (selected.owner + '/' + selected.name) && React.createElement('div', null,
               React.createElement('h3', { style: H3 }, 'Analisis a fondo'),
-              React.createElement('div', { style: { padding: '16px 18px', border: '1px solid #d0d7de', borderRadius: '6px', background: '#ffffff' } },
-                React.createElement(MarkdownReport, { text: analysis.report })
-              ),
-              React.createElement('div', { style: { fontSize: '11px', color: '#818b98', marginTop: '8px' } }, 'Este analisis queda disponible para la seccion de Automatizacion.')
+              React.createElement(MarkdownReport, { text: analysis.report }),
+              React.createElement('div', { style: { fontSize: '11px', color: '#9E94D5', marginTop: '10px' } }, 'Este analisis queda disponible para la seccion de Automatizacion.')
             )
           )
     )

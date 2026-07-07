@@ -56,7 +56,15 @@ var X1GoogleAuth = (function() {
   }
 
   function getToken() {
-    return getAuthToken(false).catch(function() { return getAuthToken(true); });
+    return getAuthToken(false)
+      .catch(function() {
+        return new Promise(function(resolve, reject) {
+          chrome.storage.local.get('google_token', function(d) {
+            if (d && d.google_token) { currentToken = d.google_token; tokenExpiry = Date.now() + 3600000; loggedIn = true; resolve(d.google_token); }
+            else { getAuthToken(true).then(resolve).catch(reject); }
+          });
+        });
+      });
   }
 
   function clearCache() {

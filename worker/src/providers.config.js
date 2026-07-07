@@ -18,6 +18,30 @@
 
 export const PROVIDERS = [
   {
+    name: 'kimi-together',
+    label: 'Kimi K2 (Moonshot AI, via Together AI)',
+    envKey: 'TOGETHER_KEY',
+    url: 'https://api.together.xyz/v1/chat/completions',
+    model: 'moonshotai/Kimi-K2-Instruct',
+    tier: 'fast',
+    cost: 0,
+    authStyle: 'bearer',
+    active: true,
+    notes: 'Kimi K2 (Moonshot AI, modelo chino MoE con fuerte capacidad agentica/tool-use) via Together AI. Anadido a peticion del usuario (2026-07-08) para el sector Desarrollo/Estrategia. VERIFICADO 2026-07-08: Groq NO tiene ningun modelo Kimi/Moonshot en su catalogo (consultado /v1/models en vivo — se probaron "moonshotai/kimi-k2-instruct" y "-0905", ambos 404); Together SI lo lista bajo este id exacto. Requiere TOGETHER_KEY como wrangler secret (`npx wrangler secret put TOGETHER_KEY`, clave gratuita en together.ai) — sin ella cae en no_key y el cascade sigue con NVIDIA/Groq/Gemini como hasta ahora, sin romper nada.'
+  },
+  {
+    name: 'kimi-moonshot',
+    label: 'Kimi K2 (Moonshot AI, API oficial)',
+    envKey: 'MOONSHOT_KEY',
+    url: 'https://api.moonshot.ai/v1/chat/completions',
+    model: 'kimi-k2-0905-preview',
+    tier: 'fast',
+    cost: 0,
+    authStyle: 'bearer',
+    active: false,
+    notes: 'Alternativa directa a kimi-together si Together se retira o el usuario prefiere la API oficial de Moonshot (platform.moonshot.ai). Desactivada por defecto para no duplicar el mismo modelo dos veces en la cascada — activar solo si se deja de usar kimi-together. Requiere MOONSHOT_KEY.'
+  },
+  {
     name: 'groq',
     label: 'Groq',
     envKey: 'GROQ_KEY',
