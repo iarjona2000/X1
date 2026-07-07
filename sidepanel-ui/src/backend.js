@@ -199,10 +199,76 @@ export function saveConversations(list) { try { localStorage.setItem('x1_convers
 export function getUser() { try { var raw = localStorage.getItem('x1_user'); if (raw) return JSON.parse(raw); } catch (e) {} return null; }
 export function saveUser(user) { try { localStorage.setItem('x1_user', JSON.stringify(user)); } catch (e) {} }
 
-export function checkGoogleAuth() { return new Promise(function(resolve) { if (typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) { resolve({logged:false}); return; } chrome.runtime.sendMessage({ type: 'X1_AUTH_CHECK_GOOGLE' }, function(resp) { if (chrome.runtime.lastError) { resolve({logged:false}); return; } resolve(resp || {logged:false}); }); }); }
-export function loginGoogle() { return new Promise(function(resolve) { if (typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) { resolve(null); return; } chrome.runtime.sendMessage({ type: 'X1_AUTH_LOGIN_GOOGLE' }, function(resp) { if (chrome.runtime.lastError) { resolve(null); return; } resolve(resp && resp.ok ? resp : null); }); }); }
-export function logoutGoogle() { return new Promise(function(resolve) { if (typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) { resolve(false); return; } chrome.runtime.sendMessage({ type: 'X1_AUTH_LOGOUT_GOOGLE' }, function(resp) { if (chrome.runtime.lastError) { resolve(false); return; } resolve(resp?.ok ?? false); }); }); }
-export function getGoogleUser() { return new Promise(function(resolve) { if (typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) { resolve(null); return; } chrome.runtime.sendMessage({ type: 'X1_AUTH_CHECK_GOOGLE' }, function(resp) { if (chrome.runtime.lastError) { resolve(null); return; } resolve(resp?.user || null); }); }); }
+export function checkGoogleAuth() {
+  return new Promise(function(r) {
+    if (typeof chrome === 'undefined') { r({logged:false}); return; }
+    chrome.storage.local.get(['google_token','google_user'], function(d) {
+      r({logged:!!(d.google_token), user:d.google_user||null});
+    });
+  });
+}
+export function loginGoogle() {
+  return new Promise(function(resolve) {
+    if (typeof chrome === 'undefined' || !chrome.identity) { console.warn('[X1] chrome.identity not available'); resolve(null); return; }
+    var timedOut = false;
+    var timer = setTimeout(function() { timedOut = true; console.warn('[X1] getAuthToken timeout'); resolve(null); }, 25000);
+    chrome.identity.getAuthToken({interactive:true}, function(token) {
+      if (timedOut) return;
+      clearTimeout(timer);
+      if (chrome.runtime.lastError || !token) {
+        console.warn('[X1] getAuthToken error:', chrome.runtime.lastError && chrome.runtime.lastError.message);
+        loginGoogleWebFlow().then(function(info) { resolve(info); }).catch(function(err) {
+          console.warn('[X1] WebAuthFlow fallback error:', err && err.message);
+          resolve(null);
+        });
+        return;
+      }
+      chrome.storage.local.set({google_token:token});
+      fetch('https://www.googleapis.com/oauth2/v2/userinfo', {headers:{Authorization:'Bearer '+token}}).then(function(r){return r.json();}).then(function(info){
+        if (info && info.email) {
+          chrome.storage.local.set({google_user:{email:info.email,name:info.name,picture:info.picture}});
+          resolve({email:info.email,name:info.name,picture:info.picture});
+        } else {
+          resolve(null);
+        }
+      }).catch(function(err) {
+        console.warn('[X1] Userinfo fetch error:', err && err.message);
+        loginGoogleWebFlow().then(function(info2) { resolve(info2); }).catch(function() { resolve(null); });
+      });
+    });
+  });
+}
+function loginGoogleWebFlow() {
+  return new Promise(function(resolve) {
+    if (typeof chrome === 'undefined' || !chrome.identity) { resolve(null); return; }
+    var redirectUri = chrome.identity.getRedirectURL();
+    var clientId = '653077619345-erf587evo9le3t8p9ku5i8t485rdo6lc.apps.googleusercontent.com';
+    var scopes = 'https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.compose https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/documents https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/tasks https://www.googleapis.com/auth/contacts.readonly';
+    var authUrl = 'https://accounts.google.com/o/oauth2/v2/auth?client_id=' + clientId + '&redirect_uri=' + encodeURIComponent(redirectUri) + '&response_type=token&scope=' + encodeURIComponent(scopes) + '&prompt=consent';
+    var timedOut = false;
+    var timer = setTimeout(function() { timedOut = true; resolve(null); }, 25000);
+    chrome.identity.launchWebAuthFlow({url:authUrl, interactive:true}, function(responseUrl) {
+      if (timedOut) return;
+      clearTimeout(timer);
+      if (chrome.runtime.lastError || !responseUrl) { console.warn('[X1] launchWebAuthFlow error:', chrome.runtime.lastError && chrome.runtime.lastError.message); resolve(null); return; }
+      var hash = responseUrl.split('#')[1];
+      if (!hash) { resolve(null); return; }
+      var params = {};
+      hash.split('&').forEach(function(p) { var kv = p.split('='); params[kv[0]] = decodeURIComponent(kv[1] || ''); });
+      var token = params.access_token;
+      if (!token) { resolve(null); return; }
+      chrome.storage.local.set({google_token:token});
+      fetch('https://www.googleapis.com/oauth2/v2/userinfo', {headers:{Authorization:'Bearer '+token}}).then(function(r){return r.json();}).then(function(info){
+        if (info && info.email) {
+          chrome.storage.local.set({google_user:{email:info.email,name:info.name,picture:info.picture}});
+          resolve({email:info.email,name:info.name,picture:info.picture});
+        } else { resolve(null); }
+      }).catch(function() { resolve(null); });
+    });
+  });
+}
+export function logoutGoogle() { return new Promise(function(resolve) { try { if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) { chrome.storage.local.remove(['google_token', 'google_user'], function() { resolve(true); }); } else { resolve(false); } } catch (e) { resolve(false); } }); }
+export function getGoogleUser() { return new Promise(function(resolve) { if (typeof chrome === 'undefined') { resolve(null); return; } chrome.storage.local.get('google_user', function(r) { resolve(r && r.google_user ? r.google_user : null); }); }); }
 export function checkGithubAuth() { return new Promise(function(resolve) { try { if (typeof chrome === 'undefined' || !chrome.storage?.local) { resolve(false); return; } chrome.storage.local.get('github_user', function(r) { resolve(!!(r?.github_user?.login)); }); } catch (e) { resolve(false); } }); }
 export function loginGithub() { return new Promise(function(resolve, reject) { if (typeof chrome === 'undefined' || !chrome.identity) { reject(new Error('chrome.identity no disponible')); return; } var clientId = 'Ov23limUz0ywpxqoPJXo'; var redirectUrl = chrome.identity.getRedirectURL(); var authUrl = 'https://github.com/login/oauth/authorize?client_id=' + clientId + '&redirect_uri=' + encodeURIComponent(redirectUrl) + '&scope=read:user+user:email'; var timedOut = false; var timer = setTimeout(function() { timedOut = true; reject(new Error('Tiempo agotado')); }, 30000); chrome.identity.launchWebAuthFlow({ url: authUrl, interactive: true }, function(redirectUrl) { if (timedOut) return; clearTimeout(timer); if (chrome.runtime.lastError) { reject(new Error(chrome.runtime.lastError.message)); return; } if (!redirectUrl) { reject(new Error('Cancelado')); return; } try { var urlObj = new URL(redirectUrl); var code = urlObj.searchParams.get('code'); if (!code) { reject(new Error('Sin codigo')); return; } resolve({ code: code }); } catch (e) { reject(new Error('URL invalida')); } }); }); }
 export function startGithubDeviceFlow() { return fetch('https://github.com/login/device/code', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify({ client_id: 'Ov23limUz0ywpxqoPJXo', scope: 'read:user user:email' }) }).then(function(r) { if (!r.ok) return r.json().then(function(data) { throw new Error(data.error_description || ('HTTP ' + r.status)); }, function() { throw new Error('HTTP ' + r.status); }); return r.json(); }).then(function(data) { if (data.error) throw new Error(data.error_description || data.error); return { device_code: data.device_code, user_code: data.user_code, verification_uri: data.verification_uri || 'https://github.com/login/device', interval: data.interval || 5 }; }); }
