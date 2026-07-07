@@ -134,7 +134,14 @@ function publish(repoCtx) {
 function startAutopilot(repoCtx) {
   if (store.building || !repoCtx) return;
   setStore({ building: true, goal: '', steps: [], proposal: null, published: null, publishError: null });
-  runAutopilot(repoCtx, function (s) { setStore({ steps: upsertStep(store.steps, s) }); }).then(function (p) {
+  // Inyecta el token en el contexto igual que build(): sin el, el primer ciclo
+  // leeria el estado ACTUAL de cada fichero con token undefined (401) y los
+  // trataria como nuevos, arriesgando sobrescribir codigo existente. Los
+  // ciclos siguientes (los procesa el service worker) ya leen el token solos.
+  B.getGithubToken().then(function (token) {
+    var ctx = Object.assign({}, repoCtx, { token: token });
+    return runAutopilot(ctx, function (s) { setStore({ steps: upsertStep(store.steps, s) }); });
+  }).then(function (p) {
     setStore({ proposal: sanitizeProposal(p), building: false });
     if (p && p.archivos && p.archivos.length) publish(repoCtx);
   }).catch(function (e) { setStore({ building: false, steps: upsertStep(store.steps, { id: 'fatal', title: 'Error inesperado: ' + (e && e.message), status: 'error' }) }); });
@@ -209,6 +216,17 @@ function timeAgo(ts) {
   return Math.floor(d / 86400000) + 'd';
 }
 
+// Cuenta hacia el proximo tick programado por el service worker (queue.nextTickAt),
+// para que el autopiloto no parezca colgado entre ciclos.
+function timeUntil(ts) {
+  if (!ts) return null;
+  var d = new Date(ts).getTime() - Date.now();
+  if (d <= 0) return 'en breve';
+  if (d < 60000) return 'en ' + Math.ceil(d / 1000) + 's';
+  if (d < 3600000) return 'en ' + Math.ceil(d / 60000) + ' min';
+  return 'en ' + Math.floor(d / 3600000) + 'h';
+}
+
 // Muestra el progreso acumulado de la cola que procesa el service worker en
 // segundo plano (una tarea cada 15-25 min, ver 'AUTOMATIZACION EN SEGUNDO
 // PLANO' en background/service-worker.js). Por cada tarea completada se ve
@@ -248,10 +266,10 @@ function BackgroundQueueView({ queue, onCancel, onResume, cancelling }) {
     ),
     React.createElement('div', { style: { fontSize: '11px', color: C.fgMuted, marginBottom: '10px', lineHeight: '1.6' } },
       isAutopilot
-        ? (done + ' ciclo(s) completado(s)' + (errored ? ', ' + errored + ' con error' : '') + ' · sin fin — X1 sigue decidiendo su proximo objetivo cada 15-25 min, siga o no el sidepanel abierto — ultima actividad hace ' + timeAgo(queue.updatedAt) + '.')
+        ? (done + ' ciclo(s) completado(s)' + (errored ? ', ' + errored + ' con error' : '') + ' · sin fin — X1 sigue decidiendo su proximo objetivo (rapido al arrancar, luego cada 15-25 min), siga o no el sidepanel abierto' + (!isPaused && queue.nextTickAt ? ' — proximo ciclo ' + timeUntil(queue.nextTickAt) : ' — ultima actividad hace ' + timeAgo(queue.updatedAt)) + '.')
         : finished
           ? ('Cola completada: ' + done + ' Pull Request(s) creados' + (errored ? ', ' + errored + ' con error' : '') + '.')
-          : (done + ' completada(s) · ' + pending + ' pendiente(s) · X1 procesa una tarea cada 15-25 min, siga o no el sidepanel abierto — ultima actividad hace ' + timeAgo(queue.updatedAt) + '.')
+          : (done + ' completada(s) · ' + pending + ' pendiente(s) · X1 procesa una tarea cada 15-25 min, siga o no el sidepanel abierto' + (queue.nextTickAt ? ' — proxima ' + timeUntil(queue.nextTickAt) : ' — ultima actividad hace ' + timeAgo(queue.updatedAt)) + '.')
     ),
     React.createElement('div', { style: { border: '1px solid ' + C.border, borderRadius: '4px', overflow: 'hidden' } },
       displayList.map(function (t, i) {

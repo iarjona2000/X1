@@ -20,51 +20,32 @@ var STEP_ICONS = {
 };
 
 var STEP_LABELS = {
-  researching: 'Researching',
-  writing: 'Writing',
-  reviewing: 'Reviewing',
-  approving: 'Approving',
+  researching: 'Researching', writing: 'Writing', reviewing: 'Reviewing', approving: 'Approving',
 };
 
 function FlowStep({ step, index, total }) {
   var isLast = index === total - 1;
-  return React.createElement('div', {
-    style: { display: 'flex', gap: '10px', alignItems: 'flex-start' }
-  },
+  return React.createElement('div', { style: { display: 'flex', gap: '10px', alignItems: 'flex-start' } },
     React.createElement('div', {
-      style: {
-        display: 'flex', flexDirection: 'column', alignItems: 'center',
-        width: '20px', flexShrink: 0,
-      }
+      style: { display: 'flex', flexDirection: 'column', alignItems: 'center', width: '20px', flexShrink: 0 }
     },
       React.createElement('div', {
         style: {
           width: '20px', height: '20px', borderRadius: '50%',
-          background: step.active ? '#f54e00' : 'rgba(38,37,30,0.08)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          transition: 'background 150ms',
+          background: step.active ? '#f54e00' : 'rgba(228,226,218,0.6)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 150ms',
         }
       }, STEP_ICONS[step.type] || STEP_ICONS.researching),
       !isLast && React.createElement('div', {
-        style: {
-          width: '1px', height: '24px',
-          background: 'rgba(38,37,30,0.10)',
-          marginTop: '4px',
-        }
+        style: { width: '1px', height: '24px', background: 'rgba(220,218,209,0.6)', marginTop: '4px' }
       })
     ),
     React.createElement('div', { style: { paddingTop: '1px' } },
       React.createElement('div', {
-        style: {
-          fontSize: '12px', fontWeight: 500,
-          color: step.active ? '#26251e' : 'rgba(38,37,30,0.55)',
-        }
+        style: { fontSize: '12px', fontWeight: 500, color: step.active ? '#2c2a27' : 'rgba(44,42,39,0.55)' }
       }, STEP_LABELS[step.type] || step.type),
       step.detail && React.createElement('div', {
-        style: {
-          fontSize: '11px', color: 'rgba(38,37,30,0.40)',
-          marginTop: '1px',
-        }
+        style: { fontSize: '11px', color: 'rgba(44,42,39,0.4)', marginTop: '1px' }
       }, step.detail)
     )
   );
@@ -72,30 +53,23 @@ function FlowStep({ step, index, total }) {
 
 export function AgentFlow({ steps, activeStep }) {
   if (!steps || steps.length === 0) return null;
-
   return React.createElement('div', {
     style: {
-      padding: '8px 12px',
-      background: 'rgba(38,37,30,0.02)',
-      borderRadius: '8px',
-      border: '1px solid rgba(38,37,30,0.06)',
+      padding: '8px 14px', background: 'rgba(231,229,221,0.4)',
+      borderRadius: '8px', border: '1px solid rgba(220,218,209,0.6)',
     }
   },
     React.createElement('div', {
       style: {
-        fontSize: '11px', fontWeight: 600,
-        color: 'rgba(38,37,30,0.55)',
-        fontFamily: "'Inter', system-ui, sans-serif",
-        textTransform: 'uppercase', letterSpacing: '0.05em',
-        marginBottom: '8px',
+        fontSize: '11px', fontWeight: 600, color: 'rgba(44,42,39,0.55)',
+        fontFamily: "'Inter', ui-sans-serif, sans-serif",
+        textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: '8px',
       }
     }, 'Agent Flow'),
     steps.map(function(step, i) {
       return React.createElement(FlowStep, {
-        key: i,
-        step: Object.assign({}, step, { active: i === activeStep }),
-        index: i,
-        total: steps.length,
+        key: i, step: Object.assign({}, step, { active: i === activeStep }),
+        index: i, total: steps.length,
       });
     })
   );

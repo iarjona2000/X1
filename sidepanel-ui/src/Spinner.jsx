@@ -1,7 +1,10 @@
 import * as React from 'react';
 
 export function Spinner({ className }) {
-  return React.createElement('span', { className, role: 'status', 'aria-label': 'Working', style: { display: 'inline-flex' } },
+  return React.createElement('span', {
+    className: className || 'animate-spin', role: 'status', 'aria-label': 'Working',
+    style: { display: 'inline-flex' }
+  },
     React.createElement('svg', { width: 14, height: 14, viewBox: '0 0 24 24', fill: 'none', className: 'animate-spin' },
       Array.from({ length: 8 }).map(function(_, i) {
         return React.createElement('rect', {
