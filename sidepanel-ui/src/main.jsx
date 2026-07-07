@@ -182,7 +182,7 @@ function Root() {
 
   if (!user) return React.createElement(GithubLogin, { onUser: setUser, onGuest: function() { setUser({ login: 'invitado', name: 'Invitado' }); } });
 
-  return React.createElement(App, { githubUser: user });
+  return React.createElement(App, { githubUser: user, onLogout: function() { setUser(null); } });
 }
 
 const root = createRoot(document.getElementById('root'));
