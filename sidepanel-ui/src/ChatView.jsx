@@ -385,7 +385,7 @@ export function ChatView({ conversations, activeConv, onSelectConv, onCreateConv
           React.createElement('div', {
             onClick: function() {
               if (googleOk) { setShowGoogleMenu(function(v) { return !v; }); }
-              else { setGoogleLoading(true); setGoogleError(null); B.loginGoogle().then(function(r) { setGoogleLoading(false); if (r) { setGoogleOk(true); setGoogleUser({email:r.email,name:r.name,picture:r.picture}); } else { setGoogleError('No se pudo conectar a Google'); setTimeout(function() { setGoogleError(null); }, 5000); } }); }
+              else { setGoogleLoading(true); setGoogleError(null); B.loginGoogle().then(function(r) { setGoogleLoading(false); if (r) { setGoogleOk(true); setGoogleUser({email:r.email,name:r.name,picture:r.picture}); } else { var extId = typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.id ? chrome.runtime.id : '?'; setGoogleError('No se pudo conectar. Abre chrome://extensions > X1 > Inspect > Console para ver errores. Extension ID: ' + extId); setTimeout(function() { setGoogleError(null); }, 12000); } }); }
             },
             title: googleUser ? googleUser.email : 'Conectar Google',
             style: { display: 'flex', alignItems: 'center', justifyContent: 'center', width: '24px', height: '24px', borderRadius: '50%', cursor: 'pointer', transition: 'background 80ms' },

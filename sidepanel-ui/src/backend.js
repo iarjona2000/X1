@@ -209,9 +209,22 @@ export function checkGoogleAuth() {
 }
 export function loginGoogle() {
   return new Promise(function(resolve) {
-    if (typeof chrome === 'undefined' || !chrome.identity) { console.warn('[X1] chrome.identity not available'); resolve(null); return; }
+    if (typeof chrome === 'undefined') { console.warn('[X1] No chrome API'); resolve(null); return; }
+    console.log('[X1] loginGoogle started, chrome.identity:', typeof chrome.identity);
+    if (!chrome.identity) {
+      console.warn('[X1] chrome.identity not available in this context');
+      // Fallback: send to SW
+      console.log('[X1] Falling back to SW-based OAuth');
+      chrome.runtime.sendMessage({ type: 'X1_AUTH_LOGIN_GOOGLE' }, function(resp) {
+        if (chrome.runtime.lastError) { console.warn('[X1] SW OAuth error:', chrome.runtime.lastError.message); resolve(null); return; }
+        console.log('[X1] SW OAuth response:', resp);
+        if (resp && resp.ok) resolve({email:resp.email,name:resp.name,picture:resp.picture});
+        else resolve(null);
+      });
+      return;
+    }
     var timedOut = false;
-    var timer = setTimeout(function() { timedOut = true; console.warn('[X1] getAuthToken timeout'); resolve(null); }, 25000);
+    var timer = setTimeout(function() { timedOut = true; console.warn('[X1] getAuthToken timeout (25s)'); resolve(null); }, 25000);
     chrome.identity.getAuthToken({interactive:true}, function(token) {
       if (timedOut) return;
       clearTimeout(timer);
@@ -223,12 +236,14 @@ export function loginGoogle() {
         });
         return;
       }
+      console.log('[X1] getAuthToken SUCCESS, token length:', token.length);
       chrome.storage.local.set({google_token:token});
       fetch('https://www.googleapis.com/oauth2/v2/userinfo', {headers:{Authorization:'Bearer '+token}}).then(function(r){return r.json();}).then(function(info){
         if (info && info.email) {
           chrome.storage.local.set({google_user:{email:info.email,name:info.name,picture:info.picture}});
           resolve({email:info.email,name:info.name,picture:info.picture});
         } else {
+          console.warn('[X1] Userinfo empty:', info);
           resolve(null);
         }
       }).catch(function(err) {
