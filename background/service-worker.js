@@ -21240,9 +21240,18 @@ var X1_PROXY_URL = 'https://x1-proxy.calezamindset.workers.dev/v1/chat/completio
 var X1_PROXY_SECRET = '9ff4b7dda5f7defd5f7fb7c32c133428bc87e8efeb8550d3ce1e5838c1d3b850';
 
 var X1_SECTOR_PROMPTS = {
-  developer: 'Eres X1 en el sector Desarrollo, un arquitecto de software senior. Escribe codigo production-ready, completo y funcional. Responde EN ESPAÑOL solo con el JSON exacto que se te pida, sin texto ni markdown alrededor.',
+  strategist: 'Eres X1 en el sector Estrategia, responsable de decidir que construir a continuacion sin que nadie te lo pida. Piensas como un CTO que conoce el repositorio a fondo. Eliges mejoras CONCRETAS, accionables y de bajo riesgo (tests nuevos, documentacion, utilidades pequenas, correcciones puntuales) antes que reescrituras grandes. Responde EN ESPAÑOL solo con el JSON exacto que se te pida, sin texto ni markdown alrededor.',
+  developer: 'Eres X1 en el sector Desarrollo, un arquitecto de software senior. Haces cambios QUIRURGICOS: para un fichero existente devuelves ediciones puntuales (buscar/reemplazar), nunca reescribes el fichero entero. Para uno nuevo, contenido completo. Codigo production-ready. Responde EN ESPAÑOL solo con el JSON exacto que se te pida, sin texto ni markdown alrededor.',
   reviewer: 'Eres X1 en el sector Auditoria de Codigo, un revisor senior extremadamente riguroso. Busca bugs, vulnerabilidades, malas practicas, casos sin cubrir y codigo incompleto en lo que te pasen. Responde EN ESPAÑOL de forma directa: una lista breve de problemas concretos, o "Sin problemas relevantes" si esta bien.',
-  refiner: 'Eres X1 en el sector Refinamiento, encargado de incorporar el feedback de una auditoria en la version final del codigo. Responde EN ESPAÑOL solo con el JSON exacto que se te pida, sin texto ni markdown alrededor.',
+  refiner: 'Eres X1 en el sector Refinamiento, encargado de incorporar el feedback de una auditoria en la version final del codigo, con ediciones quirurgicas. Responde EN ESPAÑOL solo con el JSON exacto que se te pida, sin texto ni markdown alrededor.',
+  director: 'Eres X1 en el sector Direccion: supervisas el trabajo de los demas sectores y das el visto bueno final antes de publicar. No repites su trabajo, JUZGAS si es publicable (completitud, calidad, seguridad). Responde EN ESPAÑOL solo con el JSON exacto que se te pida.',
+};
+
+// Cada sector pide primero el modelo mas adecuado a su rol via prefer_provider.
+// Si ese proveedor no tiene clave en el proxy, cae en la cascada normal (Groq).
+var X1_SECTOR_PREFERRED_PROVIDER = {
+  strategist: 'kimi-together', developer: 'nvidia-qwen', reviewer: 'nvidia-nemotron',
+  refiner: 'nvidia-qwen', director: 'kimi-together',
 };
 
 function x1GetQueue() {
@@ -21260,13 +21269,14 @@ function x1GhHeaders(token) {
   return { 'Authorization': 'Bearer ' + token, 'Accept': 'application/vnd.github+json' };
 }
 
-function x1AiCall(prompt, systemPrompt, maxTokens, timeoutMs) {
+function x1AiCall(prompt, systemPrompt, maxTokens, timeoutMs, preferProvider) {
   return fetch(X1_PROXY_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-X1-Auth': X1_PROXY_SECRET },
     body: JSON.stringify({
       messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: prompt }],
       max_tokens: maxTokens || 3000,
+      prefer_provider: preferProvider || undefined,
     }),
     signal: AbortSignal.timeout(timeoutMs || 35000),
   }).then(function (r) { return r.ok ? r.json() : null; })
@@ -21276,6 +21286,23 @@ function x1AiCall(prompt, systemPrompt, maxTokens, timeoutMs) {
       return { text: txt || null, provider: data.x_provider || null, model: data.model || null };
     })
     .catch(function () { return { text: null, provider: null, model: null }; });
+}
+
+// Como x1AiCall pero para respuestas que DEBEN ser un JSON con una forma
+// concreta. Si el modelo "hedgea" con texto en vez del JSON pedido, reintenta
+// UNA vez con un recordatorio de formato — evita que un fallo de formato de
+// 2-3s tumbe un ciclo entero que deberia seguir horas.
+function x1AiCallJson(prompt, systemPrompt, maxTokens, timeoutMs, validate, preferProvider) {
+  return x1AiCall(prompt, systemPrompt, maxTokens, timeoutMs, preferProvider).then(function (res) {
+    var parsed = x1ExtractJSON(res.text);
+    if (parsed && (!validate || validate(parsed))) return { parsed: parsed, provider: res.provider, model: res.model };
+    var repair = prompt + '\n\nTu respuesta debe ser UNICAMENTE el JSON pedido arriba, sin explicaciones ni markdown. Responde de nuevo, solo el JSON.';
+    return x1AiCall(repair, systemPrompt, maxTokens, timeoutMs, preferProvider).then(function (res2) {
+      var parsed2 = x1ExtractJSON(res2.text);
+      var ok2 = parsed2 && (!validate || validate(parsed2));
+      return { parsed: ok2 ? parsed2 : null, provider: res2.provider, model: res2.model };
+    });
+  });
 }
 
 function x1ExtractJSON(txt) {
@@ -21379,72 +21406,172 @@ function x1PublishTask(token, owner, repo, branch, prop) {
 // Codigo) -> refinamiento (sector Refinamiento) -> publicacion (rama +
 // commits + PR). Actualiza queue.tareas[idx] con el resultado, incluyendo
 // que IA/sector trabajo en cada fase, y persiste la cola.
+// ── Ediciones quirurgicas (search/replace) — un agente que EDITA, no que
+// reescribe ficheros enteros desde un contexto truncado (y los destroza). ──
+function x1ApplyEdits(current, ediciones) {
+  var text = String(current || '');
+  var applied = 0, failed = 0;
+  var list = Array.isArray(ediciones) ? ediciones : [];
+  for (var i = 0; i < list.length; i++) {
+    var e = list[i] || {};
+    var find = e.buscar != null ? String(e.buscar) : '';
+    var repl = e.reemplazar != null ? String(e.reemplazar) : '';
+    if (!find) { failed++; continue; }
+    var idx = text.indexOf(find);
+    if (idx === -1) { failed++; continue; }
+    text = text.slice(0, idx) + repl + text.slice(idx + find.length);
+    applied++;
+  }
+  return { text: text, applied: applied, failed: failed };
+}
+
+function x1ResolveProposedFile(f, filesWithState) {
+  if (!f || !f.path) return null;
+  var match = null;
+  for (var i = 0; i < filesWithState.length; i++) { if (filesWithState[i].path === f.path) { match = filesWithState[i]; break; } }
+  var current = match ? String(match.current || '') : '';
+  var exists = match ? !!match.exists : false;
+  var sha = match ? match.sha : null;
+  var isEdit = Array.isArray(f.ediciones) && f.ediciones.length > 0;
+  var hasContent = f.contenido != null && String(f.contenido).length > 0;
+  if (exists && isEdit) {
+    var res = x1ApplyEdits(current, f.ediciones);
+    if (res.applied === 0 || res.text === current) return null;
+    return { path: f.path, contenido: res.text, current: current, sha: sha, exists: true };
+  }
+  if (!exists && hasContent) return { path: f.path, contenido: String(f.contenido), current: '', sha: null, exists: false };
+  if (exists && hasContent) {
+    var nuevo = String(f.contenido);
+    if (nuevo === current) return null;
+    if (current.length > 200 && nuevo.length < current.length * 0.65) return null; // guarda anti-destruccion
+    return { path: f.path, contenido: nuevo, current: current, sha: sha, exists: true };
+  }
+  return null;
+}
+
+// Filtro barato contra basura de ciclos nocturnos sin supervision: contenido
+// vacio o con llaves/parentesis muy desbalanceados (respuesta cortada a mitad).
+function x1SanityCheckFile(content) {
+  var c = String(content || '');
+  if (c.trim().length < 3) return false;
+  var opens = (c.match(/[{(\[]/g) || []).length;
+  var closes = (c.match(/[})\]]/g) || []).length;
+  if (Math.abs(opens - closes) > Math.max(3, c.length / 200)) return false;
+  return true;
+}
+
+// Investigacion ligera (github+npm) + lectura del estado real de cada fichero.
+function x1PrepareTask(token, owner, name, tarea) {
+  var term = (tarea.busquedas && tarea.busquedas[0]) || tarea.titulo;
+  return Promise.all([x1GhSearchRepos(term), x1NpmSearch(term)]).then(function (r) {
+    var researchBlock = 'Repos relevantes: ' + r[0].map(function (x) { return x.name; }).join(', ') +
+      '\nPaquetes npm: ' + r[1].map(function (x) { return x.name; }).join(', ');
+    var files = tarea.archivos || [];
+    return Promise.all(files.map(function (f) {
+      return x1GhFetchFile(token, owner, name, f.path).then(function (existing) {
+        return Object.assign({}, f, { current: existing.content, sha: existing.sha, exists: existing.exists });
+      });
+    })).then(function (filesWithState) { return { researchBlock: researchBlock, filesWithState: filesWithState }; });
+  });
+}
+
+// Pipeline por EDICIONES (compartido por cola finita y autopiloto): Desarrollo
+// propone cambios quirurgicos -> se aplican sobre el codigo real -> Auditoria
+// revisa -> Refinamiento corrige con mas ediciones -> Cordura filtra ->
+// Direccion aprueba. Un prompt truncado ya NO corrompe ficheros: lo que no se
+// menciona, no se toca.
+function x1RunCodePipeline(goalLabel, tarea, filesWithState, researchBlock, sectorsOut) {
+  var draftValid = function (p) { return Array.isArray(p.archivos) && p.archivos.length > 0; };
+  var fileCtx = filesWithState.map(function (f) {
+    return '=== ' + f.path + ' (' + (f.exists ? 'EXISTENTE' : 'NUEVO') + ') ===\n' +
+      (f.exists ? String(f.current || '').slice(0, 6000) : '(no existe todavia — fichero nuevo)');
+  }).join('\n\n');
+  var draftPrompt = 'Objetivo: "' + goalLabel + '"\nTarea: ' + tarea.titulo + '\nMotivo: ' + tarea.motivo +
+    '\n\nInvestigacion:\n' + researchBlock +
+    '\n\nHaz cambios QUIRURGICOS. Fichero EXISTENTE: NUNCA lo reescribas entero, devuelve ediciones puntuales. Fichero NUEVO: contenido completo.\n\n' +
+    'Ficheros objetivo y su contenido ACTUAL:\n' + fileCtx +
+    '\n\nResponde SOLO con JSON (sin markdown):\n' +
+    '{"archivos":[\n' +
+    '  {"path":"ruta/existente.ext","accion":"editar","ediciones":[{"buscar":"fragmento EXACTO y literal del contenido actual de arriba, copiado tal cual con su indentacion (5-15 lineas, unico)","reemplazar":"texto nuevo que lo sustituye"}]},\n' +
+    '  {"path":"ruta/nuevo.ext","accion":"crear","contenido":"contenido completo del fichero nuevo"}\n' +
+    ']}\n' +
+    'REGLA CRITICA: cada "buscar" debe aparecer palabra por palabra en el contenido mostrado; si no, se descarta. No uses "..." ni abreviaturas.';
+
+  return x1AiCallJson(draftPrompt, X1_SECTOR_PROMPTS.developer, 4000, 40000, draftValid, X1_SECTOR_PREFERRED_PROVIDER.developer).then(function (draftRes) {
+    sectorsOut.push({ fase: 'Borrador', sector: 'Desarrollo', provider: draftRes.provider, model: draftRes.model });
+    if (!draftRes.parsed) throw new Error('El sector Desarrollo no genero un borrador valido ni tras reintentar');
+    var resolved = [], descartados = 0;
+    (draftRes.parsed.archivos || []).forEach(function (f) {
+      var r = x1ResolveProposedFile(f, filesWithState);
+      if (r) resolved.push(r); else descartados++;
+    });
+    if (descartados > 0) sectorsOut.push({ fase: 'Aplicacion', sector: 'Edicion', provider: null, model: descartados + ' cambio(s) descartado(s) (no casaban o destructivos)' });
+    if (resolved.length === 0) throw new Error('Ninguna edicion propuesta pudo aplicarse al codigo real — no se publica nada');
+
+    var reviewPrompt = 'Revisa este codigo para la tarea "' + tarea.titulo + '". Busca bugs, seguridad, malas practicas y casos sin cubrir.\n\n' +
+      resolved.map(function (f) { return '=== ' + f.path + ' ===\n' + String(f.contenido || '').slice(0, 3500); }).join('\n\n');
+    return x1AiCall(reviewPrompt, X1_SECTOR_PROMPTS.reviewer, 1200, 25000, X1_SECTOR_PREFERRED_PROVIDER.reviewer).then(function (reviewRes) {
+      sectorsOut.push({ fase: 'Auditoria', sector: 'Auditoria de codigo', provider: reviewRes.provider, model: reviewRes.model });
+      var refinePrompt = 'Codigo actual (con el primer cambio aplicado):\n' +
+        resolved.map(function (f) { return '=== ' + f.path + ' ===\n' + String(f.contenido || '').slice(0, 6000); }).join('\n\n') +
+        '\n\nAuditoria recibida:\n' + (reviewRes.text || '(sin observaciones)') +
+        '\n\nSi la auditoria senala problemas REALES, corrigelos con ediciones quirurgicas sobre el codigo de arriba. Si no, devuelve "archivos": [].\n' +
+        'Responde SOLO con JSON: {"titulo_pr":"titulo corto","descripcion_pr":"descripcion en espanol","archivos":[{"path":"ruta","ediciones":[{"buscar":"fragmento exacto","reemplazar":"texto corregido"}]}]}';
+      return x1AiCallJson(refinePrompt, X1_SECTOR_PROMPTS.refiner, 3000, 35000, function (p) { return Array.isArray(p.archivos); }, X1_SECTOR_PREFERRED_PROVIDER.refiner).then(function (refineRes) {
+        sectorsOut.push({ fase: 'Refinamiento', sector: 'Refinamiento', provider: refineRes.provider, model: refineRes.model });
+        var meta = refineRes.parsed || {};
+        (meta.archivos || []).forEach(function (rf) {
+          if (!rf || !rf.path || !Array.isArray(rf.ediciones)) return;
+          for (var i = 0; i < resolved.length; i++) {
+            if (resolved[i].path === rf.path) {
+              var res = x1ApplyEdits(resolved[i].contenido, rf.ediciones);
+              if (res.applied > 0) resolved[i].contenido = res.text;
+              break;
+            }
+          }
+        });
+        var sane = resolved.filter(function (f) { return x1SanityCheckFile(f.contenido); });
+        if (sane.length === 0) throw new Error('Ningun fichero paso la comprobacion de cordura — no se publica nada');
+        if (sane.length < resolved.length) sectorsOut.push({ fase: 'Cordura', sector: 'Verificacion', provider: null, model: (resolved.length - sane.length) + ' fichero(s) descartado(s) por incompletos' });
+        var directorPrompt = 'Tarea: ' + tarea.titulo + '\nMotivo: ' + tarea.motivo +
+          '\n\nAuditoria encontro: ' + (reviewRes.text || '(sin observaciones)') +
+          '\n\nFicheros finales: ' + sane.map(function (f) { return f.path; }).join(', ') +
+          '\n\nDecide si es publicable tal cual como Pull Request. Responde SOLO con JSON: {"aprobado": true/false, "razon": "una frase"}';
+        return x1AiCallJson(directorPrompt, X1_SECTOR_PROMPTS.director, 300, 20000, function (p) { return typeof p.aprobado === 'boolean'; }, X1_SECTOR_PREFERRED_PROVIDER.director).then(function (dirRes) {
+          var v = dirRes.parsed || { aprobado: true, razon: 'Direccion no respondio a tiempo; se publica (fail-open).' };
+          sectorsOut.push({ fase: 'Direccion', sector: v.aprobado ? 'Aprobado' : 'RECHAZADO: ' + v.razon, provider: dirRes.provider, model: dirRes.model });
+          if (!v.aprobado) throw new Error('Direccion rechazo el ciclo: ' + v.razon);
+          return { titulo_pr: meta.titulo_pr || tarea.titulo, descripcion_pr: meta.descripcion_pr || tarea.motivo, archivos: sane };
+        });
+      });
+    });
+  });
+}
+
+function x1PublishAndCount(token, owner, name, branch, proposal) {
+  return x1PublishTask(token, owner, name, branch, proposal).then(function (pr) {
+    var totalAdded = 0, totalRemoved = 0;
+    proposal.archivos.forEach(function (f) { var c = x1DiffCounts(f.current, f.contenido); totalAdded += c.added; totalRemoved += c.removed; });
+    return {
+      prUrl: pr.url, prNumber: pr.number,
+      files: proposal.archivos.map(function (f) { return f.path; }),
+      linesAdded: totalAdded, linesRemoved: totalRemoved, completedAt: Date.now(),
+    };
+  });
+}
+
+// Cola finita: el usuario dio un objetivo dividido en tareas. Procesa una.
 function x1ProcessQueueTask(queue, idx) {
   var tarea = queue.tareas[idx];
   tarea.status = 'active';
   tarea.sectors = [];
   x1SaveQueue(queue);
-
   return x1GetGithubToken().then(function (token) {
     if (!token) throw new Error('Sin sesion de GitHub');
-    var term = (tarea.busquedas && tarea.busquedas[0]) || tarea.titulo;
-
-    return Promise.all([x1GhSearchRepos(term), x1NpmSearch(term)]).then(function (r) {
-      var researchBlock = 'Repos relevantes: ' + r[0].map(function (x) { return x.name; }).join(', ') +
-        '\nPaquetes npm: ' + r[1].map(function (x) { return x.name; }).join(', ');
-
-      var files = tarea.archivos || [];
-      return Promise.all(files.map(function (f) {
-        return x1GhFetchFile(token, queue.owner, queue.name, f.path).then(function (existing) {
-          return Object.assign({}, f, { current: existing.content, sha: existing.sha, exists: existing.exists });
-        });
-      })).then(function (filesWithState) {
-
-        var draftPrompt = 'Objetivo general: "' + queue.goal + '"\nTarea: ' + tarea.titulo + '\nMotivo: ' + tarea.motivo +
-          '\n\nInvestigacion:\n' + researchBlock + '\n\nFicheros (contenido actual si existen):\n' +
-          filesWithState.map(function (f) { return '=== ' + f.path + ' (' + (f.exists ? 'existente' : 'nuevo') + ') ===\n' + (f.current || '(vacio, fichero nuevo)').slice(0, 1500); }).join('\n\n') +
-          '\n\nResponde SOLO con JSON: {"archivos":[{"path":"ruta","contenido":"contenido COMPLETO del fichero"}]}';
-
-        return x1AiCall(draftPrompt, X1_SECTOR_PROMPTS.developer, 3000, 35000).then(function (draftRes) {
-          tarea.sectors.push({ fase: 'Borrador', sector: 'Desarrollo', provider: draftRes.provider, model: draftRes.model });
-          var draft = x1ExtractJSON(draftRes.text);
-          if (!draft || !draft.archivos || !draft.archivos.length) throw new Error('El sector Desarrollo no genero un borrador valido');
-
-          var reviewPrompt = 'Revisa este codigo generado para la tarea "' + tarea.titulo + '". Busca bugs, seguridad, malas practicas y casos sin cubrir.\n\n' +
-            draft.archivos.map(function (f) { return '=== ' + f.path + ' ===\n' + String(f.contenido || '').slice(0, 3000); }).join('\n\n');
-
-          return x1AiCall(reviewPrompt, X1_SECTOR_PROMPTS.reviewer, 1200, 25000).then(function (reviewRes) {
-            tarea.sectors.push({ fase: 'Auditoria', sector: 'Auditoria de codigo', provider: reviewRes.provider, model: reviewRes.model });
-
-            var refinePrompt = 'Codigo original:\n' + draft.archivos.map(function (f) { return '=== ' + f.path + ' ===\n' + f.contenido; }).join('\n\n') +
-              '\n\nAuditoria recibida:\n' + (reviewRes.text || '(sin observaciones)') +
-              '\n\nCorrige el codigo segun la auditoria (si no hay problemas reales, deja el codigo igual). Responde SOLO con JSON: {"titulo_pr":"titulo corto","descripcion_pr":"descripcion en espanol","archivos":[{"path":"ruta","contenido":"contenido FINAL completo del fichero"}]}';
-
-            return x1AiCall(refinePrompt, X1_SECTOR_PROMPTS.refiner, 3000, 35000).then(function (refineRes) {
-              tarea.sectors.push({ fase: 'Refinamiento', sector: 'Refinamiento', provider: refineRes.provider, model: refineRes.model });
-              var final = x1ExtractJSON(refineRes.text) || draft;
-              var finalFiles = (final.archivos || draft.archivos).map(function (f) {
-                var match = filesWithState.filter(function (e) { return e.path === f.path; })[0];
-                return Object.assign({}, f, { sha: match ? match.sha : null, exists: match ? match.exists : false, current: match ? match.current : '' });
-              });
-
-              return x1PublishTask(token, queue.owner, queue.name, queue.branch, {
-                titulo_pr: final.titulo_pr || tarea.titulo, descripcion_pr: final.descripcion_pr || tarea.motivo, archivos: finalFiles,
-              }).then(function (pr) {
-                var totalAdded = 0, totalRemoved = 0;
-                finalFiles.forEach(function (f) {
-                  var c = x1DiffCounts(f.current, f.contenido);
-                  totalAdded += c.added; totalRemoved += c.removed;
-                });
-                tarea.status = 'done';
-                tarea.result = {
-                  prUrl: pr.url, prNumber: pr.number,
-                  files: finalFiles.map(function (f) { return f.path; }),
-                  linesAdded: totalAdded, linesRemoved: totalRemoved, completedAt: Date.now(),
-                };
-              });
-            });
-          });
+    return x1PrepareTask(token, queue.owner, queue.name, tarea).then(function (prep) {
+      return x1RunCodePipeline(queue.goal, tarea, prep.filesWithState, prep.researchBlock, tarea.sectors).then(function (proposal) {
+        return x1PublishAndCount(token, queue.owner, queue.name, queue.branch, proposal).then(function (result) {
+          tarea.status = 'done'; tarea.result = result;
         });
       });
     });
@@ -21458,19 +21585,137 @@ function x1ProcessQueueTask(queue, idx) {
   });
 }
 
+// ═══ AUTOPILOTO — sin objetivo del usuario y SIN fin: cada ciclo el sector
+// Estrategia decide POR SI MISMO la mejora mas valiosa, la construye con el
+// mismo pipeline, publica el PR, y repite indefinidamente (uno cada pocos
+// minutos) hasta que el usuario lo cancele. Es lo que permite dejar el modelo
+// trabajando durante horas. ═══
+function x1GhFetchTree(token, owner, repo, branch) {
+  return fetch(X1_GH_API + '/repos/' + owner + '/' + repo + '/git/trees/' + encodeURIComponent(branch) + '?recursive=1', { headers: x1GhHeaders(token) })
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (d) { return (d && d.tree || []).filter(function (n) { return n.type === 'blob'; }).map(function (n) { return n.path; }); })
+    .catch(function () { return []; });
+}
+
+// Cada 5 ciclos refresca el informe con el arbol actual, para no decidir toda
+// la noche sobre un analisis que el propio autopiloto ya dejo desfasado.
+function x1RefreshAnalysis(queue, token) {
+  return x1GhFetchTree(token, queue.owner, queue.name, queue.branch).then(function (paths) {
+    var recent = (queue.history || []).slice(-10).map(function (h) { return h.titulo; }).join(', ');
+    var prompt = 'Arbol ACTUAL de ' + queue.owner + '/' + queue.name + ':\n' + paths.slice(0, 150).join('\n') +
+      '\n\nYa hecho por autopiloto: ' + (recent || '(nada aun)') +
+      '\n\nAnalisis original (puede estar desfasado):\n' + (queue.analysisReport || '') +
+      '\n\nResponde en espanol, MARKDOWN, con "## Estado actual" (3-5 bullets) y "## Prioridades" (3-5 bullets de lo mas valioso a construir ahora, sin repetir lo ya hecho).';
+    return x1AiCall(prompt, X1_SECTOR_PROMPTS.strategist, 900, 22000, X1_SECTOR_PREFERRED_PROVIDER.strategist).then(function (r) {
+      if (r.text) queue.analysisReport = r.text;
+      return queue;
+    });
+  });
+}
+
+function x1DecideNextObjective(queue) {
+  var recent = (queue.history || []).slice(-10).map(function (h, i) {
+    return (i + 1) + '. ' + h.titulo + (h.result && h.result.error ? ' (fallo)' : ' (hecho)');
+  }).join('\n');
+  var prompt = 'No hay objetivo del usuario: decide TU MISMO la mejora mas valiosa a hacer AHORA en este repositorio.\n\n' +
+    'Repositorio: ' + queue.owner + '/' + queue.name + '\nInforme de analisis:\n' + (queue.analysisReport || '(sin informe)') + '\n\n' +
+    (recent ? 'Ya se hizo (NO repitas, elige algo distinto):\n' + recent + '\n\n' : '(Primer ciclo, sin historial.)\n\n') +
+    'Prefiere cambios concretos y de bajo riesgo (tests nuevos, docs, utilidades, correcciones puntuales). ' +
+    'Responde SOLO con JSON: {"titulo":"titulo corto","motivo":"por que es valioso ahora","busquedas":["hasta 2 terminos"],"archivos":[{"path":"ruta real del repo","motivo":"..."}]}\nMaximo 3 archivos.';
+  return x1AiCallJson(prompt, X1_SECTOR_PROMPTS.strategist, 1200, 25000, function (p) { return !!p.titulo; }, X1_SECTOR_PREFERRED_PROVIDER.strategist).then(function (r) {
+    var tarea = r.parsed || { titulo: 'Mejora general de calidad', motivo: 'Estrategia no decidio un objetivo especifico esta vez.', busquedas: ['buenas practicas'], archivos: [] };
+    return { tarea: tarea, sector: { fase: 'Estrategia', sector: 'Estrategia', provider: r.provider, model: r.model } };
+  });
+}
+
+function x1ProcessAutopilotCycle(queue) {
+  return x1GetGithubToken().then(function (token) {
+    if (!token) throw new Error('Sin sesion de GitHub');
+    var cycles = (queue.history || []).length;
+    var refresh = (cycles > 0 && cycles % 5 === 0) ? x1RefreshAnalysis(queue, token) : Promise.resolve(queue);
+    return refresh.then(function () {
+      return x1DecideNextObjective(queue).then(function (decision) {
+        var tarea = decision.tarea;
+        tarea.sectors = [decision.sector];
+        return x1PrepareTask(token, queue.owner, queue.name, tarea).then(function (prep) {
+          return x1RunCodePipeline(tarea.titulo, tarea, prep.filesWithState, prep.researchBlock, tarea.sectors).then(function (proposal) {
+            return x1PublishAndCount(token, queue.owner, queue.name, queue.branch, proposal).then(function (result) {
+              tarea.status = 'done'; tarea.result = result; return tarea;
+            });
+          });
+        }).catch(function (e) {
+          tarea.status = 'error';
+          tarea.result = { error: (e && e.message) || 'Error desconocido', completedAt: Date.now() };
+          return tarea;
+        });
+      });
+    });
+  }).then(function (tarea) {
+    queue.history = (queue.history || []).concat([tarea]).slice(-40);
+    queue.consecutiveFailures = tarea.status === 'error' ? (queue.consecutiveFailures || 0) + 1 : 0;
+    queue.updatedAt = Date.now();
+    return x1SaveQueue(queue).then(function () { return queue; });
+  });
+}
+
+// ── Programacion robusta: arranque rapido y luego crucero, guardando nextTickAt. ──
+var X1_AUTOPILOT_MAX_CONSECUTIVE_FAILURES = 3;
+var X1_AUTOPILOT_RAMP_CYCLES = 4;
+function x1AutopilotDelayMins(queue) {
+  var cycles = (queue.history || []).length;
+  if (cycles < X1_AUTOPILOT_RAMP_CYCLES) return 1;      // primeros ciclos rapidos (visible)
+  return 15 + Math.floor(Math.random() * 10);           // luego 15-25 min
+}
+function x1ScheduleNextTick(queue, mins) {
+  queue.nextTickAt = Date.now() + mins * 60000;
+  x1SaveQueue(queue);
+  chrome.alarms.create(X1_AUTOMATION_ALARM, { delayInMinutes: mins });
+}
+function x1PauseAutopilot(queue) {
+  queue.status = 'paused';
+  x1SaveQueue(queue);
+  try {
+    chrome.notifications.create('x1-autopilot-paused-' + Date.now(), {
+      type: 'basic', iconUrl: 'assets/x1-icon-128.png', title: 'X1 puso en pausa el autopiloto',
+      message: X1_AUTOPILOT_MAX_CONSECUTIVE_FAILURES + ' ciclos seguidos fallaron en ' + queue.owner + '/' + queue.name + ' — revisa el sidepanel antes de reactivarlo.',
+    });
+  } catch (e) {}
+}
+
 chrome.alarms.onAlarm.addListener(function (alarm) {
   if (alarm.name !== X1_AUTOMATION_ALARM) return;
   x1GetQueue().then(function (queue) {
-    if (!queue || queue.currentIndex >= queue.tareas.length) return;
+    if (!queue || queue.status === 'paused') return;
+
+    // ── Autopiloto: sin fin. Reprograma SIEMPRE (backstop) para que no muera. ──
+    if (queue.mode === 'autopilot') {
+      x1ProcessAutopilotCycle(queue).then(function (uq) {
+        if ((uq.consecutiveFailures || 0) >= X1_AUTOPILOT_MAX_CONSECUTIVE_FAILURES) { x1PauseAutopilot(uq); return; }
+        x1ScheduleNextTick(uq, x1AutopilotDelayMins(uq));
+      }).catch(function (e) {
+        // BACKSTOP: si el ciclo lanza (token ausente, storage caido, bug), el
+        // loop NO debe morir en silencio. Cuenta como fallo y reprograma; si ya
+        // van demasiados, pausa con aviso. Sin esto, un solo throw congelaba el
+        // autopiloto para siempre — el sintoma de "trabaja 2s y para".
+        queue.consecutiveFailures = (queue.consecutiveFailures || 0) + 1;
+        queue.lastError = (e && e.message) || 'error inesperado';
+        queue.updatedAt = Date.now();
+        if (queue.consecutiveFailures >= X1_AUTOPILOT_MAX_CONSECUTIVE_FAILURES) { x1PauseAutopilot(queue); return; }
+        x1ScheduleNextTick(queue, x1AutopilotDelayMins(queue));
+      });
+      return;
+    }
+
+    // ── Cola finita: procesa la siguiente tarea o notifica al terminar. ──
+    if (queue.currentIndex >= queue.tareas.length) return;
     x1ProcessQueueTask(queue, queue.currentIndex).then(function (updatedQueue) {
       if (updatedQueue.currentIndex < updatedQueue.tareas.length) {
-        var mins = 15 + Math.floor(Math.random() * 10); // 15-25 min: reparte el trabajo, no satura GitHub/la IA, y da tiempo a revisar cada PR
-        chrome.alarms.create(X1_AUTOMATION_ALARM, { delayInMinutes: mins });
+        x1ScheduleNextTick(updatedQueue, 15 + Math.floor(Math.random() * 10)); // 15-25 min
       } else {
         try {
           var doneCount = updatedQueue.tareas.filter(function (t) { return t.status === 'done'; }).length;
           chrome.notifications.create('x1-automation-done-' + Date.now(), {
-            type: 'basic', iconUrl: 'assets/icon-128.png', title: 'X1 termino la automatizacion',
+            type: 'basic', iconUrl: 'assets/x1-icon-128.png', title: 'X1 termino la automatizacion',
             message: doneCount + ' Pull Request(s) creados en ' + updatedQueue.owner + '/' + updatedQueue.name,
           });
         } catch (e) {}
@@ -21486,9 +21731,13 @@ chrome.alarms.onAlarm.addListener(function (alarm) {
 chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
   if (msg.type === 'X1_AUTOMATION_QUEUE_START') {
     x1SaveQueue(msg.queue).then(function () {
-      if (msg.queue.currentIndex < msg.queue.tareas.length) {
-        var mins = 15 + Math.floor(Math.random() * 10);
-        chrome.alarms.create(X1_AUTOMATION_ALARM, { delayInMinutes: mins });
+      // Autopiloto: siempre sigue (no hay "ultima tarea"). Cola finita: solo si
+      // quedan tareas pendientes tras la primera (ya procesada por el sidepanel).
+      var isAuto = msg.queue.mode === 'autopilot';
+      var shouldSchedule = isAuto ? msg.queue.status !== 'paused' : (msg.queue.currentIndex < msg.queue.tareas.length);
+      if (shouldSchedule) {
+        var mins = isAuto ? x1AutopilotDelayMins(msg.queue) : (15 + Math.floor(Math.random() * 10));
+        x1ScheduleNextTick(msg.queue, mins);
       }
       sendResponse({ ok: true });
     });
@@ -21501,6 +21750,20 @@ chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
   if (msg.type === 'X1_AUTOMATION_QUEUE_CANCEL') {
     chrome.alarms.clear(X1_AUTOMATION_ALARM);
     chrome.storage.local.remove('x1_automation_queue').then(function () { sendResponse({ ok: true }); });
+    return true;
+  }
+  // Reactiva un autopiloto pausado por el circuit breaker: resetea el contador
+  // y vuelve a programar el tick.
+  if (msg.type === 'X1_AUTOMATION_QUEUE_RESUME') {
+    x1GetQueue().then(function (queue) {
+      if (!queue) { sendResponse({ ok: false }); return; }
+      queue.status = 'running';
+      queue.consecutiveFailures = 0;
+      queue.lastError = null;
+      queue.updatedAt = Date.now();
+      x1ScheduleNextTick(queue, queue.mode === 'autopilot' ? x1AutopilotDelayMins(queue) : (15 + Math.floor(Math.random() * 10)));
+      sendResponse({ ok: true });
+    });
     return true;
   }
 });

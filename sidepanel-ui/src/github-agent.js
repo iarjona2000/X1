@@ -439,6 +439,42 @@ export function cancelBackgroundQueue() {
   });
 }
 
+// Autopiloto: sin objetivo y SIN fin. Entrega TODO al service worker (que hace
+// cada ciclo — incluido el primero ~1 min despues — con el pipeline por
+// ediciones) para que siga decidiendo y construyendo por su cuenta durante
+// horas, aunque cierres el sidepanel. Necesita un repositorio ya analizado:
+// usa su informe para decidir el primer objetivo.
+export function runAutopilot(repoCtx, onStep) {
+  if (!repoCtx) {
+    emit(onStep, { id: 'autopilot', title: 'Sin repositorio de referencia', status: 'error', detail: 'Analiza un repositorio en "Tu Repositorio" antes de activar el autopiloto — X1 necesita el informe para decidir que construir.' });
+    return Promise.resolve({ autopilot: false, error: true });
+  }
+  emit(onStep, { id: 'autopilot', title: 'Activando autopiloto', status: 'active', why: 'X1 decidira por si mismo que construir, ciclo tras ciclo, sin fin, hasta que lo canceles.' });
+  var queue = {
+    mode: 'autopilot',
+    owner: repoCtx.owner, name: repoCtx.name,
+    branch: (repoCtx.meta && repoCtx.meta.default_branch) || 'main',
+    analysisReport: String(repoCtx.report || '').slice(0, 5000),
+    history: [], status: 'running', createdAt: Date.now(), updatedAt: Date.now(),
+  };
+  return startBackgroundQueue(queue).then(function () {
+    emit(onStep, {
+      id: 'autopilot', title: 'Autopiloto activado — sin limite de tiempo', status: 'done',
+      detail: 'Primer ciclo en ~1 min; luego cada 15-25 min, indefinidamente.',
+      why: 'Cada ciclo: Estrategia decide -> Desarrollo (ediciones quirurgicas) -> Auditoria -> Refinamiento -> Direccion -> Pull Request. Sigue aunque cierres el sidepanel.',
+    });
+    return { autopilot: true };
+  });
+}
+
+// Reactiva un autopiloto pausado por el circuit breaker (N ciclos seguidos fallidos).
+export function resumeBackgroundQueue() {
+  return new Promise(function (resolve) {
+    try { chrome.runtime.sendMessage({ type: 'X1_AUTOMATION_QUEUE_RESUME' }, function () { resolve(); }); }
+    catch (e) { resolve(); }
+  });
+}
+
 // Procesa las tareas UNA A UNA (no en paralelo) para que el log se lea como
 // una secuencia clara — "Tarea 1/3", "Tarea 2/3"... — y para no saturar los
 // proveedores de IA con llamadas simultaneas.

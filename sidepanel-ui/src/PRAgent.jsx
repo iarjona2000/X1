@@ -3,7 +3,7 @@ import * as B from './backend.js';
 import {
   fetchOpenPRs, fetchPRDiff, reviewPRDiff, publishPRComment,
   loadRepoAnalysis, runAutoBuild, publishAutoBuild,
-  getBackgroundQueue, cancelBackgroundQueue,
+  getBackgroundQueue, cancelBackgroundQueue, runAutopilot, resumeBackgroundQueue,
 } from './github-agent.js';
 import { ProcessLog } from './ProcessTimeline.jsx';
 import { DiffView } from './DiffView.jsx';
@@ -128,6 +128,19 @@ function publish(repoCtx) {
     .catch(function (e) { setStore({ publishError: e.message || 'Error al publicar', publishing: false }); });
 }
 
+// Autopiloto: sin objetivo, sin fin. Entrega el control al service worker, que
+// decide y construye por su cuenta cada pocos minutos durante horas. Necesita
+// un repositorio ya analizado (usa su informe para el primer objetivo).
+function startAutopilot(repoCtx) {
+  if (store.building || !repoCtx) return;
+  setStore({ building: true, goal: '', steps: [], proposal: null, published: null, publishError: null });
+  B.getGithubToken().then(function (token) {
+    var ctx = Object.assign({}, repoCtx, { token: token });
+    return runAutopilot(ctx, function (s) { setStore({ steps: upsertStep(store.steps, s) }); });
+  }).then(function () { setStore({ building: false }); })
+    .catch(function (e) { setStore({ building: false, steps: upsertStep(store.steps, { id: 'fatal', title: 'Error inesperado: ' + (e && e.message), status: 'error' }) }); });
+}
+
 // ── Componentes Primer a medida ──
 
 var FLASH_PALETTE = {
@@ -204,31 +217,53 @@ function timeAgo(ts) {
 // Refinamiento), los ficheros tocados, lineas +/- y el enlace al PR — asi
 // queda claro que no es una sola llamada a IA sino una orquestacion real que
 // se reparte en el tiempo.
-function BackgroundQueueView({ queue, onCancel, cancelling }) {
-  var done = queue.tareas.filter(function (t) { return t.status === 'done'; }).length;
-  var errored = queue.tareas.filter(function (t) { return t.status === 'error'; }).length;
-  var pending = queue.tareas.filter(function (t) { return t.status === 'pending'; }).length;
-  var active = queue.tareas.filter(function (t) { return t.status === 'active'; }).length;
-  var finished = pending === 0 && active === 0;
+function timeUntil(ts) {
+  if (!ts) return null;
+  var d = new Date(ts).getTime() - Date.now();
+  if (d <= 0) return 'en breve';
+  if (d < 60000) return 'en ' + Math.ceil(d / 1000) + 's';
+  if (d < 3600000) return 'en ' + Math.ceil(d / 60000) + ' min';
+  return 'en ' + Math.floor(d / 3600000) + 'h';
+}
+
+function BackgroundQueueView({ queue, onCancel, onResume, cancelling }) {
+  var isAutopilot = queue.mode === 'autopilot';
+  var list = isAutopilot ? (queue.history || []) : (queue.tareas || []);
+  var done = list.filter(function (t) { return t.status === 'done'; }).length;
+  var errored = list.filter(function (t) { return t.status === 'error'; }).length;
+  var pending = isAutopilot ? 0 : list.filter(function (t) { return t.status === 'pending'; }).length;
+  var active = list.filter(function (t) { return t.status === 'active'; }).length;
+  var finished = !isAutopilot && pending === 0 && active === 0;
+  var isPaused = queue.status === 'paused';
+  var displayList = isAutopilot ? list.slice().reverse() : list;
 
   return React.createElement('div', { style: { marginBottom: '16px' } },
     React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' } },
-      React.createElement('h3', { style: Object.assign({}, H3, { flex: 1, border: 'none', margin: 0, padding: 0 }) }, 'Cola de automatizacion en segundo plano'),
-      !finished && React.createElement('button', {
+      React.createElement('h3', { style: Object.assign({}, H3, { flex: 1, border: 'none', margin: 0, padding: 0 }) }, isAutopilot ? 'Autopiloto — historial de ciclos' : 'Cola de automatizacion en segundo plano'),
+      isPaused && React.createElement('button', {
+        onClick: onResume,
+        style: { fontSize: '11px', color: C.accent, background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: F, fontWeight: '600' },
+      }, 'Reactivar'),
+      (!finished || isAutopilot) && React.createElement('button', {
         onClick: onCancel, disabled: cancelling,
         style: { fontSize: '11px', color: C.danger, background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: F },
-      }, cancelling ? 'Cancelando…' : 'Cancelar cola')
+      }, cancelling ? 'Cancelando…' : (isAutopilot ? 'Desactivar autopiloto' : 'Cancelar cola'))
+    ),
+    isPaused && React.createElement('div', { style: { fontSize: '11px', color: C.attention, background: C.attentionSubtle, border: '1px solid ' + C.attentionBorder, borderRadius: '6px', padding: '8px 10px', marginBottom: '10px', lineHeight: '1.6' } },
+      'Autopiloto en pausa: ' + (queue.consecutiveFailures || 0) + ' ciclos seguidos fallaron (circuit breaker de seguridad). ' + (queue.lastError ? 'Ultimo error: ' + queue.lastError + '. ' : '') + 'Pulsa "Reactivar" cuando este resuelto.'
     ),
     React.createElement('div', { style: { fontSize: '11px', color: C.fgMuted, marginBottom: '10px', lineHeight: '1.6' } },
-      finished
-        ? ('Cola completada: ' + done + ' Pull Request(s) creados' + (errored ? ', ' + errored + ' con error' : '') + '.')
-        : (done + ' completada(s) · ' + pending + ' pendiente(s) · X1 procesa una tarea cada 15-25 min, siga o no el sidepanel abierto — ultima actividad hace ' + timeAgo(queue.updatedAt) + '.')
+      isAutopilot
+        ? (done + ' ciclo(s) completado(s)' + (errored ? ', ' + errored + ' con error' : '') + ' · sin fin — X1 decide su proximo objetivo solo' + (!isPaused && queue.nextTickAt ? ' — proximo ciclo ' + timeUntil(queue.nextTickAt) : ' — ultima actividad hace ' + timeAgo(queue.updatedAt)) + '.')
+        : finished
+          ? ('Cola completada: ' + done + ' Pull Request(s) creados' + (errored ? ', ' + errored + ' con error' : '') + '.')
+          : (done + ' completada(s) · ' + pending + ' pendiente(s) · una tarea cada 15-25 min' + (queue.nextTickAt ? ' — proxima ' + timeUntil(queue.nextTickAt) : '') + '.')
     ),
-    React.createElement('div', { style: { border: '1px solid ' + C.border, borderRadius: '6px', overflow: 'hidden' } },
-      queue.tareas.map(function (t, i) {
-        return React.createElement(QueueTaskRow, { key: i, tarea: t, index: i, isLast: i === queue.tareas.length - 1 });
+    displayList.length ? React.createElement('div', { style: { border: '1px solid ' + C.border, borderRadius: '6px', overflow: 'hidden' } },
+      displayList.map(function (t, i) {
+        return React.createElement(QueueTaskRow, { key: i, tarea: t, index: isAutopilot ? (displayList.length - 1 - i) : i, isLast: i === displayList.length - 1 });
       })
-    )
+    ) : React.createElement('div', { style: { fontSize: '11px', color: C.fgMuted, fontStyle: 'italic' } }, isAutopilot ? 'Esperando al primer ciclo…' : '')
   );
 }
 
@@ -297,6 +332,10 @@ export function PRAgent({ githubUser, onGoToRepo }) {
   function handleCancelQueue() {
     setCancelling(true);
     cancelBackgroundQueue().then(function () { setQueue(null); setCancelling(false); });
+  }
+
+  function handleResumeQueue() {
+    resumeBackgroundQueue().then(function () { getBackgroundQueue().then(setQueue); });
   }
 
   React.useEffect(function () { setRepoCtx(loadRepoAnalysis()); }, []);
@@ -370,6 +409,27 @@ export function PRAgent({ githubUser, onGoToRepo }) {
             : 'analices un repositorio en "Tu Repositorio"',
           '.'
         ),
+
+    // ── Autopiloto: sin objetivo, sin fin (dejar el modelo trabajando horas) ──
+    (!queue || queue.mode !== 'autopilot')
+      ? React.createElement('div', { style: { marginTop: '14px', padding: '12px 14px', border: '1px solid ' + C.border, borderRadius: '6px', background: C.canvasSubtle } },
+          React.createElement('div', { style: { fontSize: '13px', fontWeight: '600', color: C.fg, marginBottom: '6px' } }, 'Autopiloto'),
+          React.createElement('div', { style: { fontSize: '12px', color: C.fgMuted, marginBottom: '10px', lineHeight: '1.6' } },
+            'Deja el modelo trabajando durante horas: X1 decide por si mismo que construir, lo implementa (Estrategia → Desarrollo → Auditoria → Refinamiento → Direccion) y publica el PR — luego repite, indefinidamente, cada pocos minutos.'
+          ),
+          React.createElement('button', {
+            onClick: function () { startAutopilot(repoCtx); }, disabled: s.building || !repoCtx,
+            style: { padding: '6px 16px', borderRadius: '6px', border: '1px solid rgba(27,31,36,0.15)', background: s.building || !repoCtx ? C.canvasSubtle : C.accent, color: s.building || !repoCtx ? C.fgSubtle : '#ffffff', fontSize: '13px', fontWeight: '600', cursor: s.building || !repoCtx ? 'default' : 'pointer', fontFamily: F },
+          }, s.building ? 'Activando…' : 'Activar autopiloto'),
+          !repoCtx && React.createElement('div', { style: { fontSize: '11px', color: C.fgSubtle, marginTop: '6px' } }, 'Analiza un repositorio primero para que X1 sepa que construir.')
+        )
+      : React.createElement(Flash, { variant: 'success' }, 'Autopiloto en marcha desde hace ' + timeAgo(queue.createdAt) + ' — X1 sigue construyendo por su cuenta, sin limite de tiempo.'),
+
+    React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', margin: '16px 0 6px' } },
+      React.createElement('div', { style: { flex: 1, height: '1px', background: C.border } }),
+      React.createElement('span', { style: { fontSize: '11px', color: C.fgSubtle } }, 'o dale un objetivo concreto'),
+      React.createElement('div', { style: { flex: 1, height: '1px', background: C.border } })
+    ),
 
     // ── Input de objetivo ──
     React.createElement('div', { style: { marginTop: '14px', marginBottom: '14px' } },
@@ -456,7 +516,7 @@ export function PRAgent({ githubUser, onGoToRepo }) {
     ),
 
     // ── Cola de automatizacion en segundo plano ──
-    queue && queue.tareas && queue.tareas.length > 0 && React.createElement(BackgroundQueueView, { queue: queue, onCancel: handleCancelQueue, cancelling: cancelling }),
+    queue && (queue.mode === 'autopilot' || (queue.tareas && queue.tareas.length > 0)) && React.createElement(BackgroundQueueView, { queue: queue, onCancel: handleCancelQueue, onResume: handleResumeQueue, cancelling: cancelling }),
 
     // ── Revision de PRs abiertos (secundario) ──
     React.createElement('div', { style: { marginTop: '24px', paddingTop: '16px', borderTop: '1px solid ' + C.border } },

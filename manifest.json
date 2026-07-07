@@ -48,76 +48,139 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://mail.google.com/*"],
-      "js": ["content/gmail.js"],
+      "matches": [
+        "https://mail.google.com/*"
+      ],
+      "js": [
+        "content/gmail.js"
+      ],
       "run_at": "document_idle"
     },
     {
-      "matches": ["https://calendar.google.com/*"],
-      "js": ["content/calendar.js"],
+      "matches": [
+        "https://calendar.google.com/*"
+      ],
+      "js": [
+        "content/calendar.js"
+      ],
       "run_at": "document_idle"
     },
     {
-      "matches": ["https://docs.google.com/*"],
-      "js": ["content/docs.js"],
+      "matches": [
+        "https://docs.google.com/*"
+      ],
+      "js": [
+        "content/docs.js"
+      ],
       "run_at": "document_idle"
     },
     {
-      "matches": ["https://sheets.google.com/*"],
-      "js": ["content/sheets.js"],
+      "matches": [
+        "https://sheets.google.com/*"
+      ],
+      "js": [
+        "content/sheets.js"
+      ],
       "run_at": "document_idle"
     },
     {
-      "matches": ["https://meet.google.com/*"],
-      "js": ["content/meet.js"],
+      "matches": [
+        "https://meet.google.com/*"
+      ],
+      "js": [
+        "content/meet.js"
+      ],
       "run_at": "document_idle"
     },
     {
-      "matches": ["https://meet.google.com/*", "https://*.zoom.us/*", "https://teams.microsoft.com/*"],
-      "js": ["content/meeting-transcription.js"],
+      "matches": [
+        "https://meet.google.com/*",
+        "https://*.zoom.us/*",
+        "https://teams.microsoft.com/*"
+      ],
+      "js": [
+        "content/meeting-transcription.js"
+      ],
       "run_at": "document_idle"
     },
     {
-      "matches": ["https://*/*"],
-      "js": ["content/universal.js"],
+      "matches": [
+        "https://*/*"
+      ],
+      "js": [
+        "content/universal.js"
+      ],
       "run_at": "document_idle"
     },
     {
-      "matches": ["https://*/*", "http://*/*"],
-      "js": ["content/voice-listener.js"],
+      "matches": [
+        "https://*/*",
+        "http://*/*"
+      ],
+      "js": [
+        "content/voice-listener.js"
+      ],
       "run_at": "document_idle",
       "world": "MAIN"
     },
     {
-      "matches": ["https://*/*", "http://*/*"],
-      "js": ["content/floating-toolbar.js"],
+      "matches": [
+        "https://*/*",
+        "http://*/*"
+      ],
+      "js": [
+        "content/floating-toolbar.js"
+      ],
       "run_at": "document_idle",
       "world": "MAIN"
     },
     {
-      "matches": ["https://*/*", "http://*/*"],
-      "js": ["content/pointer-interaction.js"],
+      "matches": [
+        "https://*/*",
+        "http://*/*"
+      ],
+      "js": [
+        "content/pointer-interaction.js"
+      ],
       "run_at": "document_idle"
     },
     {
-      "matches": ["https://*/*", "http://*/*"],
-      "js": ["background/protocol.js"],
+      "matches": [
+        "https://*/*",
+        "http://*/*"
+      ],
+      "js": [
+        "background/protocol.js"
+      ],
       "run_at": "document_idle"
     },
     {
-      "matches": ["https://*/*", "http://*/*"],
-      "js": ["content/voice-bridge.js"],
+      "matches": [
+        "https://*/*",
+        "http://*/*"
+      ],
+      "js": [
+        "content/voice-bridge.js"
+      ],
       "run_at": "document_idle",
       "world": "ISOLATED"
     },
     {
-      "matches": ["https://drive.google.com/*"],
-      "js": ["content/drive.js"],
+      "matches": [
+        "https://drive.google.com/*"
+      ],
+      "js": [
+        "content/drive.js"
+      ],
       "run_at": "document_idle"
     },
     {
-      "matches": ["https://contacts.google.com/*"],
-      "js": ["content/contacts.js"],
+      "matches": [
+        "https://contacts.google.com/*"
+      ],
+      "js": [
+        "content/contacts.js"
+      ],
       "run_at": "document_idle"
     }
   ],
@@ -131,6 +194,6 @@
   },
   "action": {
     "default_icon": "assets/icon-128.png",
-    "default_title": "Abrir X1"
+    "default_title": "System X1"
   }
 }
