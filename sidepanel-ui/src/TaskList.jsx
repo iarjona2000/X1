@@ -1,3 +1,4 @@
+import * as React from 'react';
 import { Markdown } from './Markdown.jsx';
 
 var USER_BG = 'rgba(38,37,30,0.04)';

@@ -1,3 +1,5 @@
+import * as React from 'react';
+
 var STATUS_COLORS = {
   idle: 'rgba(38,37,30,0.15)',
   active: '#f54e00',

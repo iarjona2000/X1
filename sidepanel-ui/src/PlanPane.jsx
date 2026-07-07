@@ -1,3 +1,5 @@
+import * as React from 'react';
+
 var STATUS_ICONS = {
   pending: React.createElement('svg', { width: 12, height: 12, viewBox: '0 0 24 24', fill: 'none', stroke: 'rgba(38,37,30,0.25)', strokeWidth: 2 },
     React.createElement('circle', { cx: 12, cy: 12, r: 10 })

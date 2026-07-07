@@ -1,3 +1,4 @@
+import * as React from 'react';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { AGENTS, getBestAgent, smartQuery, hasEngine, detectSector, getJudgeReason } from './backend.js';
 import { getMemoryStore } from './tools.js';

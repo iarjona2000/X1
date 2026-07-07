@@ -1,3 +1,5 @@
+import * as React from 'react';
+
 var CLI_BG = '#1a1a2e';
 var CLI_FG = '#e0e0e0';
 var CLI_HEADER_BG = '#16162a';

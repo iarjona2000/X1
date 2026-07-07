@@ -1,3 +1,5 @@
+import * as React from 'react';
+
 export function Spinner({ className }) {
   return React.createElement('span', { className, role: 'status', 'aria-label': 'Working', style: { display: 'inline-flex' } },
     React.createElement('svg', { width: 14, height: 14, viewBox: '0 0 24 24', fill: 'none', className: 'animate-spin' },

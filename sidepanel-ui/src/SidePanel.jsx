@@ -1,3 +1,4 @@
+import * as React from 'react';
 import { useState, useCallback } from 'react';
 import { loadConversations, saveConversations, AGENTS } from './backend.js';
 import { ChatView } from './ChatView.jsx';

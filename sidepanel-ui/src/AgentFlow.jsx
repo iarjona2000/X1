@@ -1,3 +1,5 @@
+import * as React from 'react';
+
 var STEP_ICONS = {
   researching: React.createElement('svg', { width: 12, height: 12, viewBox: '0 0 24 24', fill: 'none', stroke: '#0070f3', strokeWidth: 2 },
     React.createElement('circle', { cx: 11, cy: 11, r: 8 }),
