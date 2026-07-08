@@ -56,12 +56,7 @@ export function RepoView({ conversations, githubUser }) {
 
   function connectGithub() {
     setConnecting(true);
-    B.startGithubDeviceFlow().then(function(flow) {
-      window.open(flow.verification_uri, 'github-device');
-      return B.pollGithubToken(flow.device_code);
-    }).then(function(token) {
-      return B.fetchGithubUser(token);
-    }).then(function(user) {
+    B.loginGithubOAuth().then(function(user) {
       setConnecting(false);
       if (user && user.login) {
         B.saveUser({ login: user.login, name: user.name, avatar_url: user.avatar_url, email: user.email });

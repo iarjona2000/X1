@@ -118,52 +118,9 @@
         "http://*/*"
       ],
       "js": [
-        "content/voice-listener.js"
-      ],
-      "run_at": "document_idle",
-      "world": "MAIN"
-    },
-    {
-      "matches": [
-        "https://*/*",
-        "http://*/*"
-      ],
-      "js": [
-        "content/floating-toolbar.js"
-      ],
-      "run_at": "document_idle",
-      "world": "MAIN"
-    },
-    {
-      "matches": [
-        "https://*/*",
-        "http://*/*"
-      ],
-      "js": [
-        "content/pointer-interaction.js"
-      ],
-      "run_at": "document_idle"
-    },
-    {
-      "matches": [
-        "https://*/*",
-        "http://*/*"
-      ],
-      "js": [
         "background/protocol.js"
       ],
       "run_at": "document_idle"
-    },
-    {
-      "matches": [
-        "https://*/*",
-        "http://*/*"
-      ],
-      "js": [
-        "content/voice-bridge.js"
-      ],
-      "run_at": "document_idle",
-      "world": "ISOLATED"
     },
     {
       "matches": [

@@ -6723,22 +6723,8 @@ chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
     return false;
   }
   if(msg.type==='X1_CLAP'){
-    getActiveTab().then(function(tab){
-      if(!tab||!tab.id) return;
-      chrome.tabs.sendMessage(tab.id, {type:'X1_TOGGLE'}).then(function(){
-        setTimeout(function(){ greetAndBrief(tab.id); }, 500);
-      }).catch(function(){
-        chrome.scripting.executeScript({target:{tabId:tab.id}, files:['content/voice-listener.js'], world:'MAIN'})
-          .then(function(){return chrome.scripting.executeScript({target:{tabId:tab.id}, files:['content/voice-bridge.js']});})
-          .then(function(){
-            setTimeout(function(){
-              chrome.tabs.sendMessage(tab.id,{type:'X1_TOGGLE'});
-              setTimeout(function(){ greetAndBrief(tab.id); }, 800);
-            },300);
-          })
-          .catch(function(e){console.error('[X1]',e);});
-      });
-    });
+    // Barra flotante de voz eliminada: el clap ya no inyecta ningun overlay
+    // en la pagina. Se deja como no-op para no reintroducir la floating bar.
     return false;
   }
   if(msg.type==='X1_OPEN_TERMINAL' && sender && sender.tab){

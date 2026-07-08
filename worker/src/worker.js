@@ -32,6 +32,20 @@ async function handleRequest(request, env, ctx) {
     });
   }
 
+  // GitHub OAuth code->token exchange. The extension shows the real GitHub
+  // login/authorize popup (chrome.identity.launchWebAuthFlow) and gets back
+  // an authorization `code`; exchanging that code for an access_token requires
+  // the app's client_secret, which must never live in extension code (a
+  // Chrome extension's source is fully readable by anyone who unpacks it —
+  // that's exactly how the previous secret ended up leaked). The worker holds
+  // it server-side instead. Placed BEFORE checkAuth deliberately: this is the
+  // login flow itself (the extension has no PROXY_SHARED_SECRET context to
+  // send yet at this point), it only costs GitHub API calls (not AI provider
+  // spend), and gating it here would make login always fail with 401.
+  if (url.pathname === '/github/exchange' && request.method === 'POST') {
+    return exchangeGithubCode(request, env);
+  }
+
   // Everything past this point costs money or leaks infra info — gate it.
   var authError = checkAuth(request, env);
   if (authError) return authError;
@@ -174,6 +188,37 @@ async function pollCommands(env) {
   try { queue = raw ? JSON.parse(raw) : []; } catch (e) { queue = []; }
   if (queue.length > 0) await env.X1_KV.put(COMMAND_QUEUE_KEY, JSON.stringify([]));
   return jsonResponse({ commands: queue });
+}
+
+// client_id is not secret (GitHub OAuth app IDs are public, and this one is
+// already embedded in the extension's authorize URL) — only the secret set
+// via `npx wrangler secret put GITHUB_CLIENT_SECRET` stays server-side.
+var GITHUB_CLIENT_ID = 'Ov23limUz0ywpxqoPJXo';
+
+async function exchangeGithubCode(request, env) {
+  if (!env.GITHUB_CLIENT_SECRET) {
+    return jsonResponse({ error: 'github_oauth_not_configured', hint: 'set GITHUB_CLIENT_SECRET via wrangler secret put' }, 503);
+  }
+  var body;
+  try { body = await request.json(); } catch (e) { return jsonResponse({ error: 'Invalid JSON' }, 400); }
+  if (!body || typeof body.code !== 'string' || !body.code) {
+    return jsonResponse({ error: 'code required' }, 400);
+  }
+  var res = await fetch('https://github.com/login/oauth/access_token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+    body: JSON.stringify({
+      client_id: GITHUB_CLIENT_ID,
+      client_secret: env.GITHUB_CLIENT_SECRET,
+      code: body.code,
+      redirect_uri: body.redirect_uri
+    })
+  });
+  var data = await res.json().catch(function () { return {}; });
+  if (!data.access_token) {
+    return jsonResponse({ error: data.error_description || data.error || 'exchange_failed' }, 400);
+  }
+  return jsonResponse({ access_token: data.access_token });
 }
 
 function providerStatus(env) {

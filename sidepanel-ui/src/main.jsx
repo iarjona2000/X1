@@ -39,37 +39,17 @@ function GithubMark({ size = 16, fill = '#ffffff' }) {
 function GithubLogin({ onUser, onGuest }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [mode, setMode] = useState('none');
-  const [deviceCode, setDeviceCode] = useState(null);
-  const [userCode, setUserCode] = useState('');
-  const [verifyUrl, setVerifyUrl] = useState('https://github.com/login/device');
+  const [showPat, setShowPat] = useState(false);
   const [pat, setPat] = useState('');
 
-  async function handleDeviceFlow() {
+  async function handleOAuth() {
     setError(''); setLoading(true);
     try {
-      const {
-        startGithubDeviceFlow,
-        pollGithubToken,
-        fetchGithubUser,
-        saveGithubUser
-      } = await import('./backend.js');
-      const flow = await startGithubDeviceFlow();
-      if (flow.error) {
-        throw new Error(flow.error_description || flow.error || 'Error en Device Flow');
-      }
-      setDeviceCode(flow.device_code);
-      setUserCode(flow.user_code);
-      setVerifyUrl(flow.verification_uri || 'https://github.com/login/device');
-      setMode('device');
-      try { chrome.tabs.create({ url: flow.verification_uri || 'https://github.com/login/device' }); } catch (e) {}
-      const token = await pollGithubToken(flow.device_code);
-      const user = await fetchGithubUser(token);
-      try { saveGithubUser(user, token); } catch (e) {}
+      const { loginGithubOAuth } = await import('./backend.js');
+      const user = await loginGithubOAuth();
       onUser(user);
     } catch (e) {
-      setError((e && e.message) || 'Device Flow no disponible. Usa el token personal abajo (crea uno en github.com/settings/tokens).');
-      setMode('none');
+      setError((e && e.message) || 'No se pudo conectar con GitHub.');
       setLoading(false);
     }
   }
@@ -78,9 +58,8 @@ function GithubLogin({ onUser, onGuest }) {
     if (!pat.trim()) { setError('Pega un token personal primero.'); return; }
     setError(''); setLoading(true);
     try {
-      const { fetchGithubUser, saveGithubUser } = await import('./backend.js');
+      const { fetchGithubUser } = await import('./backend.js');
       const user = await fetchGithubUser(pat.trim());
-      try { saveGithubUser(user, pat.trim()); } catch (e) {}
       onUser(user);
     } catch (e) {
       setError('Token invalido o sin permisos. Genera uno nuevo en github.com/settings/tokens');
@@ -98,26 +77,24 @@ function GithubLogin({ onUser, onGuest }) {
         React.createElement('div', { style: S.subtitle }, 'Accede para conectar tus repositorios.'),
         error && React.createElement('div', { style: S.error }, error),
 
-        mode === 'device' && userCode && React.createElement('div', { style: S.deviceBox },
-          React.createElement('div', { style: { fontSize: '13px', fontWeight: 600, color: '#1f2328', marginBottom: '6px' } }, '1. Abre esta URL en tu navegador'),
-          React.createElement('div', { style: { fontSize: '14px', color: '#0969da', wordBreak: 'break-all', marginBottom: '12px' } }, verifyUrl),
-          React.createElement('div', { style: { fontSize: '13px', fontWeight: 600, color: '#1f2328', marginBottom: '6px' } }, '2. Ingresa este codigo'),
-          React.createElement('div', { style: S.deviceCode }, userCode),
-          React.createElement('div', { style: { fontSize: '12px', color: '#59636e', textAlign: 'center' } }, 'Esperando autorizacion...'),
+        React.createElement('button', { onClick: handleOAuth, disabled: loading, style: { ...S.btnGH, opacity: loading ? 0.6 : 1 } },
+          React.createElement(GithubMark, { size: 16 }), loading ? 'Conectando…' : 'Continuar con GitHub'
         ),
 
-        mode === 'none' && React.createElement('div', null,
-          React.createElement('div', { style: S.label }, 'Personal Access Token (recomendado)'),
-          React.createElement('input', { type: 'password', value: pat, onChange: function(e) { setPat(e.target.value); }, placeholder: 'ghp_xxxxxxxxxxxxxxxxxxxx', style: S.input }),
-          React.createElement('button', { onClick: handlePat, disabled: loading || !pat.trim(), style: { ...S.btnPrimary, opacity: !pat.trim() ? 0.5 : 1 } }, 'Entrar con token'),
-          React.createElement('div', { style: { fontSize: '11px', color: '#818b98', marginTop: '6px' } }, 'Crea uno en github.com/settings/tokens (scope read:user user:email)'),
-          React.createElement('div', { style: S.divider }, React.createElement('div', { style: S.dividerLine }), React.createElement('span', null, 'o'), React.createElement('div', { style: S.dividerLine })),
-          React.createElement('button', { onClick: onGuest, style: S.btnSecondary },
-            'Continuar sin GitHub'
-          ),
-          React.createElement('div', { style: S.footnote },
-            'System X1 accede en modo lectura (read:user, user:email) cuando es posible. El token personal lo generas en github.com/settings/tokens.'
-          )
+        React.createElement('div', { style: S.divider }, React.createElement('div', { style: S.dividerLine }), React.createElement('span', null, 'o'), React.createElement('div', { style: S.dividerLine })),
+
+        !showPat
+          ? React.createElement('button', { onClick: function () { setShowPat(true); }, style: S.btnSecondary }, 'Usar un token personal')
+          : React.createElement('div', null,
+              React.createElement('div', { style: S.label }, 'Personal Access Token'),
+              React.createElement('input', { type: 'password', value: pat, onChange: function(e) { setPat(e.target.value); }, placeholder: 'ghp_xxxxxxxxxxxxxxxxxxxx', style: S.input }),
+              React.createElement('button', { onClick: handlePat, disabled: loading || !pat.trim(), style: { ...S.btnPrimary, opacity: !pat.trim() ? 0.5 : 1 } }, 'Entrar con token'),
+              React.createElement('div', { style: { fontSize: '11px', color: '#818b98', marginTop: '6px' } }, 'Crea uno en github.com/settings/tokens (scope read:user user:email)')
+            ),
+
+        React.createElement('button', { onClick: onGuest, style: { ...S.btnSecondary, marginTop: '8px' } }, 'Continuar sin GitHub'),
+        React.createElement('div', { style: S.footnote },
+          'System X1 accede en modo lectura (read:user, user:email) cuando es posible.'
         )
       )
     )

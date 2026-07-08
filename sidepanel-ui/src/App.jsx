@@ -180,12 +180,7 @@ export default function App({ githubUser }) {
                   <span style={{ fontSize: '12px', color: githubStatus ? '#1a7f37' : '#59636e', fontWeight: '500' }}>{githubStatus ? 'Conectado' : 'Desconectado'}</span>
                 </div>
                 <button onClick={githubStatus ? async () => { await B.logoutGithub(); setGithubStatus(false); } : function() {
-                  B.startGithubDeviceFlow().then(function(flow) {
-                    window.open(flow.verification_uri, 'github-device');
-                    return B.pollGithubToken(flow.device_code);
-                  }).then(function(token) {
-                    return B.fetchGithubUser(token);
-                  }).then(function(user) {
+                  B.loginGithubOAuth().then(function(user) {
                     if (user && user.login) setGithubStatus(true);
                   }).catch(function(e) {
                     console.error('[X1] GitHub connect error:', e);
