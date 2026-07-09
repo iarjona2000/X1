@@ -2,7 +2,7 @@ import * as React from 'react';
 import * as B from './backend.js';
 import { ProcessTask } from './components/ui/task';
 import { Markdown } from './Markdown.jsx';
-import { Trash2, Paperclip, ArrowUp, Plus } from 'lucide-react';
+import { Trash2, Paperclip, ArrowUp, Plus, Menu } from 'lucide-react';
 
 var MCP_AGENTS = [
   { id: 'mcp-context7',    name: 'Context7',    category: 'docs',     letter: 'C7', tools: ['resolve-library-id', 'query-docs'] },
@@ -66,29 +66,17 @@ function parseAgentMention(text) {
 }
 
 var VektorLogo = function(props) {
-  var size = props.size || 14;
-  var className = props.className || '';
-  var weight = props.weight || 700;
   return React.createElement('span', {
-    className: className,
-    style: {
-      fontFamily: "'Geist Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-      fontSize: size, fontWeight: weight, letterSpacing: '-0.03em',
-      lineHeight: 1, display: 'inline-block',
-    }
+    className: 'font-semibold tracking-tight text-gray-1000',
+    style: { fontSize: props.size || 14, fontFamily: 'inherit', letterSpacing: '-0.03em', lineHeight: 1 },
   }, 'Vektor');
 };
 
 var VektorAvatar = function(props) {
   var size = props.size || 24;
-  var className = props.className || '';
   return React.createElement('div', {
-    className: 'flex items-center justify-center shrink-0 rounded-full bg-gray-100 text-gray-100 ' + className,
-    style: {
-      width: size, height: size,
-      fontFamily: "'Geist Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-      fontSize: size * 0.5, fontWeight: 600, letterSpacing: '-0.024em',
-    }
+    className: 'flex items-center justify-center shrink-0 rounded-full bg-neutral-100 text-gray-900',
+    style: { width: size, height: size, fontSize: size * 0.5, fontWeight: 600, fontFamily: 'Geist Sans, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', letterSpacing: '-0.024em' },
   }, 'V');
 };
 
@@ -96,11 +84,11 @@ function ThinkingDots() {
   return (
     <div className="flex items-center gap-2 py-1">
       <div className="flex gap-1">
-        <span className="w-1.5 h-1.5 rounded-full bg-gray-1000 animate-pulse" style={{ animation: 'pulse 1.4s ease-in-out infinite' }}></span>
-        <span className="w-1.5 h-1.5 rounded-full bg-gray-1000 animate-pulse" style={{ animation: 'pulse 1.4s ease-in-out 0.2s infinite' }}></span>
-        <span className="w-1.5 h-1.5 rounded-full bg-gray-1000 animate-pulse" style={{ animation: 'pulse 1.4s ease-in-out 0.4s infinite' }}></span>
+        <span className="w-1.5 h-1.5 rounded-full bg-gray-900 animate-pulse" style={{ animation: 'pulse 1.4s ease-in-out infinite' }}></span>
+        <span className="w-1.5 h-1.5 rounded-full bg-gray-900 animate-pulse" style={{ animation: 'pulse 1.4s ease-in-out 0.2s infinite' }}></span>
+        <span className="w-1.5 h-1.5 rounded-full bg-gray-900 animate-pulse" style={{ animation: 'pulse 1.4s ease-in-out 0.4s infinite' }}></span>
       </div>
-      <span className="text-label-13 text-gray-500">Pensando...</span>
+      <span className="text-label-13 text-muted-foreground">Pensando\u2026</span>
     </div>
   );
 }
@@ -110,7 +98,7 @@ function ReasoningPanel({ msg }) {
   if (!msg.judgeReason) return null;
   return (
     <div className="mb-2">
-      <div onClick={function() { setOpen(function(v) { return !v; }); }} className="inline-flex items-center gap-1.5 cursor-pointer text-gray-500 select-none">
+      <div onClick={function() { setOpen(function(v) { return !v; }); }} className="inline-flex items-center gap-1.5 cursor-pointer text-muted-foreground select-none">
         <svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor">
           <path d="M8 0a8 8 0 110 16A8 8 0 018 0zM1.5 8a6.5 6.5 0 1013 0 6.5 6.5 0 00-13 0zm6.25-3.25v2.992l2.028.812a.75.75 0 01-.557 1.392l-2.5-1A.751.751 0 017.25 8.25v-3.5a.75.75 0 011.5 0z" />
         </svg>
@@ -118,7 +106,7 @@ function ReasoningPanel({ msg }) {
         <svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor" className="transition-transform" style={{ transform: open ? 'rotate(180deg)' : 'none' }}> <path d="M4.427 7.427l3.396 3.396a.25.25 0 00.354 0l3.396-3.396A.25.25 0 0011.396 7H4.604a.25.25 0 00-.177.427z" /> </svg>
       </div>
       {open && (
-        <div className="mt-1.5 pl-3 border-l border-gray-300 text-label-13 text-gray-500">
+        <div className="mt-1.5 pl-3 border-l border-neutral-300 text-label-13 text-muted-foreground">
           {msg.judgeReason}
         </div>
       )}
@@ -128,8 +116,8 @@ function ReasoningPanel({ msg }) {
 
 function ToolBadge({ tool }) {
   return (
-    <span className="geist-badge geist-badge-gray">
-      <span className="w-2.5 h-2.5 rounded-xs bg-gray-1000 text-white inline-flex items-center justify-center font-medium text-label-13">
+    <span className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-label-12 font-medium bg-neutral-100 text-gray-900">
+      <span className="w-2.5 h-2.5 rounded-sm bg-gray-900 text-white inline-flex items-center justify-center font-medium text-label-13">
         {(tool || '?')[0].toUpperCase()}
       </span>
       {tool}
@@ -142,7 +130,6 @@ export function ChatView({ conversations, activeConv, onSelectConv, onCreateConv
   var [hoveredConvId, setHoveredConvId] = React.useState(null);
   var [text, setText] = React.useState('');
   var textRef = React.useRef('');
-  var taRef = React.useRef(null);
   var composerRef = React.useRef(null);
   var [busy, setBusy] = React.useState(false);
   var [activeAgent, setActiveAgent] = React.useState('auto');
@@ -152,6 +139,7 @@ export function ChatView({ conversations, activeConv, onSelectConv, onCreateConv
   var safetyRef = React.useRef(null);
   var clearProcRef = React.useRef(null);
   var busyRef = React.useRef(false);
+  var [showMobileMenu, setShowMobileMenu] = React.useState(false);
 
   React.useEffect(function() { busyRef.current = busy; }, [busy]);
 
@@ -159,15 +147,12 @@ export function ChatView({ conversations, activeConv, onSelectConv, onCreateConv
     if (logRef.current) logRef.current.scrollTo({ top: logRef.current.scrollHeight, behavior: 'smooth' });
   }, [activeConv && activeConv.messages && activeConv.messages.length, activeConv && activeConv.messages && activeConv.messages.length > 0 && activeConv.messages[activeConv.messages.length - 1].content]);
 
-  React.useEffect(function() {
-    if (!taRef.current) return;
-    taRef.current.style.height = 'auto';
-    taRef.current.style.height = Math.min(taRef.current.scrollHeight, 330) + 'px';
-  }, [text]);
-
   function handleComposerClick(e) {
     if (composerRef.current && composerRef.current.contains(e.target)) return;
-    if (taRef.current) taRef.current.focus();
+    if (composerRef.current) {
+      var editable = composerRef.current.querySelector('[contentEditable="true"]');
+      if (editable) editable.focus();
+    }
   }
 
   function patchMsg(convId, msgId, patch) {
@@ -183,7 +168,7 @@ export function ChatView({ conversations, activeConv, onSelectConv, onCreateConv
   }
 
   function send(input) {
-    var q = (input || textRef.current).trim();
+    var q = (input || textRef.current || '').trim();
     if (!q || busyRef.current) return;
 
     var mention = parseAgentMention(q);
@@ -194,7 +179,6 @@ export function ChatView({ conversations, activeConv, onSelectConv, onCreateConv
     var conv = activeConv || (onEnsureConv && onEnsureConv());
     if (!conv) return;
     setBusy(true); setText(''); textRef.current = '';
-    if (taRef.current) taRef.current.style.height = 'auto';
     if (clearProcRef.current) clearTimeout(clearProcRef.current);
 
     var agentId = activeMCPAgent || (activeAgent === 'auto' ? B.getBestAgent(q) : activeAgent);
@@ -268,13 +252,12 @@ export function ChatView({ conversations, activeConv, onSelectConv, onCreateConv
   React.useEffect(function() { if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) { chrome.runtime.sendMessage({ type: 'X1_AUTH_CHECK_GOOGLE' }, function(r) { if (!chrome.runtime.lastError && r) { setGoogleOk(r.logged); if (r.user) setGoogleUser(r.user); } }); } }, []);
 
   return (
-    <div className="flex h-full overflow-hidden">
-
-      {/* ═══ SIDEBAR — v0: w-64, bg-background-200, border-r ═══ */}
-      <div className="flex flex-col w-64 border-r border-gray-200 flex-shrink-0" style={{ background: 'var(--color-v0-background-200)' }}>
+    <div className="flex h-full overflow-hidden bg-neutral-50">
+      {/* ═══ SIDEBAR — v0: w-64, bg-neutral-50, border-r neutral-200 ═══ */}
+      <div className="flex flex-col w-64 border-r border-neutral-200 flex-shrink-0 bg-neutral-50">
         {/* New conversation */}
         <div className="p-4 pb-3">
-          <button onClick={onCreateConv} className="geist-btn geist-btn-primary geist-btn-sm w-full">
+          <button onClick={onCreateConv} className="inline-flex items-center justify-center gap-2 rounded-md px-4 py-2 text-button-14 font-medium transition-colors bg-blue-600 text-white hover:bg-blue-700 w-full">
             <Plus size={14} />
             Nueva conversacion
           </button>
@@ -293,79 +276,101 @@ export function ChatView({ conversations, activeConv, onSelectConv, onCreateConv
                 onClick={function() { onSelectConv(c.id); }}
                 onMouseEnter={function() { setHoveredConvId(c.id); }}
                 onMouseLeave={function() { setHoveredConvId(null); }}
-                className={"cursor-pointer rounded-md p-3 mb-0.5 transition-all " + (isActive ? "bg-white shadow-base" : "hover:bg-gray-100")}
+                className={"cursor-pointer rounded-md p-3 mb-0.5 transition-colors " + (isActive ? "bg-white shadow-sm" : "hover:bg-neutral-100")}
               >
                 <div className="flex items-center justify-between mb-0.5">
-                  <div className="flex-1 truncate text-sm font-medium text-gray-1000">{c.title || 'Nueva conversacion'}</div>
+                  <div className="flex-1 truncate text-sm font-medium text-gray-900">{c.title || 'Nueva conversacion'}</div>
                   {onDeleteConv && (isHovered || isConfirming) && (
-                    <button
+<button
                       onClick={function(e) {
                         e.stopPropagation();
                         if (isConfirming) { onDeleteConv(c.id); setConfirmDeleteId(null); }
                         else { setConfirmDeleteId(c.id); }
                       }}
-                      className={"ml-1.5 flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold transition-all " + (isConfirming ? "bg-gray-1000 text-white" : "text-gray-500 hover:text-gray-1000")}
+                      className={isConfirming ? "ml-1.5 flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold transition-colors bg-gray-900 text-white" : "ml-1.5 flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold transition-colors text-muted-foreground hover:text-gray-900"}
                     >
                       <Trash2 size={10} />
                       {isConfirming ? 'Eliminar' : null}
                     </button>
                   )}
                 </div>
-                <div className="truncate text-xs text-gray-500">{preview}</div>
-                {msgCount > 0 && <span className="text-[11px] text-gray-400">{msgCount} msg</span>}
+                <div className="truncate text-xs text-muted-foreground">{preview}</div>
+                {msgCount > 0 && <span className="text-[11px] text-muted-foreground">{msgCount} msg</span>}
               </div>
             );
           })}
           {conversations.length === 0 && (
-            <div className="px-4 py-6 text-center text-xs text-gray-400">No hay conversaciones</div>
+            <div className="px-4 py-6 text-center text-xs text-muted-foreground">No hay conversaciones</div>
           )}
         </div>
       </div>
 
       {/* ═══ CHAT AREA ═══ */}
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-
         {/* ── Header — v0: h-[50px], px-3, hairline-b ── */}
-        <header className="relative z-20 flex w-full shrink-0 items-center justify-between px-3 h-[50px] hairline-b" style={{ background: 'var(--color-v0-background-100)' }}>
-          <div className="flex min-w-0 items-center">
-            <div className="flex items-center gap-2 mr-1">
-              <VektorLogo size={16} className="text-gray-1000" />
-              <span className="text-label-12 text-gray-400">{agent.name}</span>
-            </div>
+        <header className="relative z-20 flex w-full shrink-0 items-center justify-between px-3 h-[50px] border-b border-neutral-200 bg-white">
+          <div className="flex min-w-0 items-center gap-2">
+            <VektorLogo size={16} />
+            <span className="text-label-12 text-muted-foreground">{agent.name}</span>
           </div>
           <div className="flex flex-1 items-center justify-end">
-            <div className="flex gap-2 items-center">
-              <div
-                className="cursor-pointer rounded-md p-1.5 transition-colors hover-bg-gray-100"
-                onClick={googleOk ? null : async function() { var r = await B.loginGoogle(); if (r) { setGoogleOk(true); setGoogleUser({email:r.email,name:r.name,picture:r.picture}); } }}
-                title={googleOk && googleUser ? googleUser.email : 'Conectar Google'}
-              >
-                <svg viewBox="0 0 24 24" width="16" height="16" fill={googleOk ? '#28a948' : 'var(--color-v0-gray-400)'}>
-                  <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" />
-                  <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-                  <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
-                  <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
-                </svg>
+            <div className="hidden md:flex flex-1 items-center gap-4 justify-between">
+              <nav className="flex items-center gap-1">
+                {AGENTS.map(function(a) {
+                  var isActive = activeAgent === a.id;
+                  return (
+                    <button
+                      key={a.id}
+                      onClick={function() { setActiveAgent(a.id); setActiveMCPAgent(null); }}
+                      className={isActive
+                        ? "inline-flex items-center justify-center rounded-md px-2 py-1 text-sm font-medium transition-colors bg-neutral-100 text-gray-900"
+                        : "inline-flex items-center justify-center rounded-md px-2 py-1 text-sm font-medium transition-colors text-muted-foreground hover:bg-neutral-100 hover:text-gray-900"}
+                    >
+                      {a.name}
+                    </button>
+                  );
+                })}
+              </nav>
+              <div className="flex items-center gap-2">
+                <div
+                  className="cursor-pointer rounded-md p-1.5 transition-colors hover:bg-neutral-100"
+                  onClick={googleOk ? null : async function() { var r = await B.loginGoogle(); if (r) { setGoogleOk(true); setGoogleUser({email:r.email,name:r.name,picture:r.picture}); } }}
+                  title={googleOk && googleUser ? googleUser.email : 'Conectar Google'}
+                >
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill={googleOk ? '#28a948' : 'currentColor'} className="text-muted-foreground">
+                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" />
+                    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
+                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
+                  </svg>
+                </div>
               </div>
             </div>
+            <button
+              className="md:hidden inline-flex items-center justify-center rounded-lg p-2 text-muted-foreground hover:bg-neutral-100"
+              onClick={function() { setShowMobileMenu(!showMobileMenu); }}
+              aria-label="Open menu"
+            >
+              <Menu size={20} />
+            </button>
           </div>
         </header>
 
         {googleError && (
-          <div className="border-b border-gray-200 bg-red-50 px-5 py-1.5 text-xs text-red-700">{googleError}</div>
+          <div className="border-b border-neutral-200 bg-red-500/10 px-5 py-1.5 text-xs text-red-600">{googleError}</div>
         )}
 
-        {/* ── Messages — v0: centered, gap-16 ── */}
-        <div ref={logRef} className="relative flex min-w-0 flex-1 flex-col overflow-y-auto" style={{ background: 'var(--color-v0-background-200)' }}>
+        {/* ── Messages — v0: centered, gap-16 lg:gap-32 ── */}
+        <div ref={logRef} className="relative flex min-w-0 flex-1 flex-col overflow-y-auto bg-neutral-50">
           <div className="@container/page-layout relative mt-0">
             <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-8">
               {msgs.length === 0 ? (
                 <main className="z-0 flex w-full flex-col sm:px-6 px-3 gap-16 lg:gap-32">
-                  <div className="relative mx-auto flex w-full flex-col gap-4 min-h-[156.5px] md:min-h-[164.5px] pt-16 lg:pt-24">
-                    <h1 className="text-center text-gray-1000 text-heading-24 md:text-heading-32 text-balance">Vektor</h1>
-                    <div className="max-w-[690px] mx-auto w-full">
-                      <div className="text-center text-copy-md text-gray-500" style={{ lineHeight: '26px' }}>
-                        Preguntame lo que quieras. Usa <span className="font-mono font-semibold text-gray-1000">#</span> para agentes especializados.
+                  <div className="-mt-8 lg:-mt-12 relative mx-auto flex w-full flex-col gap-4 min-h-[156.5px] md:min-h-[164.5px] pt-32 lg:pt-48">
+                    <h1 className="text-center text-gray-900 text-heading-24 md:text-heading-32 text-balance">Vektor</h1>
+                    <div className="group/form-container content-center relative mx-auto w-full max-w-[690px]">
+                      <div className="text-center text-copy-14 text-muted-foreground">
+                        Preguntame lo que quieras. Usa <span className="font-mono font-semibold text-gray-900">#</span> para agentes especializados.
                       </div>
                     </div>
                   </div>
@@ -380,7 +385,7 @@ export function ChatView({ conversations, activeConv, onSelectConv, onCreateConv
                         <div key={m.id} className="flex flex-col">
                           {m.role === 'user' ? (
                             <div className="flex justify-end">
-                              <div className="max-w-2xl rounded-xl bg-gray-1000 text-white px-5 py-3 text-label-14 whitespace-pre-wrap break-words" style={{ lineHeight: '20px' }}>
+                              <div className="max-w-2xl rounded-xl bg-gray-900 text-white px-5 py-3 text-label-14 whitespace-pre-wrap break-words" style={{ lineHeight: '20px' }}>
                                 {m.content}
                               </div>
                             </div>
@@ -389,16 +394,16 @@ export function ChatView({ conversations, activeConv, onSelectConv, onCreateConv
                               <VektorAvatar size={24} />
                               <div className="min-w-0 flex-1">
                                 <div className="mb-1.5 flex items-center gap-2">
-                                  <span className="text-label-14 font-semibold text-gray-1000">{mAgent.name}</span>
-                                  <span className="text-label-12 text-gray-400">{mAgent.ai}</span>
-                                  {elapsed != null && <span className="text-label-12 text-gray-400">{elapsed}s</span>}
+                                  <span className="text-label-14 font-semibold text-gray-900">{mAgent.name}</span>
+                                  <span className="text-label-12 text-muted-foreground">{mAgent.ai}</span>
+                                  {elapsed != null && <span className="text-label-12 text-muted-foreground">{elapsed}s</span>}
                                 </div>
                                 {m.status === 'thinking' ? (
                                   <ThinkingDots />
                                 ) : m.status === 'done' && m.content ? (
                                   <div>
                                     <ReasoningPanel msg={m} />
-                                    <div className="text-copy-md text-gray-1000" style={{ lineHeight: '26px' }}>
+                                    <div className="text-copy-14 text-gray-900" style={{ lineHeight: '22px' }}>
                                       <Markdown text={m.content} />
                                     </div>
                                     {m.toolsUsed && m.toolsUsed.length > 0 && (
@@ -438,44 +443,62 @@ export function ChatView({ conversations, activeConv, onSelectConv, onCreateConv
           </div>
         </div>
 
-        {/* ═══ COMPOSER — v0: rounded-xl, material-medium, bg-background-300, border-gray-400 ═══ */}
-        <div className="relative flex w-full flex-col items-center" style={{ background: 'var(--color-v0-background-200)', padding: '0 16px 16px' }}>
+        {/* ═══ COMPOSER — v0: rounded-xl, material-medium, bg-neutral-100, border-neutral-300 ═══ */}
+        <div className="relative flex w-full flex-col items-center bg-neutral-50" style={{ padding: '0 16px 16px' }}>
           <div
             ref={composerRef}
             onClick={handleComposerClick}
-            className="@container/composer z-20 relative rounded-xl overflow-visible material-medium cursor-text p-3 w-full max-w-2xl"
+            className="@container/composer z-20 relative rounded-xl overflow-visible cursor-text p-3 w-full max-w-2xl"
             style={{
-              background: 'var(--color-v0-background-300)',
-              border: '1px solid var(--color-v0-gray-400)',
+              background: 'oklch(0.97 0 0)',
+              border: '1px solid oklch(0.922 0 0)',
               minHeight: 108,
               transition: 'border-color 200ms cubic-bezier(0.31, 0.1, 0.08, 0.96)',
+              boxShadow: '0 4px 8px -2px rgba(0,0,0,.06), 0 2px 4px -2px rgba(0,0,0,.04), 0 0 0 1px rgba(0,0,0,.04)',
             }}
           >
             {activeMCPAgent && (
-              <div className="mb-2 inline-flex items-center gap-1.5 rounded-md bg-gray-100 px-2.5 py-1 text-xs text-gray-1000">
+              <div className="mb-2 inline-flex items-center gap-1.5 rounded-md bg-neutral-100 px-2.5 py-1 text-xs text-gray-900">
                 <span className="font-semibold">#</span>
                 <span>{(MCP_AGENTS.find(function(a){return a.id===activeMCPAgent})||{}).name}</span>
-                <button onClick={function(e) { e.stopPropagation(); setActiveMCPAgent(null); }} className="ml-0.5 border-none bg-transparent text-gray-500 cursor-pointer text-xs">x</button>
+                <button onClick={function(e) { e.stopPropagation(); setActiveMCPAgent(null); }} className="ml-0.5 border-none bg-transparent text-muted-foreground cursor-pointer text-xs">x</button>
               </div>
             )}
-            <textarea
-              ref={taRef}
-              value={text}
-              onChange={function(e) { setText(e.target.value); textRef.current = e.target.value; }}
-              placeholder={activeMCPAgent ? 'MCP: ' + (MCP_AGENTS.find(function(a){return a.id===activeMCPAgent})||{}).name + '...' : 'Escribe tu pregunta...'}
-              rows={1}
-              className="w-full bg-transparent text-label-14 border-none outline-none min-h-[54px] max-h-[330px] pb-2"
-              style={{ resize: 'none', color: 'var(--color-v0-gray-1000)', fontFamily: 'inherit', letterSpacing: '-0.011em' }}
-              onKeyDown={function(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
+            <div
+              contentEditable={true}
+              role="textbox"
+              aria-multiline={true}
+              data-prompt-text={text}
+              data-placeholder={activeMCPAgent ? 'MCP: ' + (MCP_AGENTS.find(function(a){return a.id===activeMCPAgent})||{}).name + '\u2026' : 'Escribe tu pregunta\u2026'}
+              className="max-h-[330px] w-full overflow-y-auto bg-transparent text-label-14 border-none outline-none pb-2 min-h-[54px]"
+              style={{
+                fontFamily: 'inherit',
+                letterSpacing: '-0.011em',
+                fontVariantLigatures: 'none',
+                fontFeatureSettings: '"liga" 0',
+                color: 'oklch(0.145 0 0)',
+              }}
+              onInput={function(e) {
+                var val = e.target.textContent || '';
+                setText(val);
+                textRef.current = val;
+              }}
+              onKeyDown={function(e) {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  send();
+                }
+              }}
+              dangerouslySetInnerHTML={{ __html: text }}
             />
             <div className="flex items-center justify-between">
-              <button className="geist-btn-ghost inline-flex items-center justify-center gap-1.5 text-gray-500 hover:text-gray-1000" title="Adjuntar" style={{ height: 28, padding: '0 8px', borderRadius: 6 }}>
+              <button className="inline-flex items-center justify-center rounded-md p-1.5 text-muted-foreground hover:bg-neutral-200 transition-colors" title="Adjuntar">
                 <Paperclip size={16} />
               </button>
-              <button
+<button
                 onClick={function() { send(); }}
                 disabled={!text.trim() || busy}
-                className="inline-flex items-center justify-center rounded-full bg-gray-1000 text-white transition-colors disabled:bg-gray-300 disabled:text-gray-500"
+                className="inline-flex items-center justify-center rounded-full bg-gray-900 text-white transition-colors disabled:bg-neutral-300 disabled:text-neutral-500"
                 style={{ width: 32, height: 32, border: 'none', cursor: text.trim() && !busy ? 'pointer' : 'not-allowed' }}
                 title="Enviar"
               >
@@ -484,7 +507,7 @@ export function ChatView({ conversations, activeConv, onSelectConv, onCreateConv
             </div>
           </div>
 
-          {/* Agent pills — v0: refined, below composer */}
+          {/* Agent pills — v0: pills with proper styling */}
           <div className="mt-3 flex flex-wrap items-center justify-center" style={{ gap: 6 }}>
             {AGENTS.map(function(a) {
               var isActive = activeAgent === a.id;
@@ -492,15 +515,17 @@ export function ChatView({ conversations, activeConv, onSelectConv, onCreateConv
                 <button
                   key={a.id}
                   onClick={function() { setActiveAgent(a.id); setActiveMCPAgent(null); }}
-                  className={"geist-btn geist-btn-sm " + (isActive ? "geist-btn-primary" : "geist-btn-secondary")}
+                  className={isActive
+                    ? "inline-flex items-center justify-center rounded-md px-3 py-1.5 text-sm font-medium transition-colors bg-gray-900 text-white"
+                    : "inline-flex items-center justify-center rounded-md px-3 py-1.5 text-sm font-medium transition-colors bg-neutral-100 text-gray-900 hover:bg-neutral-200"}
                 >
                   {a.name}
                 </button>
               );
             })}
           </div>
-          <div className="mt-2 text-center text-label-12 text-gray-400">
-            Usa <span className="font-mono font-semibold text-gray-1000">#</span> para agentes especializados
+          <div className="mt-2 text-center text-label-12 text-muted-foreground">
+            Usa <span className="font-mono font-semibold text-gray-900">#</span> para agentes especializados
           </div>
         </div>
       </div>
