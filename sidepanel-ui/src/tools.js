@@ -29,7 +29,7 @@ export function addMemory(role, content) {
 
 export function getMemoryContext() {
   return memoryStore.slice(-8).map(m =>
-    (m.role === 'user' ? 'Usuario' : 'X1') + ': ' + m.content
+    (m.role === 'user' ? 'Usuario' : 'Vektor') + ': ' + m.content
   ).join('\n');
 }
 

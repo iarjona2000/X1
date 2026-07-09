@@ -4,14 +4,14 @@ import { githubSearch, npmSearch, stackOverflowSearch } from './tools.js';
 // ── Automatizacion de repositorios de GitHub ──
 // 1) Analisis exhaustivo de un repo (analyzeRepo).
 // 2) Revision de PRs abiertos con panel+juez (reviewPRDiff).
-// 3) Constructor autonomo: dado un objetivo en texto libre, X1 lo interpreta
+// 3) Constructor autonomo: dado un objetivo en texto libre, Vektor lo interpreta
 //    usando el analisis previo del repo, lo divide en tareas concretas
 //    (una si el objetivo ya es concreto, varias si es amplio: "arregla todos
 //    los problemas"), y para cada tarea investiga (GitHub/npm/StackOverflow +
 //    una URL si lo decide), consulta el panel de IAs, propone cambios de
 //    fichero y PUBLICA la rama + PR automaticamente — sin pedir confirmacion.
 // Cada fase reporta pasos estructurados via onStep({id,title,detail,status,why})
-// para que la UI (ProcessLog) muestre siempre donde esta X1, que IA respondio
+// para que la UI (ProcessLog) muestre siempre donde esta Vektor, que IA respondio
 // y por que — nunca debe quedar una fase muda mas de un instante.
 
 var GH = 'https://api.github.com';
@@ -41,20 +41,20 @@ var PROVIDER_LABELS = {
 };
 function providerLabel(id) { return PROVIDER_LABELS[id] || (id ? id : 'IA'); }
 
-var AGENT_SYSTEM_PROMPT = 'Eres X1, un agente de automatizacion de software. Responde SIEMPRE en espanol, de forma directa y sin relleno conversacional. Sigue el formato EXACTO que pida cada instruccion (si se pide JSON puro, responde solo JSON, sin fences de markdown ni texto antes o despues).';
+var AGENT_SYSTEM_PROMPT = 'Eres Vektor, un agente de automatizacion de software. Responde SIEMPRE en espanol, de forma directa y sin relleno conversacional. Sigue el formato EXACTO que pida cada instruccion (si se pide JSON puro, responde solo JSON, sin fences de markdown ni texto antes o despues).';
 
 // Cada fase de la construccion de codigo pasa por un "sector" distinto —
 // igual que backend.js hace para el chat (ver SECTOR_PROMPTS/AGENTS ahi) —
-// para que quede claro que X1 no es una unica llamada a IA, sino una
+// para que quede claro que Vektor no es una unica llamada a IA, sino una
 // orquestacion: Desarrollo escribe un borrador, Auditoria de Codigo lo
 // revisa con un rol critico independiente, y Refinamiento incorpora esa
 // revision en la version final. Mismos sectores que usa el continuador en
 // segundo plano (background/service-worker.js) para que la experiencia sea
 // identica dure la tarea 30s o se procese horas despues en la cola.
 var SECTOR_PROMPTS = {
-  developer: 'Eres X1 en el sector Desarrollo, un arquitecto de software senior. Escribe codigo production-ready, completo y funcional. Responde EN ESPAÑOL solo con el JSON exacto que se te pida, sin texto ni markdown alrededor.',
-  reviewer: 'Eres X1 en el sector Auditoria de Codigo, un revisor senior extremadamente riguroso. Busca bugs, vulnerabilidades, malas practicas, casos sin cubrir y codigo incompleto en lo que te pasen. Responde EN ESPAÑOL de forma directa: una lista breve de problemas concretos, o "Sin problemas relevantes" si esta bien.',
-  refiner: 'Eres X1 en el sector Refinamiento, encargado de incorporar el feedback de una auditoria en la version final del codigo. Responde EN ESPAÑOL solo con el JSON exacto que se te pida, sin texto ni markdown alrededor.',
+  developer: 'Eres Vektor en el sector Desarrollo, un arquitecto de software senior. Escribe codigo production-ready, completo y funcional. Responde EN ESPA\u00d1OL solo con el JSON exacto que se te pida, sin texto ni markdown alrededor.',
+  reviewer: 'Eres Vektor en el sector Auditoria de Codigo, un revisor senior extremadamente riguroso. Busca bugs, vulnerabilidades, malas practicas, casos sin cubrir y codigo incompleto en lo que te pasen. Responde EN ESPA\u00d1OL de forma directa: una lista breve de problemas concretos, o "Sin problemas relevantes" si esta bien.',
+  refiner: 'Eres Vektor en el sector Refinamiento, encargado de incorporar el feedback de una auditoria en la version final del codigo. Responde EN ESPA\u00d1OL solo con el JSON exacto que se te pida, sin texto ni markdown alrededor.',
 };
 
 // Llama al proxy directamente (fetch desde el sidepanel, sin pasar por el
@@ -115,7 +115,7 @@ export function fetchPRDiff(token, owner, repo, number) {
 export function reviewPRDiff(title, diff) {
   var analysis = loadRepoAnalysis();
   var context = analysis && analysis.report
-    ? '\n\nContexto del repositorio (analisis previo de X1):\n' + String(analysis.report).slice(0, 1500) + '\n'
+    ? '\n\nContexto del repositorio (analisis previo de Vektor):\n' + String(analysis.report).slice(0, 1500) + '\n'
     : '';
   var prompt =
     'Actua como revisor de codigo senior. Revisa este Pull Request y responde en espanol con este formato:\n' +
@@ -224,7 +224,7 @@ export function analyzeRepo(token, owner, repo, meta, files, onStep) {
     .slice(0, 4);
 
   if (keyFiles.length === 0) {
-    emit(onStep, { id: 'nokeys', title: 'Sin ficheros clave en la raiz', status: 'done', detail: 'No hay README/package.json/etc en el nivel superior; X1 analizara solo con el arbol de ficheros.' });
+    emit(onStep, { id: 'nokeys', title: 'Sin ficheros clave en la raiz', status: 'done', detail: 'No hay README/package.json/etc en el nivel superior; Vektor analizara solo con el arbol de ficheros.' });
   }
 
   var readSteps = keyFiles.map(function (f) { return { id: 'read:' + f.path, title: 'Leyendo ' + f.path, status: 'active' }; });
@@ -248,7 +248,7 @@ export function analyzeRepo(token, owner, repo, meta, files, onStep) {
   ).then(function (contents) {
     emit(onStep, {
       id: 'ai', title: 'Consultando panel de IA (varios modelos + arbitro)', status: 'active',
-      why: 'Con el arbol y los ficheros clave ya leidos, X1 pide un informe conciso: proposito, stack, arquitectura, riesgos y recomendaciones.',
+      why: 'Con el arbol y los ficheros clave ya leidos, Vektor pide un informe conciso: proposito, stack, arquitectura, riesgos y recomendaciones.',
     });
     var tree = files.slice(0, 100).map(function (f) { return f.path; }).join('\n');
     var prompt =
@@ -338,13 +338,28 @@ function extractJSON(txt) {
     try {
       var fixed = m[0].replace(/,\s*}/g, '}').replace(/,\s*]/g, ']');
       return JSON.parse(fixed);
-    } catch (e2) { return null; }
+    }
+    catch (e2) {
+      try {
+        var start = m[0].indexOf('{');
+        var depth = 0;
+        for (var i = start; i < m[0].length; i++) {
+          if (m[0][i] === '{') depth++;
+          else if (m[0][i] === '}') depth--;
+          if (depth === 0) {
+            var candidate = m[0].slice(start, i + 1);
+            return JSON.parse(candidate);
+          }
+        }
+      } catch (e3) {}
+      return null;
+    }
   }
 }
 
 // ── Constructor autonomo ──
 // Dado un objetivo en texto libre (+ opcionalmente contexto de un repo ya
-// analizado), X1: 1) interpreta el objetivo y lo divide en tareas concretas
+// analizado), Vektor: 1) interpreta el objetivo y lo divide en tareas concretas
 // (usando el analisis de riesgos/recomendaciones del repo si el objetivo es
 // amplio, p.ej. "arregla todos los problemas"), 2) por cada tarea investiga
 // en GitHub/npm/StackOverflow y, si lo decide, lee una URL, 3) genera una
@@ -355,7 +370,7 @@ export function runAutoBuild(goal, repoCtx, onStep) {
   emit(onStep, { id: 'plan', title: 'Entendiendo el objetivo', status: 'active', detail: '"' + goal + '"' });
 
   var repoBlock = repoCtx
-    ? '\nRepositorio de referencia: ' + repoCtx.repo + '\nInforme de analisis previo de X1 (usalo para identificar problemas CONCRETOS si el objetivo es amplio):\n' + String(repoCtx.report || '').slice(0, 4000) + '\n'
+    ? '\nRepositorio de referencia: ' + repoCtx.repo + '\nInforme de analisis previo de Vektor (usalo para identificar problemas CONCRETOS si el objetivo es amplio):\n' + String(repoCtx.report || '').slice(0, 4000) + '\n'
     : '\n(No hay un repositorio de referencia seleccionado; propon una investigacion util igualmente, sin poder detallar problemas concretos de codigo.)\n';
 
   var planPrompt =
@@ -399,7 +414,7 @@ export function runAutoBuild(goal, repoCtx, onStep) {
         return startBackgroundQueue(queue).then(function () {
           emit(onStep, {
             id: 'queue', title: 'Cola en segundo plano activada', status: 'done',
-            detail: queued.length + ' tarea(s) mas pendientes — X1 seguira trabajando aunque cierres el sidepanel',
+            detail: queued.length + ' tarea(s) mas pendientes — Vektor seguira trabajando aunque cierres el sidepanel',
             why: 'Cada tarea restante se procesa cada 15-25 minutos (una a la vez, para poder revisar cada Pull Request) durante las proximas horas. Consulta el progreso en "Cola de automatizacion" mas abajo.',
           });
           return proposal;
@@ -413,30 +428,55 @@ export function runAutoBuild(goal, repoCtx, onStep) {
   });
 }
 
+// chrome.runtime.sendMessage nunca resuelve su callback si el service worker
+// (MV3, se apaga tras ~30s inactivo) muere a mitad de procesar el mensaje —
+// la promesa se queda colgada para siempre y la UI queda con un spinner sin
+// forma de cancelar. Con timeout, si no hay respuesta en 12s asumimos que el
+// SW se durmió y devolvemos null/false para que quien llama pueda reaccionar
+// (reintentar, avisar) en vez de quedarse esperando indefinidamente.
+function sendMessageWithTimeout(message, timeoutMs) {
+  return new Promise(function (resolve) {
+    var settled = false;
+    var timer = setTimeout(function () {
+      if (settled) return;
+      settled = true;
+      resolve({ ok: false, timedOut: true });
+    }, timeoutMs || 12000);
+    try {
+      chrome.runtime.sendMessage(message, function (resp) {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        resolve(resp || { ok: true });
+      });
+    } catch (e) {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve({ ok: false, error: e && e.message });
+    }
+  });
+}
+
 // Envia la cola al service worker para que la procese en segundo plano via
 // chrome.alarms — sigue corriendo aunque se cierre el sidepanel.
 function startBackgroundQueue(queue) {
-  return new Promise(function (resolve) {
-    try {
-      chrome.runtime.sendMessage({ type: 'X1_AUTOMATION_QUEUE_START', queue: queue }, function () { resolve(); });
-    } catch (e) { resolve(); }
-  });
+  return sendMessageWithTimeout({ type: 'X1_AUTOMATION_QUEUE_START', queue: queue });
 }
 
 // Lee el estado actual de la cola de automatizacion en segundo plano.
 export function getBackgroundQueue() {
-  return new Promise(function (resolve) {
-    try {
-      chrome.runtime.sendMessage({ type: 'X1_AUTOMATION_QUEUE_GET' }, function (resp) { resolve(resp && resp.queue); });
-    } catch (e) { resolve(null); }
-  });
+  return sendMessageWithTimeout({ type: 'X1_AUTOMATION_QUEUE_GET' }).then(function (resp) { return resp && resp.queue; });
 }
 
 export function cancelBackgroundQueue() {
-  return new Promise(function (resolve) {
-    try { chrome.runtime.sendMessage({ type: 'X1_AUTOMATION_QUEUE_CANCEL' }, function () { resolve(); }); }
-    catch (e) { resolve(); }
-  });
+  return sendMessageWithTimeout({ type: 'X1_AUTOMATION_QUEUE_CANCEL' });
+}
+
+// Cambia el rumbo del autopiloto sin cancelarlo — aplica desde el proximo
+// ciclo. directive vacio/null vuelve a que Vektor decida el objetivo solo.
+export function redirectAutopilot(directive) {
+  return sendMessageWithTimeout({ type: 'X1_AUTOMATION_QUEUE_REDIRECT', directive: directive });
 }
 
 // Autopiloto: sin objetivo y SIN fin. Entrega TODO al service worker (que hace
@@ -446,10 +486,10 @@ export function cancelBackgroundQueue() {
 // usa su informe para decidir el primer objetivo.
 export function runAutopilot(repoCtx, onStep) {
   if (!repoCtx) {
-    emit(onStep, { id: 'autopilot', title: 'Sin repositorio de referencia', status: 'error', detail: 'Analiza un repositorio en "Tu Repositorio" antes de activar el autopiloto — X1 necesita el informe para decidir que construir.' });
+    emit(onStep, { id: 'autopilot', title: 'Sin repositorio de referencia', status: 'error', detail: 'Analiza un repositorio en "Tu Repositorio" antes de activar el autopiloto — Vektor necesita el informe para decidir que construir.' });
     return Promise.resolve({ autopilot: false, error: true });
   }
-  emit(onStep, { id: 'autopilot', title: 'Activando autopiloto', status: 'active', why: 'X1 decidira por si mismo que construir, ciclo tras ciclo, sin fin, hasta que lo canceles.' });
+  emit(onStep, { id: 'autopilot', title: 'Activando autopiloto', status: 'active', why: 'Vektor decidira por si mismo que construir, ciclo tras ciclo, sin fin, hasta que lo canceles.' });
   var queue = {
     mode: 'autopilot',
     owner: repoCtx.owner, name: repoCtx.name,
@@ -457,7 +497,14 @@ export function runAutopilot(repoCtx, onStep) {
     analysisReport: String(repoCtx.report || '').slice(0, 5000),
     history: [], status: 'running', createdAt: Date.now(), updatedAt: Date.now(),
   };
-  return startBackgroundQueue(queue).then(function () {
+  return startBackgroundQueue(queue).then(function (resp) {
+    if (resp && resp.timedOut) {
+      emit(onStep, {
+        id: 'autopilot', title: 'El service worker no respondio', status: 'error',
+        detail: 'Chrome puede haber puesto la extension a dormir. Prueba a activarlo de nuevo — si persiste, recarga la extension en chrome://extensions.',
+      });
+      return { autopilot: false, error: true, timedOut: true };
+    }
     emit(onStep, {
       id: 'autopilot', title: 'Autopiloto activado — sin limite de tiempo', status: 'done',
       detail: 'Primer ciclo en ~1 min; luego cada 15-25 min, indefinidamente.',
@@ -469,10 +516,7 @@ export function runAutopilot(repoCtx, onStep) {
 
 // Reactiva un autopiloto pausado por el circuit breaker (N ciclos seguidos fallidos).
 export function resumeBackgroundQueue() {
-  return new Promise(function (resolve) {
-    try { chrome.runtime.sendMessage({ type: 'X1_AUTOMATION_QUEUE_RESUME' }, function () { resolve(); }); }
-    catch (e) { resolve(); }
-  });
+  return sendMessageWithTimeout({ type: 'X1_AUTOMATION_QUEUE_RESUME' });
 }
 
 // Procesa las tareas UNA A UNA (no en paralelo) para que el log se lea como
@@ -535,7 +579,7 @@ function runResearch(tarea, onStep, taskIdx) {
         id: tagPrefix + 'url', title: 'Pagina leida: ' + tarea.leer_url,
         status: text ? 'done' : 'error',
         detail: text ? fmtBytes(text.length) + ' de texto extraido' : 'No se pudo leer la pagina',
-        why: 'X1 decidio que esta pagina podia tener informacion relevante para esta tarea.',
+        why: 'Vektor decidio que esta pagina podia tener informacion relevante para esta tarea.',
       });
       return text;
     });
@@ -669,7 +713,7 @@ function aggregateProposal(resumen, tareas, results) {
   var anyError = results.some(function (r) { return r.proposal.error; });
 
   return {
-    titulo_pr: results.length === 1 ? (results[0].proposal.titulo_pr || resumen) : ('X1: ' + resumen),
+    titulo_pr: results.length === 1 ? (results[0].proposal.titulo_pr || resumen) : ('Vektor: ' + resumen),
     descripcion_pr: descripcion || resumen,
     archivos: allFiles,
     resumen: resumen,
@@ -700,7 +744,7 @@ export function publishAutoBuild(token, owner, repo, defaultBranch, proposal, on
       var commitSteps = proposal.archivos.map(function (f) {
         emit(onStep, { id: 'commit:' + f.path, title: 'Escribiendo ' + f.path, status: 'active' });
         var body = {
-          message: 'X1: ' + (proposal.titulo_pr || 'cambios automaticos') + ' — ' + f.path,
+          message: 'Vektor: ' + (proposal.titulo_pr || 'cambios automaticos') + ' — ' + f.path,
           content: btoa(unescape(encodeURIComponent(f.contenido || ''))),
           branch: branchName,
         };
@@ -720,9 +764,9 @@ export function publishAutoBuild(token, owner, repo, defaultBranch, proposal, on
       return fetch(GH + '/repos/' + owner + '/' + repo + '/pulls', {
         method: 'POST', headers: ghHeaders(token),
         body: JSON.stringify({
-          title: proposal.titulo_pr || 'Cambios automaticos de X1',
+          title: proposal.titulo_pr || 'Cambios automaticos de Vektor',
           head: branchName, base: defaultBranch,
-          body: (proposal.descripcion_pr || '') + '\n\n---\nGenerado autonomamente por X1.',
+          body: (proposal.descripcion_pr || '') + '\n\n---\nGenerado autonomamente por Vektor.',
         }),
       });
     })

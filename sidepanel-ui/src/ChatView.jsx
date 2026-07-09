@@ -1,109 +1,174 @@
 import * as React from 'react';
 import * as B from './backend.js';
-import { ProcessTimeline } from './ProcessTimeline.jsx';
+import { ProcessTask } from './components/ui/task';
 import { Markdown } from './Markdown.jsx';
+import { Trash2, Paperclip, ArrowUp, Plus } from 'lucide-react';
 
-const F = "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif";
-const C = {
-  border: '#d0d7de', borderSubtle: '#d8dee4', bg: '#ffffff', bgSubtle: '#f6f8fa',
-  fg: '#1f2328', fgMuted: '#59636e', fgSubtle: '#818b98', fgAccent: '#0969da',
-  fgSuccess: '#1a7f37', fgDanger: '#d1242f', fgAttention: '#bf8700',
-  accentUnderline: '#fd8c73',
-};
+var MCP_AGENTS = [
+  { id: 'mcp-context7',    name: 'Context7',    category: 'docs',     letter: 'C7', tools: ['resolve-library-id', 'query-docs'] },
+  { id: 'mcp-github',      name: 'GitHub',      category: 'devops',   letter: 'GH', tools: ['repos', 'issues', 'PRs', 'branches', 'search'] },
+  { id: 'mcp-october',     name: 'Oct. Themes', category: 'design',   letter: 'OT', tools: ['get_theme', 'get_theme_by_id'] },
+  { id: 'mcp-firecrawl',   name: 'Firecrawl',   category: 'research', letter: 'FC', tools: ['scrape', 'search', 'crawl', 'extract'] },
+  { id: 'mcp-cf-docs',     name: 'CF Docs',     category: 'devops',   letter: 'CD', tools: ['search_docs'] },
+  { id: 'mcp-cf-builds',   name: 'CF Builds',   category: 'devops',   letter: 'CB', tools: ['list_builds', 'get_build'] },
+  { id: 'mcp-cf-bindings', name: 'CF Bindings', category: 'devops',   letter: 'CN', tools: ['list_bindings', 'get_binding'] },
+  { id: 'mcp-cf-obs',      name: 'CF Obs',      category: 'devops',   letter: 'CO', tools: ['list_logs', 'get_metrics'] },
+  { id: 'mcp-clickhouse',  name: 'ClickHouse',  category: 'data',     letter: 'CH', tools: ['query', 'list_databases', 'list_tables'] },
+  { id: 'mcp-vercel',      name: 'Vercel',      category: 'devops',   letter: 'VC', tools: ['list_projects', 'deploy', 'get_deployment'] },
+  { id: 'mcp-qdrant',      name: 'Qdrant',      category: 'memory',   letter: 'QD', tools: ['store', 'find', 'delete', 'list_collections'] },
+  { id: 'mcp-filesystem',  name: 'Filesystem',  category: 'files',    letter: 'FS', tools: ['read_file', 'write_file', 'list_directory', 'search'] },
+  { id: 'mcp-memory',      name: 'Memory',      category: 'memory',   letter: 'MG', tools: ['entities', 'relations', 'observations', 'search'] },
+  { id: 'mcp-fetch',       name: 'Fetch',       category: 'research', letter: 'FT', tools: ['fetch_url'] },
+  { id: 'mcp-git',         name: 'Git',         category: 'devops',   letter: 'GT', tools: ['log', 'diff', 'blame', 'status'] },
+  { id: 'mcp-seqthink',    name: 'Seq. Think',  category: 'thinking', letter: 'ST', tools: ['sequential_thinking'] },
+  { id: 'mcp-cognee',      name: 'Cognee',      category: 'memory',   letter: 'CG', tools: ['remember', 'recall', 'forget'] },
+  { id: 'mcp-serena',      name: 'Serena',      category: 'code',     letter: 'SR', tools: ['search_code', 'edit_code', 'find_references'] },
+];
 
-function timeAgo(ts) {
-  var d = Date.now() - ts;
-  if (d < 60000) return 'ahora';
-  if (d < 3600000) return Math.floor(d / 60000) + 'm';
-  if (d < 86400000) return Math.floor(d / 3600000) + 'h';
-  return Math.floor(d / 86400000) + 'd';
-}
-
-const AGENTS = [
-  { id: 'auto',      name: 'AUTO',      ai: 'Automatico', letter: 'A', color: '#0969da', aiIcon: 'dist/x1-logo.png' },
-  { id: 'research',  name: 'Research',  ai: 'Gemini',    letter: 'R', color: '#4285f4', aiIcon: '../assets/ai/googlegemini.svg' },
-  { id: 'writer',    name: 'Writer',    ai: 'Claude',    letter: 'W', color: '#d97706', aiIcon: '../assets/ai/anthropic.svg' },
-  { id: 'developer', name: 'Developer', ai: 'GPT-4o',    letter: 'D', color: '#10a37f', aiIcon: '../assets/ai/openai.svg' },
-  { id: 'marketing', name: 'Marketing', ai: 'Gemini',    letter: 'M', color: '#4285f4', aiIcon: '../assets/ai/googlegemini.svg' },
-  { id: 'finance',   name: 'Finance',   ai: 'Claude',    letter: 'F', color: '#d97706', aiIcon: '../assets/ai/anthropic.svg' },
-  { id: 'legal',     name: 'Legal',     ai: 'Mistral',   letter: 'L', color: '#ff7000', aiIcon: '../assets/ai/mistralai.svg' },
-  { id: 'email',     name: 'Email',     ai: 'Llama',      letter: 'E', color: '#0668e1', aiIcon: '../assets/ai/meta.svg' },
-  { id: 'meeting',   name: 'Meeting',   ai: 'Gemini',    letter: 'G', color: '#4285f4', aiIcon: '../assets/ai/googlegemini.svg' },
+var AGENTS = [
+  { id: 'auto',      name: 'AUTO',      ai: 'Automatico' },
+  { id: 'research',  name: 'Research',  ai: 'Gemini' },
+  { id: 'writer',    name: 'Writer',    ai: 'Claude' },
+  { id: 'developer', name: 'Developer', ai: 'GPT-4o' },
+  { id: 'marketing', name: 'Marketing', ai: 'Gemini' },
+  { id: 'finance',   name: 'Finance',   ai: 'Claude' },
+  { id: 'legal',     name: 'Legal',     ai: 'Mistral' },
+  { id: 'email',     name: 'Email',     ai: 'Llama' },
+  { id: 'meeting',   name: 'Meeting',   ai: 'Gemini' },
 ];
 
 function agentById(id) {
   return AGENTS.find(function(a) { return a.id === id; }) || AGENTS[0];
 }
 
-function AgentAvatar({ agent, size }) {
-  size = size || 20;
-  if (agent.aiIcon) {
-    return React.createElement('img', {
-      src: agent.aiIcon, alt: '',
-      style: { width: size, height: size, borderRadius: '4px', objectFit: 'contain', flexShrink: 0 },
-      onError: function(e) { e.currentTarget.style.display = 'none'; }
+function stripMarkdown(text) {
+  return String(text || '')
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/\*([^*]+)\*/g, '$1')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/^#{1,4}\s+/gm, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function parseAgentMention(text) {
+  var match = text.match(/#(\w+)/);
+  if (match) {
+    var agentName = match[1].toLowerCase();
+    var found = MCP_AGENTS.find(function(a) {
+      return a.id.toLowerCase().includes(agentName) || a.name.toLowerCase().includes(agentName);
     });
+    if (found) return { agent: found, cleanText: text.replace(match[0], '').trim() };
   }
-  return React.createElement('div', {
-    style: {
-      width: size, height: size, borderRadius: '4px',
-      background: agent.color || '#0969da', color: '#fff',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      fontSize: size * 0.55, fontWeight: '600', flexShrink: 0,
-    }
-  }, agent.letter);
+  return { agent: null, cleanText: text };
 }
 
-function ToolIcon({ tool, size }) {
-  size = size || 12;
-  var colors = { github: '#1f2328', npm: '#cb3837', stackoverflow: '#f48024', web: '#de5833' };
-  var letters = { github: 'G', npm: 'N', stackoverflow: 'S', web: 'W' };
-  return React.createElement('div', {
+var VektorLogo = function(props) {
+  var size = props.size || 14;
+  var className = props.className || '';
+  var weight = props.weight || 700;
+  return React.createElement('span', {
+    className: className,
     style: {
-      width: size, height: size, borderRadius: '3px',
-      background: colors[tool] || '#656d76', color: '#fff',
-      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-      fontSize: size * 0.5, fontWeight: '700', flexShrink: 0,
+      fontFamily: "'Geist Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+      fontSize: size, fontWeight: weight, letterSpacing: '-0.03em',
+      lineHeight: 1, display: 'inline-block',
     }
-  }, letters[tool] || '?');
+  }, 'Vektor');
+};
+
+var VektorAvatar = function(props) {
+  var size = props.size || 24;
+  var className = props.className || '';
+  return React.createElement('div', {
+    className: 'flex items-center justify-center shrink-0 rounded-full bg-gray-100 text-gray-100 ' + className,
+    style: {
+      width: size, height: size,
+      fontFamily: "'Geist Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+      fontSize: size * 0.5, fontWeight: 600, letterSpacing: '-0.024em',
+    }
+  }, 'V');
+};
+
+function ThinkingDots() {
+  return (
+    <div className="flex items-center gap-2 py-1">
+      <div className="flex gap-1">
+        <span className="w-1.5 h-1.5 rounded-full bg-gray-1000 animate-pulse" style={{ animation: 'pulse 1.4s ease-in-out infinite' }}></span>
+        <span className="w-1.5 h-1.5 rounded-full bg-gray-1000 animate-pulse" style={{ animation: 'pulse 1.4s ease-in-out 0.2s infinite' }}></span>
+        <span className="w-1.5 h-1.5 rounded-full bg-gray-1000 animate-pulse" style={{ animation: 'pulse 1.4s ease-in-out 0.4s infinite' }}></span>
+      </div>
+      <span className="text-label-13 text-gray-500">Pensando...</span>
+    </div>
+  );
 }
 
-const QUICK = [
-  { label: 'Resumir',    prompt: 'Resume la pagina que tengo abierta' },
-  { label: 'Investigar', prompt: 'Investiga sobre esta pagina' },
-  { label: 'Codigo',     prompt: 'Escribe codigo para esto' },
-  { label: 'Email',      prompt: 'Redacta un email profesional' },
-];
+function ReasoningPanel({ msg }) {
+  var [open, setOpen] = React.useState(false);
+  if (!msg.judgeReason) return null;
+  return (
+    <div className="mb-2">
+      <div onClick={function() { setOpen(function(v) { return !v; }); }} className="inline-flex items-center gap-1.5 cursor-pointer text-gray-500 select-none">
+        <svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor">
+          <path d="M8 0a8 8 0 110 16A8 8 0 018 0zM1.5 8a6.5 6.5 0 1013 0 6.5 6.5 0 00-13 0zm6.25-3.25v2.992l2.028.812a.75.75 0 01-.557 1.392l-2.5-1A.751.751 0 017.25 8.25v-3.5a.75.75 0 011.5 0z" />
+        </svg>
+        <span className="text-label-12">Razonamiento{msg.sector ? ' \u00b7 ' + msg.sector : ''}</span>
+        <svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor" className="transition-transform" style={{ transform: open ? 'rotate(180deg)' : 'none' }}> <path d="M4.427 7.427l3.396 3.396a.25.25 0 00.354 0l3.396-3.396A.25.25 0 0011.396 7H4.604a.25.25 0 00-.177.427z" /> </svg>
+      </div>
+      {open && (
+        <div className="mt-1.5 pl-3 border-l border-gray-300 text-label-13 text-gray-500">
+          {msg.judgeReason}
+        </div>
+      )}
+    </div>
+  );
+}
 
-export function ChatView({ conversations, activeConv, onSelectConv, onCreateConv, onEnsureConv, onUpdateConv }) {
-  const [text, setText] = React.useState('');
-  const textRef = React.useRef('');
-  const taRef = React.useRef(null);
-  const [busy, setBusy] = React.useState(false);
-  const [activeAgent, setActiveAgent] = React.useState('auto');
-  const [agentMenu, setAgentMenu] = React.useState(false);
-  const [procSteps, setProcSteps] = React.useState([]);
-  const logRef = React.useRef(null);
-  const safetyRef = React.useRef(null);
-  const clearProcRef = React.useRef(null);
-  const busyRef = React.useRef(false);
+function ToolBadge({ tool }) {
+  return (
+    <span className="geist-badge geist-badge-gray">
+      <span className="w-2.5 h-2.5 rounded-xs bg-gray-1000 text-white inline-flex items-center justify-center font-medium text-label-13">
+        {(tool || '?')[0].toUpperCase()}
+      </span>
+      {tool}
+    </span>
+  );
+}
+
+export function ChatView({ conversations, activeConv, onSelectConv, onCreateConv, onEnsureConv, onUpdateConv, onDeleteConv }) {
+  var [confirmDeleteId, setConfirmDeleteId] = React.useState(null);
+  var [hoveredConvId, setHoveredConvId] = React.useState(null);
+  var [text, setText] = React.useState('');
+  var textRef = React.useRef('');
+  var taRef = React.useRef(null);
+  var composerRef = React.useRef(null);
+  var [busy, setBusy] = React.useState(false);
+  var [activeAgent, setActiveAgent] = React.useState('auto');
+  var [activeMCPAgent, setActiveMCPAgent] = React.useState(null);
+  var [procSteps, setProcSteps] = React.useState([]);
+  var logRef = React.useRef(null);
+  var safetyRef = React.useRef(null);
+  var clearProcRef = React.useRef(null);
+  var busyRef = React.useRef(false);
 
   React.useEffect(function() { busyRef.current = busy; }, [busy]);
 
-  // Auto-scroll suave al ultimo mensaje cuando llega.
   React.useEffect(function() {
-    if (logRef.current) {
-      logRef.current.scrollTo({ top: logRef.current.scrollHeight, behavior: 'smooth' });
-    }
+    if (logRef.current) logRef.current.scrollTo({ top: logRef.current.scrollHeight, behavior: 'smooth' });
   }, [activeConv && activeConv.messages && activeConv.messages.length, activeConv && activeConv.messages && activeConv.messages.length > 0 && activeConv.messages[activeConv.messages.length - 1].content]);
 
-  // Auto-resize del textarea segun contenido.
   React.useEffect(function() {
     if (!taRef.current) return;
-    var ta = taRef.current;
-    ta.style.height = 'auto';
-    ta.style.height = Math.min(ta.scrollHeight, 120) + 'px';
+    taRef.current.style.height = 'auto';
+    taRef.current.style.height = Math.min(taRef.current.scrollHeight, 330) + 'px';
   }, [text]);
+
+  function handleComposerClick(e) {
+    if (composerRef.current && composerRef.current.contains(e.target)) return;
+    if (taRef.current) taRef.current.focus();
+  }
 
   function patchMsg(convId, msgId, patch) {
     onUpdateConv(convId, { messages: function(prevMsgs) {
@@ -120,24 +185,28 @@ export function ChatView({ conversations, activeConv, onSelectConv, onCreateConv
   function send(input) {
     var q = (input || textRef.current).trim();
     if (!q || busyRef.current) return;
+
+    var mention = parseAgentMention(q);
+    var mcpAgent = mention.agent;
+    var cleanQ = mention.cleanText || q;
+    if (mcpAgent) { setActiveMCPAgent(mcpAgent.id); q = cleanQ; }
+
     var conv = activeConv || (onEnsureConv && onEnsureConv());
     if (!conv) return;
     setBusy(true); setText(''); textRef.current = '';
     if (taRef.current) taRef.current.style.height = 'auto';
     if (clearProcRef.current) clearTimeout(clearProcRef.current);
 
-    var agentId = activeAgent === 'auto' ? B.getBestAgent(q) : activeAgent;
-    var judgeReason = B.getJudgeReason(q, agentId);
-    var sector = B.detectSector(q);
-    var pickedAgent = agentById(agentId);
+    var agentId = activeMCPAgent || (activeAgent === 'auto' ? B.getBestAgent(q) : activeAgent);
+    var judgeReason = B.getJudgeReason(q, activeAgent === 'auto' ? B.getBestAgent(q) : activeAgent);
+    var sector = activeMCPAgent ? 'MCP' : B.detectSector(q);
+    var pickedAgent = activeMCPAgent ? { name: activeMCPAgent, ai: 'MCP Agent' } : agentById(agentId);
 
-    // Timeline del proceso: sector -> IA -> tools -> respuesta
-    var aiIcon = pickedAgent.aiIcon;
     setProcSteps([
-      { id: 1, iconSrc: aiIcon, description: 'Sector: ' + sector,            sub: 'Clasificando tu consulta',   status: 'active' },
-      { id: 2, iconSrc: aiIcon, description: 'IA: ' + pickedAgent.ai,         sub: 'Agente ' + pickedAgent.name,   status: 'pending' },
-      { id: 3, iconSrc: aiIcon, description: 'Procesando',                    sub: 'Razonando + herramientas',     status: 'pending' },
-      { id: 4, iconSrc: aiIcon, description: 'Respuesta',                     sub: 'Redactando',                  status: 'pending' },
+      { id: 1, description: 'Sector: ' + sector, sub: 'Clasificando tu consulta', status: 'active' },
+      { id: 2, description: 'IA: ' + pickedAgent.ai, sub: 'Agente ' + pickedAgent.name, status: 'pending' },
+      { id: 3, description: 'Procesando', sub: 'Razonando + herramientas', status: 'pending' },
+      { id: 4, description: 'Respuesta', sub: 'Redactando', status: 'pending' },
     ]);
     setTimeout(function() { setStep(1, 'done'); setStep(2, 'active'); }, 300);
     setTimeout(function() { setStep(2, 'done'); setStep(3, 'active'); }, 700);
@@ -157,8 +226,7 @@ export function ChatView({ conversations, activeConv, onSelectConv, onCreateConv
     safetyRef.current = setTimeout(function() {
       if (busyRef.current) {
         patchMsg(conv.id, aiMsg.id, { content: 'Tiempo de espera agotado (24s). Intenta de nuevo.', status: 'done' });
-        finishProc(false);
-        setBusy(false);
+        finishProc(false); setBusy(false);
       }
     }, 24000);
 
@@ -167,11 +235,10 @@ export function ChatView({ conversations, activeConv, onSelectConv, onCreateConv
       setStep(3, 'done'); setStep(4, 'active');
       if (result) {
         var processSteps = [
-          { icon: 'sector', label: 'Sector',       detail: result.sector || sector },
-          { icon: 'agent',  label: 'Agente',        detail: (result.agentName || pickedAgent.name) + ' (' + (result.agentModel || pickedAgent.ai) + ')' },
-          { icon: 'repo',   label: 'Repo Open-Source', detail: result.agentRepo || pickedAgent.repo || '' },
-          { icon: 'ai',     label: 'Proveedor',     detail: (result.provider || 'proxy') + ' - ' + (result.model || 'desconocido') },
-          { icon: 'clock',  label: 'Latencia',      detail: (result.latencyMs || '?') + 'ms' },
+          { label: 'Sector', detail: result.sector || sector },
+          { label: 'Agente', detail: (result.agentName || pickedAgent.name) + ' (' + (result.agentModel || pickedAgent.ai) + ')' },
+          { label: 'Proveedor', detail: (result.provider || 'proxy') + ' - ' + (result.model || 'desconocido') },
+          { label: 'Latencia', detail: (result.latencyMs || '?') + 'ms' },
         ];
         patchMsg(conv.id, aiMsg.id, {
           content: result.response || 'Completado.', status: 'done',
@@ -182,13 +249,13 @@ export function ChatView({ conversations, activeConv, onSelectConv, onCreateConv
         });
       } else {
         patchMsg(conv.id, aiMsg.id, { content: 'No pude procesar eso.', status: 'done',
-          processSteps: [{ icon: 'error', label: 'Estado', detail: 'IA no disponible' }], finishedAt: Date.now() });
+          processSteps: [{ label: 'Estado', detail: 'IA no disponible' }], finishedAt: Date.now() });
       }
       finishProc(true); setBusy(false);
     }).catch(function(err) {
       if (safetyRef.current) clearTimeout(safetyRef.current);
       patchMsg(conv.id, aiMsg.id, { content: 'Error: ' + ((err && err.message) || 'desconocido'), status: 'done',
-        processSteps: [{ icon: 'error', label: 'Error', detail: (err && err.message) || 'desconocido' }], finishedAt: Date.now() });
+        processSteps: [{ label: 'Error', detail: (err && err.message) || 'desconocido' }], finishedAt: Date.now() });
       finishProc(false); setBusy(false);
     });
   }
@@ -198,416 +265,245 @@ export function ChatView({ conversations, activeConv, onSelectConv, onCreateConv
   var [googleOk, setGoogleOk] = React.useState(null);
   var [googleUser, setGoogleUser] = React.useState(null);
   var [googleError, setGoogleError] = React.useState(null);
-  var [showGoogleMenu, setShowGoogleMenu] = React.useState(false);
   React.useEffect(function() { if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) { chrome.runtime.sendMessage({ type: 'X1_AUTH_CHECK_GOOGLE' }, function(r) { if (!chrome.runtime.lastError && r) { setGoogleOk(r.logged); if (r.user) setGoogleUser(r.user); } }); } }, []);
 
-  // Panel de razonamiento del juez (estilo "Thinking" de Claude/o1).
-  function ReasoningPanel({ msg }) {
-    if (!msg.judgeReason) return null;
-    return React.createElement('div', {
-      style: {
-        marginBottom: '10px',
-        background: '#f6f8fa',
-        border: '1px solid #d0d7de',
-        borderRadius: '6px',
-        padding: '10px 12px',
-        fontSize: '12px',
-        color: '#59636e',
-        lineHeight: '1.6',
-        fontFamily: F,
-      }
-    },
-      React.createElement('div', {
-        style: {
-          display: 'flex', alignItems: 'center', gap: '6px',
-          marginBottom: '6px', paddingBottom: '6px',
-          borderBottom: '1px solid #d8dee4',
-        }
-      },
-        React.createElement('svg', { viewBox: '0 0 16 16', width: '13', height: '13', fill: '#59636e' },
-          React.createElement('path', { d: 'M8 0a8 8 0 110 16A8 8 0 018 0zM1.5 8a6.5 6.5 0 1013 0 6.5 6.5 0 00-13 0zm6.25-3.25v2.992l2.028.812a.75.75 0 01-.557 1.392l-2.5-1A.751.751 0 017.25 8.25v-3.5a.75.75 0 011.5 0z' })
-        ),
-        React.createElement('span', {
-          style: { fontWeight: '600', color: '#1f2328', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px' }
-        }, 'Razonamiento'),
-        msg.sector && React.createElement('span', {
-          style: {
-            fontSize: '10px', padding: '1px 8px', borderRadius: '999px',
-            background: '#ddf4ff', color: '#0969da', fontWeight: '600',
-          }
-        }, msg.sector)
-      ),
-      React.createElement('div', { style: { fontSize: '12px', color: '#59636e' } }, msg.judgeReason)
-    );
-  }
+  return (
+    <div className="flex h-full overflow-hidden">
 
-  // Indicador "Pensando..." con 3 puntos animados.
-  function ThinkingDots() {
-    return React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 0' } },
-      React.createElement('div', { style: { display: 'flex', gap: '4px' } },
-        React.createElement('span', { style: { width: '6px', height: '6px', borderRadius: '50%', background: '#0969da', animation: 'pulse 1s infinite' } }),
-        React.createElement('span', { style: { width: '6px', height: '6px', borderRadius: '50%', background: '#0969da', animation: 'pulse 1s infinite 0.2s' } }),
-        React.createElement('span', { style: { width: '6px', height: '6px', borderRadius: '50%', background: '#0969da', animation: 'pulse 1s infinite 0.4s' } })
-      ),
-      React.createElement('span', { style: { fontSize: '12px', color: '#818b98', fontFamily: F } }, 'Pensando...')
-    );
-  }
+      {/* ═══ SIDEBAR — v0: w-64, bg-background-200, border-r ═══ */}
+      <div className="flex flex-col w-64 border-r border-gray-200 flex-shrink-0" style={{ background: 'var(--color-v0-background-200)' }}>
+        {/* New conversation */}
+        <div className="p-4 pb-3">
+          <button onClick={onCreateConv} className="geist-btn geist-btn-primary geist-btn-sm w-full">
+            <Plus size={14} />
+            Nueva conversacion
+          </button>
+        </div>
+        {/* Conversation list */}
+        <div className="flex-1 overflow-auto px-2 pb-2">
+          {conversations.map(function(c) {
+            var isActive = activeConv && activeConv.id === c.id;
+            var msgCount = c.messages ? c.messages.length : 0;
+            var lastMsg = c.messages && c.messages.length > 0 ? c.messages[c.messages.length - 1] : null;
+            var preview = lastMsg ? stripMarkdown(lastMsg.content).slice(0, 55) : 'Sin mensajes';
+            var isConfirming = confirmDeleteId === c.id;
+            var isHovered = hoveredConvId === c.id;
+            return (
+              <div key={c.id}
+                onClick={function() { onSelectConv(c.id); }}
+                onMouseEnter={function() { setHoveredConvId(c.id); }}
+                onMouseLeave={function() { setHoveredConvId(null); }}
+                className={"cursor-pointer rounded-md p-3 mb-0.5 transition-all " + (isActive ? "bg-white shadow-base" : "hover:bg-gray-100")}
+              >
+                <div className="flex items-center justify-between mb-0.5">
+                  <div className="flex-1 truncate text-sm font-medium text-gray-1000">{c.title || 'Nueva conversacion'}</div>
+                  {onDeleteConv && (isHovered || isConfirming) && (
+                    <button
+                      onClick={function(e) {
+                        e.stopPropagation();
+                        if (isConfirming) { onDeleteConv(c.id); setConfirmDeleteId(null); }
+                        else { setConfirmDeleteId(c.id); }
+                      }}
+                      className={"ml-1.5 flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold transition-all " + (isConfirming ? "bg-gray-1000 text-white" : "text-gray-500 hover:text-gray-1000")}
+                    >
+                      <Trash2 size={10} />
+                      {isConfirming ? 'Eliminar' : null}
+                    </button>
+                  )}
+                </div>
+                <div className="truncate text-xs text-gray-500">{preview}</div>
+                {msgCount > 0 && <span className="text-[11px] text-gray-400">{msgCount} msg</span>}
+              </div>
+            );
+          })}
+          {conversations.length === 0 && (
+            <div className="px-4 py-6 text-center text-xs text-gray-400">No hay conversaciones</div>
+          )}
+        </div>
+      </div>
 
-  return React.createElement('div', { style: { display: 'flex', flex: 1, overflow: 'hidden', fontFamily: F } },
+      {/* ═══ CHAT AREA ═══ */}
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
 
-    // Sidebar conversaciones (260px, GitHub Primer)
-    React.createElement('div', { style: { width: '260px', borderRight: '1px solid #d0d7de', display: 'flex', flexDirection: 'column', background: '#f6f8fa' } },
-      React.createElement('div', { style: { padding: '12px', borderBottom: '1px solid #d0d7de' } },
-        React.createElement('button', {
-          onClick: onCreateConv,
-          style: {
-            width: '100%', padding: '6px 12px', borderRadius: '6px',
-            border: '1px solid rgba(27,31,36,0.15)', background: '#2da44e', color: '#ffffff',
-            fontSize: '12px', fontWeight: '600', cursor: 'pointer', fontFamily: F,
-            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.25)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
-          }
-        }, '+ Nueva conversacion')
-      ),
-      React.createElement('div', { style: { flex: 1, overflow: 'auto', padding: '6px 8px' } },
-        conversations.map(function(c) {
-          var isActive = activeConv && activeConv.id === c.id;
-          var msgCount = c.messages ? c.messages.length : 0;
-          var lastMsg = c.messages && c.messages.length > 0 ? c.messages[c.messages.length - 1] : null;
-          var preview = lastMsg ? (lastMsg.content || '').slice(0, 60) : 'Sin mensajes';
-          var cAgent = agentById(c.agent || 'research');
-          return React.createElement('div', {
-            key: c.id, onClick: function() { onSelectConv(c.id); },
-            style: {
-              padding: '10px 12px', borderRadius: '6px', cursor: 'pointer', marginBottom: '4px',
-              background: isActive ? '#ddf4ff' : 'transparent',
-              border: isActive ? '1px solid rgba(9,105,218,0.2)' : '1px solid transparent',
-              transition: 'all 80ms',
-            },
-            onMouseEnter: function(e) { if (!isActive) e.currentTarget.style.background = '#eaeef2'; },
-            onMouseLeave: function(e) { if (!isActive) e.currentTarget.style.background = 'transparent'; },
-          },
-            React.createElement('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' } },
-              React.createElement('div', { style: { fontSize: '13px', fontWeight: isActive ? '600' : '500', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: isActive ? '#1f2328' : '#24292f', flex: 1 } }, c.title || 'Nueva conversacion'),
-              React.createElement('span', { style: { fontSize: '11px', color: '#818b98', flexShrink: 0, marginLeft: '6px' } }, timeAgo(c.updatedAt || c.createdAt))
-            ),
-            React.createElement('div', { style: { fontSize: '12px', color: '#59636e', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, preview),
-            React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px' } },
-              msgCount > 0 && React.createElement('span', { style: { fontSize: '11px', color: '#818b98' } }, msgCount + ' msg'),
-              React.createElement('span', {
-                style: {
-                  fontSize: '10px', padding: '1px 6px', borderRadius: '999px',
-                  background: '#ddf4ff', color: '#0969da', fontWeight: '500',
-                  display: 'inline-flex', alignItems: 'center', gap: '3px',
-                }
-              }, cAgent.name)
-            )
-          );
-        }),
-        conversations.length === 0 && React.createElement('div', { style: { padding: '24px 16px', textAlign: 'center', color: '#818b98', fontSize: '12px' } },
-          React.createElement('svg', { viewBox: '0 0 16 16', width: '22', height: '22', fill: '#afb8c1', style: { marginBottom: '8px' } },
-            React.createElement('path', { d: 'M1.75 1h8.5c.966 0 1.75.784 1.75 1.75v5.5A1.75 1.75 0 0 1 10.25 10H7.061l-2.574 2.573A1.458 1.458 0 0 1 2 11.543V10h-.25A1.75 1.75 0 0 1 0 8.25v-5.5C0 1.784.784 1 1.75 1ZM1.5 2.75v5.5c0 .138.112.25.25.25h1a.75.75 0 0 1 .75.75v2.19l2.72-2.72a.749.749 0 0 1 .53-.22h3.5a.25.25 0 0 0 .25-.25v-5.5a.25.25 0 0 0-.25-.25h-8.5a.25.25 0 0 0-.25.25Z' })
-          ),
-          React.createElement('div', null, 'No hay conversaciones')
-        )
-      )
-    ),
+        {/* ── Header — v0: h-[50px], px-3, hairline-b ── */}
+        <header className="relative z-20 flex w-full shrink-0 items-center justify-between px-3 h-[50px] hairline-b" style={{ background: 'var(--color-v0-background-100)' }}>
+          <div className="flex min-w-0 items-center">
+            <div className="flex items-center gap-2 mr-1">
+              <VektorLogo size={16} className="text-gray-1000" />
+              <span className="text-label-12 text-gray-400">{agent.name}</span>
+            </div>
+          </div>
+          <div className="flex flex-1 items-center justify-end">
+            <div className="flex gap-2 items-center">
+              <div
+                className="cursor-pointer rounded-md p-1.5 transition-colors hover-bg-gray-100"
+                onClick={googleOk ? null : async function() { var r = await B.loginGoogle(); if (r) { setGoogleOk(true); setGoogleUser({email:r.email,name:r.name,picture:r.picture}); } }}
+                title={googleOk && googleUser ? googleUser.email : 'Conectar Google'}
+              >
+                <svg viewBox="0 0 24 24" width="16" height="16" fill={googleOk ? '#28a948' : 'var(--color-v0-gray-400)'}>
+                  <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" />
+                  <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                  <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
+                  <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
+                </svg>
+              </div>
+            </div>
+          </div>
+        </header>
 
-    // Chat area
-    React.createElement('div', { style: { flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 } },
+        {googleError && (
+          <div className="border-b border-gray-200 bg-red-50 px-5 py-1.5 text-xs text-red-700">{googleError}</div>
+        )}
 
-      // Header con selector de agente (UnderlineNav style)
-      React.createElement('div', { style: { padding: '8px 16px', borderBottom: '1px solid #d0d7de', display: 'flex', alignItems: 'center', gap: '12px', background: '#ffffff' } },
-        React.createElement('div', { style: { position: 'relative' } },
-          React.createElement('button', {
-            onClick: function() { setAgentMenu(function(v) { return !v; }); },
-            style: {
-              display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 10px',
-              background: '#f6f8fa', border: '1px solid #d0d7de', borderRadius: '6px',
-              fontSize: '13px', cursor: 'pointer', transition: 'border-color 80ms', fontFamily: F,
-            },
-            onMouseEnter: function(e) { e.currentTarget.style.borderColor = '#0969da'; },
-            onMouseLeave: function(e) { e.currentTarget.style.borderColor = '#d0d7de'; },
-          },
-            React.createElement(AgentAvatar, { agent: agent, size: 16 }),
-            React.createElement('span', { style: { fontWeight: '600', color: '#1f2328' } }, agent.name),
-            React.createElement('span', { style: { color: '#59636e', fontSize: '12px' } }, agent.ai),
-            React.createElement('svg', { viewBox: '0 0 16 16', width: '12', height: '12', fill: '#59636e' },
-              React.createElement('path', { d: 'M4.427 7.427l3.396 3.396a.25.25 0 00.354 0l3.396-3.396A.25.25 0 0011.396 7H4.604a.25.25 0 00-.177.427z' })
-            )
-          ),
-          agentMenu && React.createElement('div', {
-            style: {
-              position: 'absolute', top: '100%', left: 0, zIndex: 30, marginTop: '4px',
-              minWidth: '210px', background: '#ffffff', border: '1px solid #d0d7de',
-              borderRadius: '6px', boxShadow: '0 8px 24px rgba(140,149,159,0.2)', padding: '4px',
-            }
-          },
-            AGENTS.map(function(a) {
+        {/* ── Messages — v0: centered, gap-16 ── */}
+        <div ref={logRef} className="relative flex min-w-0 flex-1 flex-col overflow-y-auto" style={{ background: 'var(--color-v0-background-200)' }}>
+          <div className="@container/page-layout relative mt-0">
+            <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-8">
+              {msgs.length === 0 ? (
+                <main className="z-0 flex w-full flex-col sm:px-6 px-3 gap-16 lg:gap-32">
+                  <div className="relative mx-auto flex w-full flex-col gap-4 min-h-[156.5px] md:min-h-[164.5px] pt-16 lg:pt-24">
+                    <h1 className="text-center text-gray-1000 text-heading-24 md:text-heading-32 text-balance">Vektor</h1>
+                    <div className="max-w-[690px] mx-auto w-full">
+                      <div className="text-center text-copy-md text-gray-500" style={{ lineHeight: '26px' }}>
+                        Preguntame lo que quieras. Usa <span className="font-mono font-semibold text-gray-1000">#</span> para agentes especializados.
+                      </div>
+                    </div>
+                  </div>
+                </main>
+              ) : (
+                <div className="flex w-full flex-col items-center" style={{ padding: '32px 24px 120px' }}>
+                  <div className="flex w-full max-w-2xl flex-col gap-16">
+                    {msgs.map(function(m) {
+                      var mAgent = agentById(m.agent || 'research');
+                      var elapsed = m.finishedAt && m.startedAt ? Math.round((m.finishedAt - m.startedAt) / 100) / 10 : null;
+                      return (
+                        <div key={m.id} className="flex flex-col">
+                          {m.role === 'user' ? (
+                            <div className="flex justify-end">
+                              <div className="max-w-2xl rounded-xl bg-gray-1000 text-white px-5 py-3 text-label-14 whitespace-pre-wrap break-words" style={{ lineHeight: '20px' }}>
+                                {m.content}
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex gap-3">
+                              <VektorAvatar size={24} />
+                              <div className="min-w-0 flex-1">
+                                <div className="mb-1.5 flex items-center gap-2">
+                                  <span className="text-label-14 font-semibold text-gray-1000">{mAgent.name}</span>
+                                  <span className="text-label-12 text-gray-400">{mAgent.ai}</span>
+                                  {elapsed != null && <span className="text-label-12 text-gray-400">{elapsed}s</span>}
+                                </div>
+                                {m.status === 'thinking' ? (
+                                  <ThinkingDots />
+                                ) : m.status === 'done' && m.content ? (
+                                  <div>
+                                    <ReasoningPanel msg={m} />
+                                    <div className="text-copy-md text-gray-1000" style={{ lineHeight: '26px' }}>
+                                      <Markdown text={m.content} />
+                                    </div>
+                                    {m.toolsUsed && m.toolsUsed.length > 0 && (
+                                      <div className="mt-3 flex flex-wrap gap-1.5">
+                                        {m.toolsUsed.map(function(tool) { return <ToolBadge key={tool} tool={tool} />; })}
+                                      </div>
+                                    )}
+                                    {m.processSteps && m.processSteps.length > 0 && (
+                                      <div className="mt-4">
+                                        <ProcessTask
+                                          steps={m.processSteps.map(function(ps, i) {
+                                            return {
+                                              id: i, status: ps.status || 'done',
+                                              description: ps.label || ps.description || 'Procesando',
+                                              sub: ps.sector || ps.category || null,
+                                              details: ps.detail || null,
+                                              startedAt: ps.startedAt || null, finishedAt: ps.finishedAt || null,
+                                            };
+                                          })}
+                                          isRunning={m.status === 'thinking'}
+                                          title="Procedimiento de ejecucion"
+                                        />
+                                      </div>
+                                    )}
+                                  </div>
+                                ) : null}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* ═══ COMPOSER — v0: rounded-xl, material-medium, bg-background-300, border-gray-400 ═══ */}
+        <div className="relative flex w-full flex-col items-center" style={{ background: 'var(--color-v0-background-200)', padding: '0 16px 16px' }}>
+          <div
+            ref={composerRef}
+            onClick={handleComposerClick}
+            className="@container/composer z-20 relative rounded-xl overflow-visible material-medium cursor-text p-3 w-full max-w-2xl"
+            style={{
+              background: 'var(--color-v0-background-300)',
+              border: '1px solid var(--color-v0-gray-400)',
+              minHeight: 108,
+              transition: 'border-color 200ms cubic-bezier(0.31, 0.1, 0.08, 0.96)',
+            }}
+          >
+            {activeMCPAgent && (
+              <div className="mb-2 inline-flex items-center gap-1.5 rounded-md bg-gray-100 px-2.5 py-1 text-xs text-gray-1000">
+                <span className="font-semibold">#</span>
+                <span>{(MCP_AGENTS.find(function(a){return a.id===activeMCPAgent})||{}).name}</span>
+                <button onClick={function(e) { e.stopPropagation(); setActiveMCPAgent(null); }} className="ml-0.5 border-none bg-transparent text-gray-500 cursor-pointer text-xs">x</button>
+              </div>
+            )}
+            <textarea
+              ref={taRef}
+              value={text}
+              onChange={function(e) { setText(e.target.value); textRef.current = e.target.value; }}
+              placeholder={activeMCPAgent ? 'MCP: ' + (MCP_AGENTS.find(function(a){return a.id===activeMCPAgent})||{}).name + '...' : 'Escribe tu pregunta...'}
+              rows={1}
+              className="w-full bg-transparent text-label-14 border-none outline-none min-h-[54px] max-h-[330px] pb-2"
+              style={{ resize: 'none', color: 'var(--color-v0-gray-1000)', fontFamily: 'inherit', letterSpacing: '-0.011em' }}
+              onKeyDown={function(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
+            />
+            <div className="flex items-center justify-between">
+              <button className="geist-btn-ghost inline-flex items-center justify-center gap-1.5 text-gray-500 hover:text-gray-1000" title="Adjuntar" style={{ height: 28, padding: '0 8px', borderRadius: 6 }}>
+                <Paperclip size={16} />
+              </button>
+              <button
+                onClick={function() { send(); }}
+                disabled={!text.trim() || busy}
+                className="inline-flex items-center justify-center rounded-full bg-gray-1000 text-white transition-colors disabled:bg-gray-300 disabled:text-gray-500"
+                style={{ width: 32, height: 32, border: 'none', cursor: text.trim() && !busy ? 'pointer' : 'not-allowed' }}
+                title="Enviar"
+              >
+                <ArrowUp size={16} />
+              </button>
+            </div>
+          </div>
+
+          {/* Agent pills — v0: refined, below composer */}
+          <div className="mt-3 flex flex-wrap items-center justify-center" style={{ gap: 6 }}>
+            {AGENTS.map(function(a) {
               var isActive = activeAgent === a.id;
-              return React.createElement('div', {
-                key: a.id,
-                onClick: function() { setActiveAgent(a.id); setAgentMenu(false); },
-                style: {
-                  padding: '6px 8px', borderRadius: '4px', cursor: 'pointer',
-                  display: 'flex', alignItems: 'center', gap: '8px',
-                  background: isActive ? '#ddf4ff' : 'transparent',
-                  transition: 'background 80ms',
-                },
-                onMouseEnter: function(e) { if (!isActive) e.currentTarget.style.background = '#eaeef2'; },
-                onMouseLeave: function(e) { if (!isActive) e.currentTarget.style.background = isActive ? '#ddf4ff' : 'transparent'; },
-              },
-                React.createElement(AgentAvatar, { agent: a, size: 22 }),
-                React.createElement('div', { style: { flex: 1 } },
-                  React.createElement('div', { style: { fontSize: '13px', fontWeight: '600', color: '#1f2328' } }, a.name),
-                  React.createElement('div', { style: { fontSize: '11px', color: '#59636e' } }, a.ai)
-                ),
-                isActive && React.createElement('svg', { viewBox: '0 0 16 16', width: '14', height: '14', fill: '#0969da' },
-                  React.createElement('path', { d: 'M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z' })
-                )
+              return (
+                <button
+                  key={a.id}
+                  onClick={function() { setActiveAgent(a.id); setActiveMCPAgent(null); }}
+                  className={"geist-btn geist-btn-sm " + (isActive ? "geist-btn-primary" : "geist-btn-secondary")}
+                >
+                  {a.name}
+                </button>
               );
-            })
-          )
-        ),
-        React.createElement('div', { style: { flex: 1 } }),
-        React.createElement('span', { style: { fontSize: '12px', color: '#818b98', fontWeight: '500' } }, 'System X1'),
-        React.createElement('div', { style: { position: 'relative' } },
-          React.createElement('div', {
-            style: {
-              display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', padding: '2px 6px',
-              borderRadius: '6px', background: googleOk ? '#f0fff4' : 'transparent',
-              border: '1px solid', borderColor: googleOk ? '#b7e1c0' : 'transparent',
-              transition: 'all 80ms',
-            },
-            onClick: googleOk ? function() { setShowGoogleMenu(function(v) { return !v; }); setGoogleError(null); } : async function() { setGoogleError(null); var r = await B.loginGoogle(); if (r) { setGoogleOk(true); setGoogleUser({email:r.email,name:r.name,picture:r.picture}); } else { setGoogleError('No se pudo conectar. Prueba en chrome://extensions > X1 > Inspect > Console para ver errores.'); setTimeout(function() { setGoogleError(null); }, 6000); } },
-            title: googleOk && googleUser ? googleUser.email : 'Conectar Google',
-            onMouseEnter: function(e) { e.currentTarget.style.borderColor = googleOk ? '#b7e1c0' : '#d0d7de'; },
-            onMouseLeave: function(e) { e.currentTarget.style.borderColor = googleOk ? '#b7e1c0' : 'transparent'; },
-          },
-            googleOk && googleUser && googleUser.picture ?
-              React.createElement('img', { src: googleUser.picture, alt: '', style: { width: '18px', height: '18px', borderRadius: '50%' }, onError: function(e) { e.currentTarget.style.display = 'none'; } })
-            :
-              React.createElement('svg', { viewBox: '0 0 24 24', width: '16', height: '16', fill: googleOk === true ? '#1a7f37' : googleOk === false ? '#818b98' : '#d0d7de' },
-                React.createElement('path', { d: 'M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z', fill: googleOk === true ? '#34A853' : '#818b98' }),
-                React.createElement('path', { d: 'M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z', fill: googleOk === true ? '#4285F4' : '#818b98' }),
-                React.createElement('path', { d: 'M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z', fill: googleOk === true ? '#FBBC05' : '#818b98' }),
-                React.createElement('path', { d: 'M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z', fill: googleOk === true ? '#EA4335' : '#818b98' })
-              ),
-            googleOk && googleUser && React.createElement('span', { style: { fontSize: '11px', color: '#1a7f37', fontWeight: 500, maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, googleUser.name || googleUser.email),
-            googleOk && React.createElement('svg', { viewBox: '0 0 16 16', width: '10', height: '10', fill: '#1a7f37' },
-              React.createElement('path', { d: 'M4.427 7.427l3.396 3.396a.25.25 0 00.354 0l3.396-3.396A.25.25 0 0011.396 7H4.604a.25.25 0 00-.177.427z' })
-            )
-          ),
-          showGoogleMenu && googleOk && React.createElement('div', {
-            style: {
-              position: 'absolute', top: '100%', right: 0, zIndex: 30, marginTop: '4px',
-              width: '220px', background: '#ffffff', border: '1px solid #d0d7de',
-              borderRadius: '6px', boxShadow: '0 8px 24px rgba(140,149,159,0.2)', padding: '8px',
-            }
-          },
-            googleUser && React.createElement('div', { style: { padding: '6px 8px', borderBottom: '1px solid #d8dee4', marginBottom: '6px' } },
-              googleUser.picture && React.createElement('img', { src: googleUser.picture, alt: '', style: { width: '32px', height: '32px', borderRadius: '50%', marginBottom: '4px' }, onError: function(e) { e.currentTarget.style.display = 'none'; } }),
-              React.createElement('div', { style: { fontSize: '13px', fontWeight: '600', color: '#1f2328' } }, googleUser.name || 'Google'),
-              React.createElement('div', { style: { fontSize: '11px', color: '#59636e' } }, googleUser.email)
-            ),
-            React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '4px' } },
-              React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 8px', fontSize: '12px', color: '#1f2328' } },
-                React.createElement('svg', { viewBox: '0 0 16 16', width: '14', height: '14', fill: '#1a7f37' }, React.createElement('path', { d: 'M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z' })),
-                React.createElement('span', { style: { flex: 1 } }, 'Gmail'),
-                React.createElement('span', { style: { color: '#1a7f37', fontWeight: 500 } }, 'Conectado')
-              ),
-              React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 8px', fontSize: '12px', color: '#1f2328' } },
-                React.createElement('svg', { viewBox: '0 0 16 16', width: '14', height: '14', fill: '#1a7f37' }, React.createElement('path', { d: 'M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z' })),
-                React.createElement('span', { style: { flex: 1 } }, 'Calendar'),
-                React.createElement('span', { style: { color: '#1a7f37', fontWeight: 500 } }, 'Conectado')
-              ),
-              React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 8px', fontSize: '12px', color: '#1f2328' } },
-                React.createElement('svg', { viewBox: '0 0 16 16', width: '14', height: '14', fill: '#1a7f37' }, React.createElement('path', { d: 'M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z' })),
-                React.createElement('span', { style: { flex: 1 } }, 'Sheets'),
-                React.createElement('span', { style: { color: '#1a7f37', fontWeight: 500 } }, 'Conectado')
-              ),
-              React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 8px', fontSize: '12px', color: '#1f2328' } },
-                React.createElement('svg', { viewBox: '0 0 16 16', width: '14', height: '14', fill: '#1a7f37' }, React.createElement('path', { d: 'M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z' })),
-                React.createElement('span', { style: { flex: 1 } }, 'Docs'),
-                React.createElement('span', { style: { color: '#1a7f37', fontWeight: 500 } }, 'Conectado')
-              )
-            ),
-            React.createElement('div', { style: { borderTop: '1px solid #d8dee4', marginTop: '8px', paddingTop: '6px' } },
-              React.createElement('button', {
-                onClick: async function() { await B.logoutGoogle(); setGoogleOk(false); setGoogleUser(null); setShowGoogleMenu(false); },
-                style: { width: '100%', padding: '4px 8px', border: 'none', background: 'transparent', fontSize: '12px', color: '#d1242f', cursor: 'pointer', textAlign: 'left', borderRadius: '4px' },
-                onMouseEnter: function(e) { e.currentTarget.style.background = '#f6f8fa'; },
-                onMouseLeave: function(e) { e.currentTarget.style.background = 'transparent'; },
-              }, 'Desconectar Google')
-            )
-          )
-        )
-      ),
-
-      googleError ? React.createElement('div', { style: { padding: '6px 20px', background: '#fff0ee', color: '#d1242f', fontSize: '12px', borderBottom: '1px solid #ffc2c2', fontFamily: F } }, googleError) : null,
-
-      // Mensajes (ProcessTimeline eliminado de aqui, ahora por cada respuesta abajo)
-      React.createElement('div', { ref: logRef, style: { flex: 1, overflow: 'auto', padding: '20px' } },
-        msgs.length === 0 ?
-          React.createElement('div', { style: { height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '12px' } },
-            React.createElement('div', { style: { width: '56px', height: '56px', borderRadius: '50%', background: '#f6f8fa', border: '1px solid #d0d7de', display: 'flex', alignItems: 'center', justifyContent: 'center' } },
-              React.createElement('img', { src: 'dist/x1-logo.png', alt: 'X1', style: { width: '32px', height: '32px', borderRadius: '4px', objectFit: 'contain' }, onError: function(e) { e.currentTarget.style.display = 'none'; } })
-            ),
-            React.createElement('div', { style: { fontSize: '17px', fontWeight: '600', color: '#1f2328', fontFamily: F } }, 'System X1'),
-            React.createElement('div', { style: { fontSize: '14px', color: '#59636e', maxWidth: '300px', textAlign: 'center', lineHeight: '1.7', fontFamily: F } },
-              'Preguntame lo que quieras. Tengo 8 agentes especializados. Puedo buscar en GitHub, npm, Stack Overflow y mas.'
-            ),
-            React.createElement('div', { style: { display: 'flex', gap: '6px', marginTop: '8px', flexWrap: 'wrap', justifyContent: 'center', maxWidth: '320px' } },
-              QUICK.map(function(q) {
-                return React.createElement('button', {
-                  key: q.label,
-                  onClick: function() { send(q.prompt); },
-                  style: {
-                    padding: '4px 12px', border: '1px solid #d0d7de', borderRadius: '999px',
-                    background: '#ffffff', fontSize: '12px', color: '#59636e', cursor: 'pointer',
-                    fontFamily: F, transition: 'all 80ms',
-                  },
-                  onMouseEnter: function(e) { e.currentTarget.style.background = '#f6f8fa'; e.currentTarget.style.borderColor = '#0969da'; e.currentTarget.style.color = '#0969da'; },
-                  onMouseLeave: function(e) { e.currentTarget.style.background = '#ffffff'; e.currentTarget.style.borderColor = '#d0d7de'; e.currentTarget.style.color = '#59636e'; },
-                }, q.label);
-              })
-            )
-          )
-        :
-          React.createElement('div', { style: { maxWidth: '680px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '20px' } },
-            msgs.map(function(m) {
-              var mAgent = agentById(m.agent || 'research');
-              var elapsed = m.finishedAt && m.startedAt ? Math.round((m.finishedAt - m.startedAt) / 100) / 10 : null;
-              return React.createElement('div', { key: m.id, style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
-                m.role === 'user' ?
-                  React.createElement('div', { style: { display: 'flex', justifyContent: 'flex-end' } },
-                    React.createElement('div', {
-                      style: {
-                        maxWidth: '75%', padding: '10px 14px', borderRadius: '14px 14px 4px 14px',
-                        background: '#ddf4ff', fontSize: '14px', lineHeight: '1.6', color: '#1f2328',
-                        fontFamily: F, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-                      }
-                    }, m.content)
-                  )
-                :
-                  // Mensaje del asistente: avatar + nombre + razonamiento + respuesta + tools + meta
-                  React.createElement('div', { style: { display: 'flex', gap: '10px', alignItems: 'flex-start' } },
-                    React.createElement(AgentAvatar, { agent: mAgent, size: 22 }),
-                    React.createElement('div', { style: { flex: 1, minWidth: 0 } },
-                      // Nombre del agente + IA
-                      React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' } },
-                        React.createElement('span', { style: { fontSize: '13px', fontWeight: '600', color: '#1f2328', fontFamily: F } }, mAgent.name),
-                        React.createElement('span', { style: { fontSize: '11px', color: '#818b98' } }, mAgent.ai),
-                        elapsed != null && React.createElement('span', { style: { fontSize: '10px', color: '#818b98' } }, elapsed + 's')
-                      ),
-                      // Estado "thinking" -> puntos animados
-                      m.status === 'thinking' ?
-                        React.createElement(ThinkingDots, null)
-                      :
-                      // Estado "done" con contenido
-                      m.status === 'done' && m.content ?
-                        React.createElement('div', null,
-                          // Panel de razonamiento del juez (estilo Claude/o1 "Thinking")
-                          React.createElement(ReasoningPanel, { msg: m }),
-                          // Cuerpo de la respuesta (formato markdown)
-                          React.createElement('div', { style: { padding: '4px 0' } },
-                            React.createElement(Markdown, { text: m.content })
-                          ),
-                          // Badges de herramientas usadas
-                          m.toolsUsed && m.toolsUsed.length > 0 ?
-                            React.createElement('div', { style: { display: 'flex', gap: '4px', marginTop: '8px', flexWrap: 'wrap' } },
-                              m.toolsUsed.map(function(tool) {
-                                return React.createElement('span', {
-                                  key: tool,
-                                  style: {
-                                    display: 'inline-flex', alignItems: 'center', gap: '4px',
-                                    fontSize: '11px', padding: '2px 8px', borderRadius: '999px',
-                                    background: '#f6f8fa', border: '1px solid #d0d7de', color: '#59636e',
-                                    fontFamily: F,
-                                  }
-                                },
-                                  React.createElement(ToolIcon, { tool: tool, size: 12 }),
-                                  tool
-                                );
-                              })
-                            )
-                          : null,
-                          // Panel de proceso debajo de la respuesta
-                          m.processSteps ? React.createElement('div', {
-                            style: {
-                              marginTop: '12px', borderTop: '1px solid #d8dee4', paddingTop: '10px',
-                              display: 'flex', flexDirection: 'column', gap: '6px',
-                            }
-                          },
-                            React.createElement('div', { style: { fontSize: '11px', fontWeight: '600', color: '#59636e', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' } }, 'Proceso de ejecucion'),
-                            m.processSteps.map(function(ps, i) {
-                              var iconSvg = null;
-                              if (ps.icon === 'sector') iconSvg = React.createElement('svg', { viewBox: '0 0 16 16', width: '12', height: '12', fill: '#59636e' }, React.createElement('path', { d: 'M1.75 1h8.5c.966 0 1.75.784 1.75 1.75v5.5A1.75 1.75 0 0110.25 10H7.061l-2.574 2.573A1.458 1.458 0 012 11.543V10h-.25A1.75 1.75 0 010 8.25v-5.5C0 1.784.784 1 1.75 1z' }));
-                              else if (ps.icon === 'agent') iconSvg = React.createElement('svg', { viewBox: '0 0 16 16', width: '12', height: '12', fill: '#59636e' }, React.createElement('path', { d: 'M10.561 8.073a6.005 6.005 0 013.432 5.142.75.75 0 11-1.498.07 4.5 4.5 0 00-8.99 0 .75.75 0 11-1.498-.07 6.004 6.004 0 013.431-5.142 3.999 3.999 0 115.123 0zM10.5 5a2.5 2.5 0 10-5 0 2.5 2.5 0 005 0z' }));
-                              else if (ps.icon === 'repo') iconSvg = React.createElement('svg', { viewBox: '0 0 16 16', width: '12', height: '12', fill: '#59636e' }, React.createElement('path', { d: 'M2 2.5A2.5 2.5 0 014.5 0h8.75a.75.75 0 01.75.75v12.5a.75.75 0 01-.75.75h-2.5a.75.75 0 110-1.5h1.75v-2h-8a1 1 0 00-.714 1.7.75.75 0 01-1.072 1.05A2.495 2.495 0 012 11.5v-9z' }));
-                              else if (ps.icon === 'ai') iconSvg = React.createElement('svg', { viewBox: '0 0 16 16', width: '12', height: '12', fill: '#59636e' }, React.createElement('path', { d: 'M8 0a8 8 0 110 16A8 8 0 018 0zM1.5 8a6.5 6.5 0 1013 0 6.5 6.5 0 00-13 0zm6.25-3.25v2.992l2.028.812a.75.75 0 01-.557 1.392l-2.5-1A.751.751 0 017.25 8.25v-3.5a.75.75 0 011.5 0z' }));
-                              else if (ps.icon === 'clock') iconSvg = React.createElement('svg', { viewBox: '0 0 16 16', width: '12', height: '12', fill: '#59636e' }, React.createElement('path', { d: 'M8 0a8 8 0 110 16A8 8 0 018 0zM1.5 8a6.5 6.5 0 1013 0 6.5 6.5 0 00-13 0zm6.25-3.25v3a.75.75 0 01-.22.53l-2 2a.75.75 0 01-1.06-1.06l1.78-1.78V4.75a.75.75 0 111.5 0z' }));
-                              else iconSvg = React.createElement('svg', { viewBox: '0 0 16 16', width: '12', height: '12', fill: '#d1242f' }, React.createElement('path', { d: 'M3.72 3.72a.75.75 0 011.06 0L8 6.94l3.22-3.22a.75.75 0 111.06 1.06L9.06 8l3.22 3.22a.75.75 0 11-1.06 1.06L8 9.06l-3.22 3.22a.75.75 0 01-1.06-1.06L6.94 8 3.72 4.78a.75.75 0 010-1.06z' }));
-                              return React.createElement('div', { key: i, style: { display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px' } },
-                                iconSvg,
-                                React.createElement('span', { style: { color: '#59636e', flexShrink: 0, minWidth: '60px', fontWeight: 500 } }, ps.label),
-                                React.createElement('span', { style: { color: '#1f2328' } }, ps.detail)
-                              );
-                            })
-                          ) : null
-                        )
-                      : null
-                    )
-                  )
-              );
-            })
-          )
-      ),
-
-      // Input area (GitHub Primer) con auto-resize
-      React.createElement('div', { style: { padding: '0 20px 14px' } },
-        React.createElement('div', {
-          style: {
-            display: 'flex', alignItems: 'flex-end', gap: '10px',
-            background: '#ffffff', border: '1px solid #d0d7de', borderRadius: '6px',
-            padding: '10px 12px',
-            transition: 'border-color 80ms',
-          },
-          onFocus: function(e) { e.currentTarget.style.borderColor = '#0969da'; },
-          onBlur: function(e) { e.currentTarget.style.borderColor = '#d0d7de'; },
-        },
-          React.createElement('textarea', {
-            ref: taRef,
-            value: text,
-            onChange: function(e) { setText(e.target.value); textRef.current = e.target.value; },
-            placeholder: 'Escribe tu mensaje a ' + agent.name + '...',
-            rows: 1,
-            style: {
-              flex: 1, border: 'none', outline: 'none', resize: 'none',
-              fontSize: '14px', fontFamily: F, lineHeight: '1.5',
-              background: 'transparent', minHeight: '22px', maxHeight: '120px', color: '#1f2328',
-              overflow: 'auto',
-            },
-            onKeyDown: function(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }
-          }),
-          React.createElement('button', {
-            onClick: function() { send(); },
-            disabled: !text.trim() || busy,
-            style: {
-              width: '28px', height: '28px', borderRadius: '6px',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              border: 'none', cursor: text.trim() && !busy ? 'pointer' : 'default',
-              background: text.trim() && !busy ? '#2da44e' : '#f6f8fa',
-              color: text.trim() && !busy ? '#ffffff' : '#818b98',
-              flexShrink: 0, transition: 'background 80ms',
-            }
-          },
-            React.createElement('svg', { viewBox: '0 0 16 16', width: '14', height: '14', fill: 'currentColor' },
-              React.createElement('path', { d: 'M.989 8 .064 2.68a1.342 1.342 0 0 1 1.85-1.462l13.402 5.744a1.13 1.13 0 0 1 0 2.076L1.913 14.782a1.343 1.343 0 0 1-1.85-1.463L.99 8Zm.603-5.288L2.38 7.25h4.87a.75.75 0 0 1 0 1.5H2.38l-.788 4.538L13.929 8Z' })
-            )
-          )
-        )
-      )
-    )
+            })}
+          </div>
+          <div className="mt-2 text-center text-label-12 text-gray-400">
+            Usa <span className="font-mono font-semibold text-gray-1000">#</span> para agentes especializados
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }

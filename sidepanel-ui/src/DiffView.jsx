@@ -1,6 +1,6 @@
 import * as React from 'react';
 
-const MONO = "'SF Mono', 'Cascadia Code', Consolas, monospace";
+const MONO = "'Geist Mono', 'SF Mono', 'Cascadia Code', Consolas, monospace";
 const MAX_DIFF_LINES = 2000; // por encima de esto el diff O(n*m) no compensa
 
 // Diff de lineas clasico (LCS via programacion dinamica) — suficiente para
@@ -54,10 +54,12 @@ function toHunks(lines, contextSize) {
   return ranges.map(function (r) { return lines.slice(r[0], r[1] + 1); });
 }
 
+// Unica excepcion cromatica del theme monocromo: lineas añadidas/eliminadas
+// de un diff, exactamente como cualquier vista de diff (GitHub, Devin, etc).
 var LINE_STYLE = {
-  add: { bg: '#dafbe1', fg: '#116329', prefix: '+' },
-  del: { bg: '#ffebe9', fg: '#82071e', prefix: '-' },
-  ctx: { bg: 'transparent', fg: '#59636e', prefix: ' ' },
+  add: { bg: '#eafbea', fg: '#16a34a', prefix: '+' },
+  del: { bg: '#fbe9e9', fg: '#dc2626', prefix: '-' },
+  ctx: { bg: 'transparent', fg: '#707070', prefix: ' ' },
 };
 
 export function DiffView({ oldText, newText, maxHeight }) {
@@ -68,8 +70,8 @@ export function DiffView({ oldText, newText, maxHeight }) {
     // contenido completo, compacto, sin pretender ser un diff.
     return React.createElement('pre', {
       style: {
-        margin: 0, padding: '8px 10px', background: '#f6f8fa', borderRadius: '6px',
-        fontFamily: MONO, fontSize: '11px', lineHeight: '1.5', color: '#1f2328',
+        margin: 0, padding: '8px 10px', background: '#f7f7f7', borderRadius: '6px',
+        fontFamily: MONO, fontSize: '11px', lineHeight: '1.5', color: '#000000',
         whiteSpace: 'pre-wrap', wordBreak: 'break-word', overflow: 'auto', maxHeight: maxHeight || '280px',
       },
     }, newText);
@@ -80,15 +82,15 @@ export function DiffView({ oldText, newText, maxHeight }) {
   var removed = lines.filter(function (l) { return l.type === 'del'; }).length;
 
   return React.createElement('div', { style: { fontFamily: MONO, fontSize: '11px', lineHeight: '1.6' } },
-    React.createElement('div', { style: { color: '#818b98', marginBottom: '4px', fontSize: '11px' } },
-      React.createElement('span', { style: { color: '#1a7f37' } }, '+' + added),
+    React.createElement('div', { style: { color: '#a3a3a3', marginBottom: '4px', fontSize: '11px' } },
+      React.createElement('span', { style: { color: '#16a34a' } }, '+' + added),
       ' ',
-      React.createElement('span', { style: { color: '#d1242f' } }, '-' + removed)
+      React.createElement('span', { style: { color: '#dc2626' } }, '-' + removed)
     ),
-    React.createElement('div', { style: { border: '1px solid #d0d7de', borderRadius: '6px', overflow: 'auto', maxHeight: maxHeight || '280px' } },
+    React.createElement('div', { style: { border: '1px solid #e8e8e8', borderRadius: '6px', overflow: 'auto', maxHeight: maxHeight || '280px' } },
       hunks.map(function (hunk, hi) {
         return React.createElement('div', { key: hi },
-          hi > 0 && React.createElement('div', { style: { padding: '2px 10px', background: '#f6f8fa', color: '#818b98', borderTop: '1px solid #d0d7de', borderBottom: '1px solid #d0d7de' } }, '…'),
+          hi > 0 && React.createElement('div', { style: { padding: '2px 10px', background: '#f7f7f7', color: '#a3a3a3', borderTop: '1px solid #e8e8e8', borderBottom: '1px solid #e8e8e8' } }, '…'),
           hunk.map(function (l, li) {
             var st = LINE_STYLE[l.type];
             return React.createElement('div', {

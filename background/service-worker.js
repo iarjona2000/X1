@@ -58,6 +58,7 @@ try {
     'extract/data-extractor.js',
     'seo/seo-analyzer.js',
     'mcp/client.js',
+    'agents/mcp-agents.js',
     'skills/engine.js',
     'prompts/assembler.js',
     'x1-core/bundle/x1-core.js',
@@ -1653,6 +1654,7 @@ var SYSTEM_PROMPT = [
 'INVESTIGACION: deepResearch(query,depth?:standard|deep|thorough,maxSteps?) — busqueda multi-fuente con sintesis IA',
 'SKILLS: runSkill(name,params?), registerSkill(name,trigger,steps,description?), listSkills — flujos reutilizables',
 'MCP: mcpCall(server,tool,params?), mcpListServers, mcpAddServer(name,url) — Model Context Protocol',
+'MCP AGENTS (18): mcpAgent(agentId,query) — Context7(docs), GitHub(devops), Oct.Themes(design), Firecrawl(research), CF Docs/Builds/Bindings/Obs(devops), ClickHouse(data), Vercel(devops), Qdrant(memory), Filesystem(files), Memory(memory), Fetch(research), Git(devops), Seq.Think(thinking), Cognee(memory), Serena(code)',
 'DEBATE: debate(topic,providers?:[],rounds?) — debate multi-modelo paralelo',
 'EXTRACCION: extractAI(query) — extraccion inteligente de datos de pagina con IA',
 'SEO: seoAnalysis — analisis completo SEO de la pagina actual',
@@ -5177,6 +5179,51 @@ function execAction(act, tabId) {
           var sText = 'Servidores MCP:\n';
           servers.forEach(function(s, i) { sText += (i+1) + '. ' + s.name + ' (' + s.url + ') ' + (s.enabled ? '[ON]' : '[OFF]') + '\n'; });
           resolve({text: sText, showText: true});
+        });
+        break;
+
+      case 'mcpAgent':
+        var mcpAgentId = act.agentId || act.agent;
+        var mcpAgentQuery = act.query || act.text || '';
+        var mcpAgentObj = null;
+        if (typeof X1MCPAgents !== 'undefined') {
+          mcpAgentObj = X1MCPAgents.getById(mcpAgentId);
+        }
+        if (!mcpAgentObj) {
+          resolve({text: 'MCP Agent "' + mcpAgentId + '" no encontrado.', showText: true});
+          break;
+        }
+        var mcpIdx = stepProgress(tabId, mcpAgentObj.name, 'Processing...');
+        var mcpSysPrompt = (typeof X1MCPAgents !== 'undefined') ? X1MCPAgents.getAgentSystemPrompt(mcpAgentId) : '';
+        aiComplete(mcpSysPrompt + '\n\nQuery: ' + mcpAgentQuery, {preferProvider: 'groq', temperature: 0.1}).then(function(result) {
+          stepDone(tabId, mcpIdx);
+          resolve({text: result || mcpAgentObj.name + ' completed.', showText: true});
+        }).catch(function(e) {
+          stepError(tabId, mcpIdx);
+          resolve({text: mcpAgentObj.name + ' error: ' + e.message, showText: true});
+        });
+        break;
+
+      case 'mcpAgentQuery':
+        var mcpAqId = act.agentId || '';
+        var mcpAqQuery = act.query || act.text || '';
+        var mcpAqObj = null;
+        if (typeof X1MCPAgents !== 'undefined') {
+          mcpAqObj = X1MCPAgents.matchAgentForQuery(mcpAqQuery);
+          if (mcpAqId) mcpAqObj = X1MCPAgents.getById(mcpAqId) || mcpAqObj;
+        }
+        if (!mcpAqObj) {
+          resolve({text: 'No MCP agent matched for this query.', showText: true});
+          break;
+        }
+        var mcpAqIdx = stepProgress(tabId, mcpAqObj.name, 'Thinking...');
+        var mcpAqSys = (typeof X1MCPAgents !== 'undefined') ? X1MCPAgents.getAgentSystemPrompt(mcpAqObj.id) : '';
+        aiComplete(mcpAqSys + '\n\nUser: ' + mcpAqQuery, {preferProvider: 'groq', temperature: 0.1}).then(function(result) {
+          stepDone(tabId, mcpAqIdx);
+          resolve({text: result || mcpAqObj.name + ' response.', showText: true});
+        }).catch(function(e) {
+          stepError(tabId, mcpAqIdx);
+          resolve({text: mcpAqObj.name + ' error: ' + e.message, showText: true});
         });
         break;
 
@@ -21294,12 +21341,34 @@ function x1AiCallJson(prompt, systemPrompt, maxTokens, timeoutMs, validate, pref
 function x1ExtractJSON(txt) {
   if (!txt) return null;
   var cleaned = String(txt).replace(/```(?:json)?\s*([\s\S]*?)\s*```/g, '$1').trim();
+  // Intenta extraer el primer objeto JSON valido del texto.
   var m = cleaned.match(/\{[\s\S]*\}/);
   if (!m) return null;
   try { return JSON.parse(m[0]); }
   catch (e) {
-    try { return JSON.parse(m[0].replace(/,\s*}/g, '}').replace(/,\s*]/g, ']')); }
-    catch (e2) { return null; }
+    // Intenta reparar comas colgantes y corchetes desbalanceados.
+    try {
+      var fixed = m[0]
+        .replace(/,\s*}/g, '}')
+        .replace(/,\s*]/g, ']')
+        .replace(/}\s*{/g, '},{');  // objetos consecutivos sin coma
+      return JSON.parse(fixed);
+    } catch (e2) {
+      // Ultimo recurso: busca el objeto JSON mas grande que sea valido.
+      try {
+        var start = m[0].indexOf('{');
+        var depth = 0;
+        for (var i = start; i < m[0].length; i++) {
+          if (m[0][i] === '{') depth++;
+          else if (m[0][i] === '}') depth--;
+          if (depth === 0) {
+            var candidate = m[0].slice(start, i + 1);
+            return JSON.parse(candidate);
+          }
+        }
+      } catch (e3) {}
+      return null;
+    }
   }
 }
 
@@ -21403,10 +21472,17 @@ function x1ApplyEdits(current, ediciones) {
     var find = e.buscar != null ? String(e.buscar) : '';
     var repl = e.reemplazar != null ? String(e.reemplazar) : '';
     if (!find) { failed++; continue; }
+    // Reemplaza TODAS las ocurrencias (no solo la primera) — si el modelo
+    // propone un cambio que aplica en multiples sitios, queremos todos.
     var idx = text.indexOf(find);
     if (idx === -1) { failed++; continue; }
-    text = text.slice(0, idx) + repl + text.slice(idx + find.length);
-    applied++;
+    var count = 0;
+    while (idx !== -1 && count < 50) { // limite de seguridad contra loops infinitos
+      text = text.slice(0, idx) + repl + text.slice(idx + find.length);
+      idx = text.indexOf(find, idx + repl.length);
+      applied++;
+      count++;
+    }
   }
   return { text: text, applied: applied, failed: failed };
 }
@@ -21429,7 +21505,12 @@ function x1ResolveProposedFile(f, filesWithState) {
   if (exists && hasContent) {
     var nuevo = String(f.contenido);
     if (nuevo === current) return null;
-    if (current.length > 200 && nuevo.length < current.length * 0.65) return null; // guarda anti-destruccion
+    // Guardia anti-destruccion: si el fichero existente tenia contenido real
+    // (>200 chars) y el nuevo tiene menos del 50% de lineas, probablemente el
+    // modelo genero un JSON truncado o un fichero incompleto — no publicamos.
+    var currentLines = current.split('\n').length;
+    var newLines = nuevo.split('\n').length;
+    if (currentLines > 10 && newLines < currentLines * 0.5) return null;
     return { path: f.path, contenido: nuevo, current: current, sha: sha, exists: true };
   }
   return null;
@@ -21442,7 +21523,10 @@ function x1SanityCheckFile(content) {
   if (c.trim().length < 3) return false;
   var opens = (c.match(/[{(\[]/g) || []).length;
   var closes = (c.match(/[})\]]/g) || []).length;
-  if (Math.abs(opens - closes) > Math.max(3, c.length / 200)) return false;
+  // Tolera hasta 30% de desbalance (valido para JSON, templates, regex, etc).
+  // Solo rechaza si el desbalance es extremo (>30% del total de brackets).
+  var total = opens + closes;
+  if (total > 0 && Math.abs(opens - closes) > total * 0.3) return false;
   return true;
 }
 
@@ -21551,11 +21635,19 @@ function x1ProcessQueueTask(queue, idx) {
   var tarea = queue.tareas[idx];
   tarea.status = 'active';
   tarea.sectors = [];
+  queue.activeTask = { titulo: tarea.titulo, status: 'preparing', startedAt: Date.now() };
+  queue.updatedAt = Date.now();
   x1SaveQueue(queue);
   return x1GetGithubToken().then(function (token) {
     if (!token) throw new Error('Sin sesion de GitHub');
     return x1PrepareTask(token, queue.owner, queue.name, tarea).then(function (prep) {
+      queue.activeTask.status = 'coding';
+      queue.updatedAt = Date.now();
+      x1SaveQueue(queue);
       return x1RunCodePipeline(queue.goal, tarea, prep.filesWithState, prep.researchBlock, tarea.sectors).then(function (proposal) {
+        queue.activeTask.status = 'publishing';
+        queue.updatedAt = Date.now();
+        x1SaveQueue(queue);
         return x1PublishAndCount(token, queue.owner, queue.name, queue.branch, proposal).then(function (result) {
           tarea.status = 'done'; tarea.result = result;
         });
@@ -21563,9 +21655,14 @@ function x1ProcessQueueTask(queue, idx) {
     });
   }).catch(function (e) {
     tarea.status = 'error';
-    tarea.result = { error: (e && e.message) || 'Error desconocido', completedAt: Date.now() };
+    tarea.result = {
+      error: (e && e.message) || 'Error desconocido',
+      completedAt: Date.now(),
+      sector: tarea.sectors && tarea.sectors.length ? tarea.sectors[tarea.sectors.length - 1].fase : null,
+    };
   }).then(function () {
     queue.currentIndex = idx + 1;
+    queue.activeTask = null;
     queue.updatedAt = Date.now();
     return x1SaveQueue(queue).then(function () { return queue; });
   });
@@ -21603,8 +21700,18 @@ function x1DecideNextObjective(queue) {
   var recent = (queue.history || []).slice(-10).map(function (h, i) {
     return (i + 1) + '. ' + h.titulo + (h.result && h.result.error ? ' (fallo)' : ' (hecho)');
   }).join('\n');
-  var prompt = 'No hay objetivo del usuario: decide TU MISMO la mejora mas valiosa a hacer AHORA en este repositorio.\n\n' +
-    'Repositorio: ' + queue.owner + '/' + queue.name + '\nInforme de analisis:\n' + (queue.analysisReport || '(sin informe)') + '\n\n' +
+  var analysisBlock = queue.analysisReport && queue.analysisReport.trim()
+    ? 'Informe de analisis:\n' + queue.analysisReport + '\n\n'
+    : '(Sin informe de analisis previo. Decide basandote en el historial y buenas practicas generales.)\n\n';
+  // Direccion del usuario: el sidepanel puede mandar X1_AUTOMATION_QUEUE_REDIRECT
+  // en cualquier momento para cambiar el rumbo sin tener que cancelar y volver a
+  // activar el autopiloto. Se mantiene vigente ciclo tras ciclo hasta que el
+  // usuario mande otra, o "objetivo libre" para volver a que X1 decida solo.
+  var directiveBlock = queue.userDirective
+    ? 'DIRECCION DEL USUARIO (obligatoria, tiene prioridad sobre cualquier otra idea tuya): "' + queue.userDirective + '"\nElige el proximo paso concreto que mas avance esta direccion.\n\n'
+    : 'No hay objetivo del usuario: decide TU MISMO la mejora mas valiosa a hacer AHORA en este repositorio.\n\n';
+  var prompt = directiveBlock +
+    'Repositorio: ' + queue.owner + '/' + queue.name + '\n' + analysisBlock +
     (recent ? 'Ya se hizo (NO repitas, elige algo distinto):\n' + recent + '\n\n' : '(Primer ciclo, sin historial.)\n\n') +
     'Prefiere cambios concretos y de bajo riesgo (tests nuevos, docs, utilidades, correcciones puntuales). ' +
     'Responde SOLO con JSON: {"titulo":"titulo corto","motivo":"por que es valioso ahora","busquedas":["hasta 2 terminos"],"archivos":[{"path":"ruta real del repo","motivo":"..."}]}\nMaximo 3 archivos.';
@@ -21623,21 +21730,34 @@ function x1ProcessAutopilotCycle(queue) {
       return x1DecideNextObjective(queue).then(function (decision) {
         var tarea = decision.tarea;
         tarea.sectors = [decision.sector];
+        // Guarda progreso inmediatamente tras decidir el objetivo (si el SW
+        // muere aqui, el proximo tick recupera que ya se decidio y reintenta).
+        queue.activeTask = { titulo: tarea.titulo, status: 'decided', startedAt: Date.now() };
+        queue.updatedAt = Date.now();
+        x1SaveQueue(queue);
         return x1PrepareTask(token, queue.owner, queue.name, tarea).then(function (prep) {
+          queue.activeTask.status = 'coding';
+          queue.updatedAt = Date.now();
+          x1SaveQueue(queue);
           return x1RunCodePipeline(tarea.titulo, tarea, prep.filesWithState, prep.researchBlock, tarea.sectors).then(function (proposal) {
+            queue.activeTask.status = 'publishing';
+            queue.updatedAt = Date.now();
+            x1SaveQueue(queue);
             return x1PublishAndCount(token, queue.owner, queue.name, queue.branch, proposal).then(function (result) {
-              tarea.status = 'done'; tarea.result = result; return tarea;
+              tarea.status = 'done'; tarea.result = result;
+              return tarea;
             });
           });
         }).catch(function (e) {
           tarea.status = 'error';
-          tarea.result = { error: (e && e.message) || 'Error desconocido', completedAt: Date.now() };
+          tarea.result = { error: (e && e.message) || 'Error desconocido', completedAt: Date.now(), sector: tarea.sectors && tarea.sectors.length ? tarea.sectors[tarea.sectors.length - 1].fase : null };
           return tarea;
         });
       });
     });
   }).then(function (tarea) {
     queue.history = (queue.history || []).concat([tarea]).slice(-40);
+    queue.activeTask = null;
     queue.consecutiveFailures = tarea.status === 'error' ? (queue.consecutiveFailures || 0) + 1 : 0;
     queue.updatedAt = Date.now();
     return x1SaveQueue(queue).then(function () { return queue; });
@@ -21649,7 +21769,7 @@ var X1_AUTOPILOT_MAX_CONSECUTIVE_FAILURES = 3;
 var X1_AUTOPILOT_RAMP_CYCLES = 4;
 function x1AutopilotDelayMins(queue) {
   var cycles = (queue.history || []).length;
-  if (cycles < X1_AUTOPILOT_RAMP_CYCLES) return 1;      // primeros ciclos rapidos (visible)
+  if (cycles < X1_AUTOPILOT_RAMP_CYCLES) return 1;      // Chrome alarms minimo es 1 min
   return 15 + Math.floor(Math.random() * 10);           // luego 15-25 min
 }
 function x1ScheduleNextTick(queue, mins) {
@@ -21683,6 +21803,7 @@ chrome.alarms.onAlarm.addListener(function (alarm) {
         // loop NO debe morir en silencio. Cuenta como fallo y reprograma; si ya
         // van demasiados, pausa con aviso. Sin esto, un solo throw congelaba el
         // autopiloto para siempre — el sintoma de "trabaja 2s y para".
+        queue.activeTask = null;
         queue.consecutiveFailures = (queue.consecutiveFailures || 0) + 1;
         queue.lastError = (e && e.message) || 'error inesperado';
         queue.updatedAt = Date.now();
@@ -21695,6 +21816,7 @@ chrome.alarms.onAlarm.addListener(function (alarm) {
     // ── Cola finita: procesa la siguiente tarea o notifica al terminar. ──
     if (queue.currentIndex >= queue.tareas.length) return;
     x1ProcessQueueTask(queue, queue.currentIndex).then(function (updatedQueue) {
+      updatedQueue.activeTask = null;
       if (updatedQueue.currentIndex < updatedQueue.tareas.length) {
         x1ScheduleNextTick(updatedQueue, 15 + Math.floor(Math.random() * 10)); // 15-25 min
       } else {
@@ -21717,13 +21839,24 @@ chrome.alarms.onAlarm.addListener(function (alarm) {
 chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
   if (msg.type === 'X1_AUTOMATION_QUEUE_START') {
     x1SaveQueue(msg.queue).then(function () {
-      // Autopiloto: siempre sigue (no hay "ultima tarea"). Cola finita: solo si
-      // quedan tareas pendientes tras la primera (ya procesada por el sidepanel).
       var isAuto = msg.queue.mode === 'autopilot';
       var shouldSchedule = isAuto ? msg.queue.status !== 'paused' : (msg.queue.currentIndex < msg.queue.tareas.length);
-      if (shouldSchedule) {
-        var mins = isAuto ? x1AutopilotDelayMins(msg.queue) : (15 + Math.floor(Math.random() * 10));
-        x1ScheduleNextTick(msg.queue, mins);
+      if (isAuto && shouldSchedule) {
+        // Autopiloto: primer ciclo INMEDIATO (no espera al alarm de 1 min).
+        // El alarm se programa despues de que el primer ciclo termine.
+        x1ProcessAutopilotCycle(msg.queue).then(function (uq) {
+          if ((uq.consecutiveFailures || 0) >= X1_AUTOPILOT_MAX_CONSECUTIVE_FAILURES) { x1PauseAutopilot(uq); return; }
+          x1ScheduleNextTick(uq, x1AutopilotDelayMins(uq));
+        }).catch(function (e) {
+          msg.queue.activeTask = null;
+          msg.queue.consecutiveFailures = (msg.queue.consecutiveFailures || 0) + 1;
+          msg.queue.lastError = (e && e.message) || 'error inesperado';
+          msg.queue.updatedAt = Date.now();
+          if (msg.queue.consecutiveFailures >= X1_AUTOPILOT_MAX_CONSECUTIVE_FAILURES) { x1PauseAutopilot(msg.queue); return; }
+          x1ScheduleNextTick(msg.queue, x1AutopilotDelayMins(msg.queue));
+        });
+      } else if (shouldSchedule) {
+        x1ScheduleNextTick(msg.queue, 15 + Math.floor(Math.random() * 10));
       }
       sendResponse({ ok: true });
     });
@@ -21746,9 +21879,22 @@ chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
       queue.status = 'running';
       queue.consecutiveFailures = 0;
       queue.lastError = null;
+      queue.activeTask = null;
       queue.updatedAt = Date.now();
       x1ScheduleNextTick(queue, queue.mode === 'autopilot' ? x1AutopilotDelayMins(queue) : (15 + Math.floor(Math.random() * 10)));
       sendResponse({ ok: true });
+    });
+    return true;
+  }
+  // Cambia el rumbo del autopiloto sin cancelarlo: msg.directive vacio/null
+  // vuelve a que X1 decida solo. Aplica desde el proximo ciclo (no interrumpe
+  // uno ya en marcha).
+  if (msg.type === 'X1_AUTOMATION_QUEUE_REDIRECT') {
+    x1GetQueue().then(function (queue) {
+      if (!queue) { sendResponse({ ok: false }); return; }
+      queue.userDirective = (msg.directive || '').trim() || null;
+      queue.updatedAt = Date.now();
+      x1SaveQueue(queue).then(function () { sendResponse({ ok: true }); });
     });
     return true;
   }

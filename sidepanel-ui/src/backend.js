@@ -4,6 +4,27 @@ const AI = '../assets/ai/';
 const PROXY_URL = 'https://x1-proxy.calezamindset.workers.dev/v1/chat/completions';
 const PROXY_SECRET = '9ff4b7dda5f7defd5f7fb7c32c133428bc87e8efeb8550d3ce1e5838c1d3b850';
 
+var MCP_AGENTS = [
+  { id: 'mcp-context7',    name: 'Context7',    category: 'docs',     color: '#6366f1', letter: 'C7', tools: ['resolve-library-id', 'query-docs'] },
+  { id: 'mcp-github',      name: 'GitHub',      category: 'devops',   color: '#24292e', letter: 'GH', tools: ['repos', 'issues', 'PRs', 'branches', 'search'] },
+  { id: 'mcp-october',     name: 'Oct. Themes', category: 'design',   color: '#f59e0b', letter: 'OT', tools: ['get_theme', 'get_theme_by_id'] },
+  { id: 'mcp-firecrawl',   name: 'Firecrawl',   category: 'research', color: '#ef4444', letter: 'FC', tools: ['scrape', 'search', 'crawl', 'extract'] },
+  { id: 'mcp-cf-docs',     name: 'CF Docs',     category: 'devops',   color: '#f6821f', letter: 'CD', tools: ['search_docs'] },
+  { id: 'mcp-cf-builds',   name: 'CF Builds',   category: 'devops',   color: '#f6821f', letter: 'CB', tools: ['list_builds', 'get_build'] },
+  { id: 'mcp-cf-bindings', name: 'CF Bindings', category: 'devops',   color: '#f6821f', letter: 'CN', tools: ['list_bindings', 'get_binding'] },
+  { id: 'mcp-cf-obs',      name: 'CF Obs',      category: 'devops',   color: '#f6821f', letter: 'CO', tools: ['list_logs', 'get_metrics'] },
+  { id: 'mcp-clickhouse',  name: 'ClickHouse',  category: 'data',     color: '#ffcc00', letter: 'CH', tools: ['query', 'list_databases', 'list_tables'] },
+  { id: 'mcp-vercel',      name: 'Vercel',      category: 'devops',   color: '#000',    letter: 'VC', tools: ['list_projects', 'deploy', 'get_deployment'] },
+  { id: 'mcp-qdrant',      name: 'Qdrant',      category: 'memory',   color: '#10b981', letter: 'QD', tools: ['store', 'find', 'delete', 'list_collections'] },
+  { id: 'mcp-filesystem',  name: 'Filesystem',  category: 'files',    color: '#8b5cf6', letter: 'FS', tools: ['read_file', 'write_file', 'list_directory', 'search'] },
+  { id: 'mcp-memory',      name: 'Memory',      category: 'memory',   color: '#06b6d4', letter: 'MG', tools: ['entities', 'relations', 'observations', 'search'] },
+  { id: 'mcp-fetch',       name: 'Fetch',       category: 'research', color: '#14b8a6', letter: 'FT', tools: ['fetch_url'] },
+  { id: 'mcp-git',         name: 'Git',         category: 'devops',   color: '#f97316', letter: 'GT', tools: ['log', 'diff', 'blame', 'status'] },
+  { id: 'mcp-seqthink',    name: 'Seq. Think',  category: 'thinking', color: '#a855f7', letter: 'ST', tools: ['sequential_thinking'] },
+  { id: 'mcp-cognee',      name: 'Cognee',      category: 'memory',   color: '#ec4899', letter: 'CG', tools: ['remember', 'recall', 'forget'] },
+  { id: 'mcp-serena',      name: 'Serena',      category: 'code',     color: '#3b82f6', letter: 'SR', tools: ['search_code', 'edit_code', 'find_references'] },
+];
+
 // Prompts de sistema por sector — cada uno describe un rol + modelo open-source diferente.
 const SECTOR_PROMPTS = {
   developer: 'Eres un arquitecto de software experto, entrenado sobre Qwen3 Coder 480B (open source, Alibaba). Responde EN ESPAÑOL con ejemplos de codigo funcionales, buenas practicas y explicaciones claras. Usa `codigo` para bloques, **negrita** para conceptos clave. Cuando sea relevante, menciona repositorios open-source de referencia.',
@@ -92,7 +113,7 @@ export async function callAI(query, opts) {
       headers: { 'Content-Type': 'application/json', 'X-X1-Auth': PROXY_SECRET },
       body: JSON.stringify({
         messages: [
-          { role: 'system', content: opts.systemPrompt || 'Eres System X1. Responde EN ESPAÑOL de forma clara y util.' },
+          { role: 'system', content: opts.systemPrompt || 'Eres Vektor. Responde EN ESPA\u00d1OL de forma clara y util.' },
           { role: 'user', content: query }
         ],
         max_tokens: maxTokens,
@@ -119,14 +140,27 @@ export async function callAI(query, opts) {
 
 export async function smartQuery(query, agentId) {
   T.addMemory('user', query);
-  var sector = sectorForAgent(agentId);
+  var sector = agentId && agentId.indexOf('mcp-') === 0 ? 'MCP' : sectorForAgent(agentId);
   var agent = AGENTS.find(function(a) { return a.id === agentId; });
+
+  // MCP Agent routing
+  if (agentId && agentId.indexOf('mcp-') === 0) {
+    var mcpAgent = MCP_AGENTS.find(function(a) { return a.id === agentId; });
+    if (mcpAgent) {
+      var mcpSystemPrompt = 'You are the ' + mcpAgent.name + ' MCP Agent. Category: ' + mcpAgent.category + '. Tools: ' + mcpAgent.tools.join(', ') + '. Help the user with their query using your available tools.';
+      var mcpResult = await callAI(query, { systemPrompt: mcpSystemPrompt });
+      if (mcpResult && mcpResult.text) {
+        T.addMemory('assistant', mcpResult.text);
+        return { response: mcpResult.text, tools: [], judgeReason: 'MCP Agent: ' + mcpAgent.name + ' (' + mcpAgent.category + ')', sector: 'MCP', model: mcpResult.model, provider: mcpResult.provider, latencyMs: mcpResult.latencyMs, agentName: mcpAgent.name, agentModel: 'MCP', agentRepo: '' };
+      }
+    }
+  }
 
   if (isGreeting(query)) {
     var res = await callAI(query, { maxTokens: 300, temperature: 0.7 });
-    var greet = res && res.text ? res.text : 'Hola! Soy System X1. En que puedo ayudarte?';
+    var greet = res && res.text ? res.text : 'Hola! Soy Vektor. En que puedo ayudarte?';
     T.addMemory('assistant', greet);
-    return { response: greet, tools: [], judgeReason: null, sector: sector, model: res && res.model || null, provider: res && res.provider || null, latencyMs: res && res.latencyMs || 0, agentName: agent ? agent.name : 'X1', agentModel: agent ? agent.ai : 'IA', agentRepo: agent ? agent.repo : '' };
+    return { response: greet, tools: [], judgeReason: null, sector: sector, model: res && res.model || null, provider: res && res.provider || null, latencyMs: res && res.latencyMs || 0, agentName: agent ? agent.name : 'Vektor', agentModel: agent ? agent.ai : 'IA', agentRepo: agent ? agent.repo : '' };
   }
 
   var judgeReason = getJudgeReason(query, agentId);
@@ -140,7 +174,9 @@ export async function smartQuery(query, agentId) {
       response: aiResult.text, tools: [],
       judgeReason: judgeReason, sector: sector,
       model: aiResult.model, provider: aiResult.provider, latencyMs: aiResult.latencyMs,
-      agentName: agent ? agent.name : 'X1', agentModel: agent ? agent.ai : 'IA', agentRepo: agent ? agent.repo : ''
+      agentName: agent ? agent.name : 'Vektor', agentModel: agent ? agent.ai : 'IA', agentRepo: agent ? agent.repo : ''
+
+
     };
   }
 
@@ -152,24 +188,24 @@ export async function smartQuery(query, agentId) {
   if (toolText) {
     var toolsUsed = T.toolsUsedList(toolResults || {});
     T.addMemory('assistant', toolText);
-    return { response: 'El motor IA esta temporalmente sin conexion. Resultados de busqueda:\n\n' + toolText, tools: toolsUsed, judgeReason: judgeReason, sector: sector, agentName: agent ? agent.name : 'X1', agentModel: agent ? agent.ai : 'IA', agentRepo: agent ? agent.repo : '' };
+    return { response: 'El motor IA esta temporalmente sin conexion. Resultados de busqueda:\n\n' + toolText, tools: toolsUsed, judgeReason: judgeReason, sector: sector, agentName: agent ? agent.name : 'Vektor', agentModel: agent ? agent.ai : 'IA', agentRepo: agent ? agent.repo : '' };
   }
 
   // 3) Fallback local
   var localFallback = buildLocalFallback(query, agentId, sector);
   T.addMemory('assistant', localFallback);
-  return { response: localFallback, tools: [], judgeReason: judgeReason, sector: sector, agentName: agent ? agent.name : 'X1', agentModel: agent ? agent.ai : 'IA', agentRepo: agent ? agent.repo : '' };
+  return { response: localFallback, tools: [], judgeReason: judgeReason, sector: sector, agentName: agent ? agent.name : 'Vektor', agentModel: agent ? agent.ai : 'IA', agentRepo: agent ? agent.repo : '' };
 }
 
 function buildLocalFallback(query, agentId, sector) {
   var t = query.toLowerCase().trim();
   var agent = AGENTS.find(function(a) { return a.id === agentId; });
-  var agentName = agent ? agent.name : 'X1';
+  var agentName = agent ? agent.name : 'Vektor';
   var agentAI = agent ? agent.ai : 'IA';
 
-  if (isGreeting(query)) return 'Hola. Soy System X1 en modo local (sin conexion IA). Puedo orientarte.';
+  if (isGreeting(query)) return 'Hola. Soy Vektor en modo local (sin conexion IA). Puedo orientarte.';
   if (/^(quien eres|que eres|como te llamas|que puedes hacer|que sabes hacer|ayuda|help|que haces)/.test(t))
-    return 'Soy **System X1**. Uso modelos open-source de GitHub. **' + agentName + '** (' + agentAI + ') activo para **' + sector + '**.';
+    return 'Soy **Vektor**. Uso modelos open-source de GitHub. **' + agentName + '** (' + agentAI + ') activo para **' + sector + '**.';
   if (/codigo|code|programa|funcion|componente|react|debug|script|api|html|css|bug|error/.test(t))
     return '**Consulta de desarrollo.** Agente: ' + agentName + ' (' + agentAI + '). IA offline. Prueba: **"busca en github..."**';
   if (/email|correo|gmail|mensaje|redacta/.test(t))

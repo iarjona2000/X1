@@ -2,9 +2,9 @@ import * as React from 'react';
 import * as B from './backend.js';
 import { RepoAnalysis } from './RepoAnalysis.jsx';
 
-const F = "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif";
+const F = "'Geist Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif";
 
-const OctocatSvg = ({ w = 16, h = 16, fill = '#656d76' }) => (
+const OctocatSvg = ({ w = 16, h = 16, fill = '#707070' }) => (
   <svg viewBox="0 0 98 96" width={w} height={h} fill={fill}>
     <path d="M48.854 0C21.839 0 0 22 0 49.217c0 21.756 13.993 40.172 33.405 46.69 2.427.49 3.316-1.059 3.316-2.362 0-1.141-.08-5.052-.08-9.127-13.59 2.934-16.42-5.867-16.42-5.867-2.184-5.704-5.42-7.17-5.42-7.17-4.448-3.015.324-3.015.324-3.015 4.934.326 7.523 5.052 7.523 5.052 4.367 7.496 11.404 5.378 14.235 4.074.404-3.178 1.699-5.378 3.074-6.6-10.839-1.141-22.243-5.378-22.243-24.283 0-5.378 1.94-9.778 5.014-13.2-.485-1.222-2.184-6.275.486-13.038 0 0 4.125-1.304 13.426 5.052a46.97 46.97 0 0 1 12.214-1.63c4.125 0 8.33.571 12.213 1.63 9.302-6.356 13.427-5.052 13.427-5.052 2.67 6.763.97 11.816.485 13.038 3.155 3.422 5.015 7.822 5.015 13.2 0 18.905-11.404 23.06-22.324 24.283 1.78 1.548 3.316 4.481 3.316 9.126 0 6.6-.08 11.897-.08 13.526 0 1.304.89 2.853 3.316 2.364 19.412-6.52 33.405-24.935 33.405-46.691C97.707 22 75.788 0 48.854 0z"/>
   </svg>
@@ -25,7 +25,7 @@ function timeAgo(ts) {
 }
 
 const TOOL_ITEMS = [
-  { id: 'github', name: 'GitHub', desc: 'Busca repositorios y codigo', letter: 'G', bg: '#1f2328' },
+  { id: 'github', name: 'GitHub', desc: 'Busca repositorios y codigo', letter: 'G', bg: '#000000' },
   { id: 'npm', name: 'npm', desc: 'Busca paquetes de Node.js', letter: 'N', bg: '#cb3837' },
   { id: 'stackoverflow', name: 'Stack Overflow', desc: 'Busca soluciones a errores', letter: 'S', bg: '#f48024' },
   { id: 'web', name: 'Web Search', desc: 'Busca en DuckDuckGo', letter: 'W', bg: '#de5833' },
@@ -91,7 +91,7 @@ export function RepoView({ conversations, githubUser }) {
           if (x1Repo) {
             setMyRepoData(x1Repo);
           } else {
-            setMyRepoData({ name: githubUser.login + '/x1-data', description: 'Datos de System X1', private: true, entries: conversations ? conversations.length : 0 });
+            setMyRepoData({ name: githubUser.login + '/vektor-data', description: 'Datos de Vektor', private: true, entries: conversations ? conversations.length : 0 });
           }
           setMyRepoLoading(false);
         }).catch(() => setMyRepoLoading(false));
@@ -125,18 +125,18 @@ export function RepoView({ conversations, githubUser }) {
   items.sort((a, b) => b.updatedAt - a.updatedAt);
 
   const TAG_COLORS = {
-    Codigo: { bg: '#ddf4ff', fg: '#0969da' },
+    Codigo: { bg: '#eeeeee', fg: '#000000' },
     Diseno: { bg: '#fbefff', fg: '#8250df' },
-    Estrategia: { bg: '#dafbe1', fg: '#1a7f37' },
-    Email: { bg: '#fff8c5', fg: '#9a6700' },
-    Datos: { bg: '#ddf4ff', fg: '#0969da' },
-    Nota: { bg: '#f3f4f6', fg: '#656d76' },
+    Estrategia: { bg: '#eeeeee', fg: '#000000' },
+    Email: { bg: '#eeeeee', fg: '#707070' },
+    Datos: { bg: '#eeeeee', fg: '#000000' },
+    Nota: { bg: '#eeeeee', fg: '#707070' },
   };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden', fontFamily: F }}>
       {/* Tab bar */}
-      <div style={{ display: 'flex', borderBottom: '1px solid #d0d7de', background: '#ffffff', padding: '0 16px' }}>
+      <div style={{ display: 'flex', borderBottom: '1px solid #e8e8e8', background: '#ffffff', padding: '0 16px' }}>
         {[
           { id: 'local', label: 'Repositorio' },
           { id: 'myrepo', label: 'Mi Repositorio', disabled: !githubUser },
@@ -146,8 +146,8 @@ export function RepoView({ conversations, githubUser }) {
           <button key={tab.id} onClick={() => !tab.disabled && setActiveTab(tab.id)} style={{
             padding: '8px 12px', border: 'none', background: 'transparent',
             fontSize: '14px', fontWeight: activeTab === tab.id ? '600' : '400',
-            color: activeTab === tab.id ? '#1f2328' : '#59636e',
-            borderBottom: activeTab === tab.id ? '2px solid #fd8c73' : '2px solid transparent',
+            color: activeTab === tab.id ? '#000000' : '#707070',
+            borderBottom: activeTab === tab.id ? '2px solid #000000' : '2px solid transparent',
             cursor: tab.disabled ? 'not-allowed' : 'pointer',
             opacity: tab.disabled ? 0.4 : 1,
             marginRight: '4px',
@@ -168,13 +168,13 @@ export function RepoView({ conversations, githubUser }) {
             <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
               <div style={{
                 flex: 1, display: 'flex', alignItems: 'center', gap: '6px',
-                padding: '5px 12px', background: '#f6f8fa', border: '1px solid #d0d7de',
+                padding: '5px 12px', background: '#f7f7f7', border: '1px solid #e8e8e8',
                 borderRadius: '6px',
               }}>
-                <SearchIcon w={16} h={16} fill="#818b98" />
+                <SearchIcon w={16} h={16} fill="#a3a3a3" />
                 <input value={search} onChange={e => setSearch(e.target.value)}
                   placeholder="Filtrar repositorio..."
-                  style={{ border: 'none', outline: 'none', background: 'transparent', fontSize: '14px', flex: 1, fontFamily: F, color: '#1f2328' }}
+                  style={{ border: 'none', outline: 'none', background: 'transparent', fontSize: '14px', flex: 1, fontFamily: F, color: '#000000' }}
                 />
               </div>
             </div>
@@ -182,7 +182,7 @@ export function RepoView({ conversations, githubUser }) {
             {/* Filter chips — estilo GitHub Primer: UnderlineNav horizontal */}
             <div role="nav" style={{
               display: 'flex', gap: 0, marginBottom: 24, flexWrap: 'wrap',
-              borderBottom: '1px solid #d0d7de',
+              borderBottom: '1px solid #e8e8e8',
               fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif',
             }}>
               {[
@@ -203,12 +203,12 @@ export function RepoView({ conversations, githubUser }) {
                       padding: '8px 16px',
                       background: 'transparent',
                       border: 'none',
-                      borderBottom: active ? '2px solid #fd8c73' : '2px solid transparent',
+                      borderBottom: active ? '2px solid #000000' : '2px solid transparent',
                       marginBottom: active ? '-1px' : 0,
                       cursor: 'pointer',
                       fontSize: '14px',
                       fontWeight: active ? 600 : 400,
-                      color: active ? '#1f2328' : '#59636e',
+                      color: active ? '#000000' : '#707070',
                       transition: 'color 80ms, border-bottom 80ms',
                       fontFamily: 'inherit',
                     }}
@@ -219,13 +219,13 @@ export function RepoView({ conversations, githubUser }) {
 
             {/* Items list */}
             {items.length === 0 ? (
-              <div style={{ padding: '48px 0', textAlign: 'center', color: '#59636e', fontSize: '14px' }}>
-                <OctocatSvg w={40} h={40} fill="#818b98" />
+              <div style={{ padding: '48px 0', textAlign: 'center', color: '#707070', fontSize: '14px' }}>
+                <OctocatSvg w={40} h={40} fill="#a3a3a3" />
                 <div style={{ marginTop: '12px', fontWeight: '500' }}>Tu repositorio esta vacio</div>
-                <div style={{ fontSize: '12px', color: '#818b98', marginTop: '4px' }}>Crea una conversacion para empezar</div>
+                <div style={{ fontSize: '12px', color: '#a3a3a3', marginTop: '4px' }}>Crea una conversacion para empezar</div>
                 {!isGhConnected && (
                   <button onClick={connectGithub} disabled={connecting}
-                    style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginTop: '20px', padding: '6px 16px', borderRadius: '6px', border: '1px solid rgba(27,31,36,0.15)', background: '#24292f', color: '#ffffff', fontSize: '13px', fontWeight: '600', cursor: connecting ? 'not-allowed' : 'pointer', opacity: connecting ? 0.7 : 1, boxShadow: 'inset 0 1px 0 rgba(208,215,222,0.2)', fontFamily: F }}>
+                    style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginTop: '20px', padding: '6px 16px', borderRadius: '6px', border: '1px solid rgba(0,0,0,0.15)', background: '#000000', color: '#ffffff', fontSize: '13px', fontWeight: '600', cursor: connecting ? 'not-allowed' : 'pointer', opacity: connecting ? 0.7 : 1, boxShadow: 'inset 0 1px 0 rgba(0,0,0,0.08)', fontFamily: F }}>
                     <OctocatSvg w={16} h={16} fill="#ffffff" />
                     {connecting ? 'Conectando...' : 'Conectar GitHub'}
                   </button>
@@ -238,28 +238,28 @@ export function RepoView({ conversations, githubUser }) {
                   return (
                     <div key={item.id} style={{
                       padding: '14px 18px', background: '#ffffff',
-                      border: '1px solid #d0d7de', borderRadius: '6px',
+                      border: '1px solid #e8e8e8', borderRadius: '6px',
                       cursor: 'pointer', lineHeight: '1.6',
                       transition: 'background 80ms, border-color 80ms',
                     }}
-                      onMouseEnter={e => { e.currentTarget.style.background = '#f6f8fa'; e.currentTarget.style.borderColor = '#0969da'; }}
-                      onMouseLeave={e => { e.currentTarget.style.background = '#ffffff'; e.currentTarget.style.borderColor = '#d0d7de'; }}
+                      onMouseEnter={e => { e.currentTarget.style.background = '#f7f7f7'; e.currentTarget.style.borderColor = '#000000'; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = '#ffffff'; e.currentTarget.style.borderColor = '#e8e8e8'; }}
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <div style={{
                           width: '16px', height: '16px', borderRadius: '3px',
-                          background: item.tags[0] ? tc.bg : '#f3f4f6',
+                          background: item.tags[0] ? tc.bg : '#eeeeee',
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
                           flexShrink: 0,
                         }}>
-                          <div style={{ width: '8px', height: '8px', borderRadius: '2px', background: item.tags[0] ? tc.fg : '#818b98' }} />
+                          <div style={{ width: '8px', height: '8px', borderRadius: '2px', background: item.tags[0] ? tc.fg : '#a3a3a3' }} />
                         </div>
-                        <span style={{ fontSize: '14px', fontWeight: '600', color: '#0969da', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</span>
-                        <span style={{ fontSize: '12px', color: '#59636e', flexShrink: 0 }}>{item.count} msg{item.count !== 1 ? 's' : ''}</span>
-                        <span style={{ fontSize: '12px', color: '#818b98', flexShrink: 0 }}>{timeAgo(item.updatedAt)}</span>
+                        <span style={{ fontSize: '14px', fontWeight: '600', color: '#000000', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</span>
+                        <span style={{ fontSize: '12px', color: '#707070', flexShrink: 0 }}>{item.count} msg{item.count !== 1 ? 's' : ''}</span>
+                        <span style={{ fontSize: '12px', color: '#a3a3a3', flexShrink: 0 }}>{timeAgo(item.updatedAt)}</span>
                       </div>
                       {item.preview && (
-                        <div style={{ fontSize: '12px', color: '#59636e', marginTop: '6px', marginLeft: '26px',
+                        <div style={{ fontSize: '12px', color: '#707070', marginTop: '6px', marginLeft: '26px',
                           lineHeight: '1.6', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.preview}</div>
                       )}
                     </div>
@@ -274,35 +274,35 @@ export function RepoView({ conversations, githubUser }) {
         {activeTab === 'github' && (
           <div style={{ padding: '16px' }}>
             {!githubUser ? (
-              <div style={{ padding: '48px 0', textAlign: 'center', color: '#59636e', fontSize: '14px' }}>
+              <div style={{ padding: '48px 0', textAlign: 'center', color: '#707070', fontSize: '14px' }}>
                 Conecta tu cuenta de GitHub en Configuracion
               </div>
             ) : ghLoading ? (
-              <div style={{ padding: '48px 0', textAlign: 'center', color: '#59636e', fontSize: '14px' }}>
+              <div style={{ padding: '48px 0', textAlign: 'center', color: '#707070', fontSize: '14px' }}>
                 Cargando...
               </div>
             ) : (
               <>
                 {/* Repos */}
                 <div style={{ marginBottom: '24px' }}>
-                  <h3 style={{ fontSize: '14px', fontWeight: '600', color: '#1f2328', marginBottom: '8px', padding: '0 0 8px', borderBottom: '1px solid #d0d7de' }}>
-                    Tus repos <span style={{ color: '#818b98', fontWeight: '400' }}>({githubRepos.length})</span>
+                  <h3 style={{ fontSize: '14px', fontWeight: '600', color: '#000000', marginBottom: '8px', padding: '0 0 8px', borderBottom: '1px solid #e8e8e8' }}>
+                    Tus repos <span style={{ color: '#a3a3a3', fontWeight: '400' }}>({githubRepos.length})</span>
                   </h3>
                   {githubRepos.map(r => (
                     <a key={r.name} href={r.url} target="_blank" rel="noopener" style={{
                       display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
-                      border: '1px solid #d0d7de', borderRadius: '6px',
-                      background: '#ffffff', textDecoration: 'none', color: '#1f2328',
+                      border: '1px solid #e8e8e8', borderRadius: '6px',
+                      background: '#ffffff', textDecoration: 'none', color: '#000000',
                       marginBottom: '4px', transition: 'border-color 80ms',
                     }}
-                      onMouseEnter={e => e.currentTarget.style.borderColor = '#0969da'}
-                      onMouseLeave={e => e.currentTarget.style.borderColor = '#d0d7de'}
+                      onMouseEnter={e => e.currentTarget.style.borderColor = '#000000'}
+                      onMouseLeave={e => e.currentTarget.style.borderColor = '#e8e8e8'}
                     >
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: '14px', fontWeight: '600', color: '#0969da' }}>{r.name}</div>
-                        {r.description && <div style={{ fontSize: '12px', color: '#59636e', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.description}</div>}
+                        <div style={{ fontSize: '14px', fontWeight: '600', color: '#000000' }}>{r.name}</div>
+                        {r.description && <div style={{ fontSize: '12px', color: '#707070', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.description}</div>}
                       </div>
-                      <div style={{ display: 'flex', gap: '8px', flexShrink: 0, alignItems: 'center', fontSize: '12px', color: '#59636e' }}>
+                      <div style={{ display: 'flex', gap: '8px', flexShrink: 0, alignItems: 'center', fontSize: '12px', color: '#707070' }}>
                         {r.language && <span>{r.language}</span>}
                         <span style={{ display: 'flex', alignItems: 'center', gap: '2px' }}><StarIcon /> {formatNum(r.stars)}</span>
                       </div>
@@ -312,24 +312,24 @@ export function RepoView({ conversations, githubUser }) {
 
                 {/* Starred */}
                 <div style={{ marginBottom: '24px' }}>
-                  <h3 style={{ fontSize: '14px', fontWeight: '600', color: '#1f2328', marginBottom: '8px', padding: '0 0 8px', borderBottom: '1px solid #d0d7de' }}>
-                    Destacados <span style={{ color: '#818b98', fontWeight: '400' }}>({githubStarred.length})</span>
+                  <h3 style={{ fontSize: '14px', fontWeight: '600', color: '#000000', marginBottom: '8px', padding: '0 0 8px', borderBottom: '1px solid #e8e8e8' }}>
+                    Destacados <span style={{ color: '#a3a3a3', fontWeight: '400' }}>({githubStarred.length})</span>
                   </h3>
                   {githubStarred.map(r => (
                     <a key={r.name} href={r.url} target="_blank" rel="noopener" style={{
                       display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
-                      border: '1px solid #d0d7de', borderRadius: '6px',
-                      background: '#ffffff', textDecoration: 'none', color: '#1f2328',
+                      border: '1px solid #e8e8e8', borderRadius: '6px',
+                      background: '#ffffff', textDecoration: 'none', color: '#000000',
                       marginBottom: '4px', transition: 'border-color 80ms',
                     }}
-                      onMouseEnter={e => e.currentTarget.style.borderColor = '#0969da'}
-                      onMouseLeave={e => e.currentTarget.style.borderColor = '#d0d7de'}
+                      onMouseEnter={e => e.currentTarget.style.borderColor = '#000000'}
+                      onMouseLeave={e => e.currentTarget.style.borderColor = '#e8e8e8'}
                     >
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: '14px', fontWeight: '600', color: '#0969da' }}>{r.name}</div>
-                        {r.description && <div style={{ fontSize: '12px', color: '#59636e', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.description}</div>}
+                        <div style={{ fontSize: '14px', fontWeight: '600', color: '#000000' }}>{r.name}</div>
+                        {r.description && <div style={{ fontSize: '12px', color: '#707070', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.description}</div>}
                       </div>
-                      <div style={{ display: 'flex', gap: '8px', flexShrink: 0, alignItems: 'center', fontSize: '12px', color: '#59636e' }}>
+                      <div style={{ display: 'flex', gap: '8px', flexShrink: 0, alignItems: 'center', fontSize: '12px', color: '#707070' }}>
                         {r.language && <span>{r.language}</span>}
                         <span style={{ display: 'flex', alignItems: 'center', gap: '2px' }}><StarIcon /> {formatNum(r.stars)}</span>
                       </div>
@@ -339,23 +339,23 @@ export function RepoView({ conversations, githubUser }) {
 
                 {/* Issues */}
                 <div>
-                  <h3 style={{ fontSize: '14px', fontWeight: '600', color: '#1f2328', marginBottom: '8px', padding: '0 0 8px', borderBottom: '1px solid #d0d7de' }}>
-                    Issues abiertas <span style={{ color: '#818b98', fontWeight: '400' }}>({githubIssues.length})</span>
+                  <h3 style={{ fontSize: '14px', fontWeight: '600', color: '#000000', marginBottom: '8px', padding: '0 0 8px', borderBottom: '1px solid #e8e8e8' }}>
+                    Issues abiertas <span style={{ color: '#a3a3a3', fontWeight: '400' }}>({githubIssues.length})</span>
                   </h3>
                   {githubIssues.map(i => (
                     <a key={i.url} href={i.url} target="_blank" rel="noopener" style={{
                       display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
-                      border: '1px solid #d0d7de', borderRadius: '6px',
-                      background: '#ffffff', textDecoration: 'none', color: '#1f2328',
+                      border: '1px solid #e8e8e8', borderRadius: '6px',
+                      background: '#ffffff', textDecoration: 'none', color: '#000000',
                       marginBottom: '4px', transition: 'border-color 80ms',
                     }}
-                      onMouseEnter={e => e.currentTarget.style.borderColor = '#0969da'}
-                      onMouseLeave={e => e.currentTarget.style.borderColor = '#d0d7de'}
+                      onMouseEnter={e => e.currentTarget.style.borderColor = '#000000'}
+                      onMouseLeave={e => e.currentTarget.style.borderColor = '#e8e8e8'}
                     >
-                      <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#1a7f37', flexShrink: 0 }} />
+                      <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#000000', flexShrink: 0 }} />
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: '14px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{i.title}</div>
-                        <div style={{ fontSize: '12px', color: '#59636e' }}>{i.repo}</div>
+                        <div style={{ fontSize: '12px', color: '#707070' }}>{i.repo}</div>
                       </div>
                     </a>
                   ))}
@@ -369,57 +369,57 @@ export function RepoView({ conversations, githubUser }) {
         {activeTab === 'myrepo' && (
           <div style={{ padding: '16px' }}>
             {!githubUser ? (
-              <div style={{ padding: '48px 0', textAlign: 'center', color: '#59636e', fontSize: '14px' }}>
+              <div style={{ padding: '48px 0', textAlign: 'center', color: '#707070', fontSize: '14px' }}>
                 Conecta tu cuenta de GitHub en Configuracion para ver tu repositorio
               </div>
             ) : myRepoLoading ? (
-              <div style={{ padding: '48px 0', textAlign: 'center', color: '#59636e', fontSize: '14px' }}>
+              <div style={{ padding: '48px 0', textAlign: 'center', color: '#707070', fontSize: '14px' }}>
                 Cargando tu repositorio...
               </div>
             ) : (
               <>
                 {/* Repo header */}
-                <div style={{ padding: '16px', border: '1px solid #d0d7de', borderRadius: '6px', background: '#ffffff', marginBottom: '16px' }}>
+                <div style={{ padding: '16px', border: '1px solid rgba(0,0,0,0.08)', borderRadius: '12px', background: '#ffffff', boxShadow: '0 2px 2px rgba(0,0,0,0.04)', marginBottom: '16px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
-                    <div style={{ width: '40px', height: '40px', borderRadius: '8px', background: '#f6f8fa', border: '1px solid #d0d7de', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <OctocatSvg w={24} h={24} fill="#24292f" />
+                    <div style={{ width: '40px', height: '40px', borderRadius: '8px', background: '#f7f7f7', border: '1px solid #e8e8e8', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <OctocatSvg w={24} h={24} fill="#000000" />
                     </div>
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: '16px', fontWeight: '600', color: '#0969da' }}>{myRepoData ? myRepoData.name : githubUser.login + '/x1-data'}</div>
-                      <div style={{ fontSize: '12px', color: '#59636e' }}>{myRepoData ? myRepoData.description || 'Repositorio de datos de System X1' : 'Repositorio de datos de System X1'}</div>
+                      <div style={{ fontSize: '16px', fontWeight: '600', color: '#000000' }}>{myRepoData ? myRepoData.name : githubUser.login + '/x1-data'}</div>
+                      <div style={{ fontSize: '12px', color: '#707070' }}>{myRepoData ? myRepoData.description || 'Repositorio de datos de Vektor' : 'Repositorio de datos de Vektor'}</div>
                     </div>
                     {myRepoData && myRepoData.url && (
-                      <a href={myRepoData.url} target="_blank" rel="noopener" style={{ fontSize: '12px', color: '#0969da', textDecoration: 'none', fontWeight: '500' }}>Abrir en GitHub &#8599;</a>
+                      <a href={myRepoData.url} target="_blank" rel="noopener" style={{ fontSize: '12px', color: '#000000', textDecoration: 'none', fontWeight: '500' }}>Abrir en GitHub &#8599;</a>
                     )}
                   </div>
-                  <div style={{ display: 'flex', gap: '16px', fontSize: '12px', color: '#59636e' }}>
+                  <div style={{ display: 'flex', gap: '16px', fontSize: '12px', color: '#707070' }}>
                     <span>{conversations ? conversations.length : 0} conversaciones</span>
                     <span>{conversations ? conversations.reduce(function(acc, c) { return acc + (c.messages ? c.messages.length : 0); }, 0) : 0} mensajes totales</span>
-                    {myRepoData && myRepoData.private && <span style={{ color: '#818b98' }}>Privado</span>}
+                    {myRepoData && myRepoData.private && <span style={{ color: '#a3a3a3' }}>Privado</span>}
                   </div>
                 </div>
 
                 {/* Data flow */}
                 <div style={{ marginBottom: '20px' }}>
-                  <h3 style={{ fontSize: '14px', fontWeight: '600', color: '#1f2328', marginBottom: '10px', padding: '0 0 8px', borderBottom: '1px solid #d0d7de', lineHeight: '1.6' }}>
+                  <h3 style={{ fontSize: '14px', fontWeight: '600', color: '#000000', marginBottom: '10px', padding: '0 0 8px', borderBottom: '1px solid #e8e8e8', lineHeight: '1.6' }}>
                     Flujo de datos
                   </h3>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                     {[
-                      { step: '1', title: 'Conversacion', desc: 'Cada mensaje que envias se guarda en memoria local', color: '#0969da' },
+                      { step: '1', title: 'Conversacion', desc: 'Cada mensaje que envias se guarda en memoria local', color: '#000000' },
                       { step: '2', title: 'Analisis', desc: 'El sistema juez analiza tu consulta y selecciona el mejor agente', color: '#8250df' },
-                      { step: '3', title: 'Busqueda', desc: 'Las herramientas buscan informacion relevante cuando hace falta', color: '#1a7f37' },
-                      { step: '4', title: 'Respuesta', desc: 'El agente genera una respuesta basada en los resultados', color: '#bf8700' },
-                      { step: '5', title: 'Almacenamiento', desc: 'La conversacion se guarda en tu repositorio local y GitHub', color: '#cf222e' },
+                      { step: '3', title: 'Busqueda', desc: 'Las herramientas buscan informacion relevante cuando hace falta', color: '#000000' },
+                      { step: '4', title: 'Respuesta', desc: 'El agente genera una respuesta basada en los resultados', color: '#707070' },
+                      { step: '5', title: 'Almacenamiento', desc: 'La conversacion se guarda en tu repositorio local y GitHub', color: '#dc2626' },
                     ].map(function(item) {
                       return (
-                        <div key={item.step} style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '12px 14px', border: '1px solid #d0d7de', borderRadius: '6px', background: '#ffffff', lineHeight: '1.7' }}>
+                        <div key={item.step} style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '12px 14px', border: '1px solid rgba(0,0,0,0.08)', borderRadius: '12px', background: '#ffffff', boxShadow: '0 2px 2px rgba(0,0,0,0.04)', lineHeight: '1.7' }}>
                           <div style={{ width: '30px', height: '30px', borderRadius: '6px', background: item.color + '15', border: '1px solid ' + item.color + '30', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: '13px', fontWeight: '700', color: item.color }}>
                             {item.step}
                           </div>
                           <div style={{ flex: 1, lineHeight: '1.75' }}>
-                            <div style={{ fontSize: '14px', fontWeight: '600', color: '#1f2328', marginBottom: '4px', lineHeight: '1.5' }}>{item.title}</div>
-                            <div style={{ fontSize: '13px', color: '#59636e', lineHeight: '1.8' }}>{item.desc}</div>
+                            <div style={{ fontSize: '14px', fontWeight: '600', color: '#000000', marginBottom: '4px', lineHeight: '1.5' }}>{item.title}</div>
+                            <div style={{ fontSize: '13px', color: '#707070', lineHeight: '1.8' }}>{item.desc}</div>
                           </div>
                         </div>
                       );
@@ -429,25 +429,25 @@ export function RepoView({ conversations, githubUser }) {
 
                 {/* Recent activity */}
                 <div>
-                  <h3 style={{ fontSize: '14px', fontWeight: '600', color: '#1f2328', marginBottom: '8px', padding: '0 0 8px', borderBottom: '1px solid #d0d7de' }}>
+                  <h3 style={{ fontSize: '14px', fontWeight: '600', color: '#000000', marginBottom: '8px', padding: '0 0 8px', borderBottom: '1px solid #e8e8e8' }}>
                     Actividad reciente
                   </h3>
                   {conversations && conversations.length > 0 ? (
                     conversations.slice(0, 5).map(function(c) {
                       return (
-                        <div key={c.id} style={{ padding: '8px 12px', border: '1px solid #d0d7de', borderRadius: '6px', background: '#ffffff', marginBottom: '4px' }}>
+                        <div key={c.id} style={{ padding: '8px 12px', border: '1px solid rgba(0,0,0,0.08)', borderRadius: '12px', background: '#ffffff', boxShadow: '0 2px 2px rgba(0,0,0,0.04)', marginBottom: '4px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                            <span style={{ fontSize: '14px', fontWeight: '500', color: '#0969da' }}>{c.title || 'Sin titulo'}</span>
-                            <span style={{ fontSize: '12px', color: '#818b98' }}>{timeAgo(c.updatedAt || c.createdAt)}</span>
+                            <span style={{ fontSize: '14px', fontWeight: '500', color: '#000000' }}>{c.title || 'Sin titulo'}</span>
+                            <span style={{ fontSize: '12px', color: '#a3a3a3' }}>{timeAgo(c.updatedAt || c.createdAt)}</span>
                           </div>
-                          <div style={{ fontSize: '12px', color: '#59636e', marginTop: '4px' }}>
+                          <div style={{ fontSize: '12px', color: '#707070', marginTop: '4px' }}>
                             {(c.messages ? c.messages.length : 0) + ' mensajes' + (c.agent ? ' | Agente: ' + c.agent : '')}
                           </div>
                         </div>
                       );
                     })
                   ) : (
-                    <div style={{ padding: '24px 0', textAlign: 'center', color: '#818b98', fontSize: '12px' }}>No hay actividad aun</div>
+                    <div style={{ padding: '24px 0', textAlign: 'center', color: '#a3a3a3', fontSize: '12px' }}>No hay actividad aun</div>
                   )}
                 </div>
               </>
@@ -458,35 +458,35 @@ export function RepoView({ conversations, githubUser }) {
         {/* TOOLS TAB */}
         {activeTab === 'tools' && (
           <div style={{ padding: '16px' }}>
-            <h3 style={{ fontSize: '14px', fontWeight: '600', color: '#1f2328', marginBottom: '8px', padding: '0 0 8px', borderBottom: '1px solid #d0d7de' }}>
+            <h3 style={{ fontSize: '14px', fontWeight: '600', color: '#000000', marginBottom: '8px', padding: '0 0 8px', borderBottom: '1px solid #e8e8e8' }}>
               Herramientas de busqueda
             </h3>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '24px' }}>
               {TOOL_ITEMS.map(tool => (
-                <div key={tool.id} style={{ padding: '12px', border: '1px solid #d0d7de', borderRadius: '6px', background: '#ffffff' }}>
+                <div key={tool.id} style={{ padding: '12px', border: '1px solid rgba(0,0,0,0.08)', borderRadius: '12px', background: '#ffffff', boxShadow: '0 2px 2px rgba(0,0,0,0.04)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
                     <span style={{
                       width: '24px', height: '24px', borderRadius: '6px', background: tool.bg,
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       fontSize: '12px', fontWeight: '700', color: '#ffffff',
                     }}>{tool.letter}</span>
-                    <span style={{ fontSize: '14px', fontWeight: '600', color: '#1f2328' }}>{tool.name}</span>
+                    <span style={{ fontSize: '14px', fontWeight: '600', color: '#000000' }}>{tool.name}</span>
                   </div>
-                  <div style={{ fontSize: '12px', color: '#59636e' }}>{tool.desc}</div>
+                  <div style={{ fontSize: '12px', color: '#707070' }}>{tool.desc}</div>
                 </div>
               ))}
             </div>
 
-            <h3 style={{ fontSize: '14px', fontWeight: '600', color: '#1f2328', marginBottom: '8px', padding: '0 0 8px', borderBottom: '1px solid #d0d7de' }}>
+            <h3 style={{ fontSize: '14px', fontWeight: '600', color: '#000000', marginBottom: '8px', padding: '0 0 8px', borderBottom: '1px solid #e8e8e8' }}>
               Agentes IA
             </h3>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
               {AI_ITEMS.map(a => (
-                <div key={a.id} style={{ padding: '12px', border: '1px solid #d0d7de', borderRadius: '6px', background: '#ffffff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div key={a.id} style={{ padding: '12px', border: '1px solid rgba(0,0,0,0.08)', borderRadius: '12px', background: '#ffffff', boxShadow: '0 2px 2px rgba(0,0,0,0.04)', display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <img src={a.src} alt={a.name} style={{ width: '24px', height: '24px', borderRadius: '4px' }} onError={e => e.currentTarget.style.display='none'} />
                   <div>
-                    <div style={{ fontSize: '14px', fontWeight: '600', color: '#1f2328' }}>{a.name}</div>
-                    <div style={{ fontSize: '12px', color: '#59636e' }}>{a.ai}</div>
+                    <div style={{ fontSize: '14px', fontWeight: '600', color: '#000000' }}>{a.name}</div>
+                    <div style={{ fontSize: '12px', color: '#707070' }}>{a.ai}</div>
                   </div>
                 </div>
               ))}
