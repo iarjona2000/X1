@@ -1,4 +1,14 @@
 var X1AutomationEngine = (function() {
+  // ── Guard: la capa compartida debe cargar ANTES. ───────────────
+  // importScripts(): orchestrator/capability-shared.js (L46) -> automation/rule-engine.js (L51).
+  // Si alguien reordena, este throw aborta la importacion del SW con un mensaje claro.
+  if (typeof X1CapabilityShared === 'undefined') {
+    throw new Error(
+      '[X1AutomationEngine] X1CapabilityShared no definido. ' +
+      'Carga orchestrator/capability-shared.js ANTES de automation/rule-engine.js en importScripts.'
+    );
+  }
+
   var rules = [];
   var STORAGE_KEY = 'x1_automation_rules';
   var ALARM_PREFIX = 'x1-auto-';
@@ -231,7 +241,9 @@ var X1AutomationEngine = (function() {
       '"every day at 9am give me a briefing" -> {"name":"Morning briefing","trigger":{"type":"schedule","cron":"0 9 * * *"},"action":{"command":"dailyDigest","params":{}}}';
 
     return aiFunc(prompt, 'You are a JSON parser. Return ONLY valid JSON, no markdown, no explanation.').then(function(response) {
-      var cleaned = response.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+      // sanitizeAiResponse (2026-07-13) — antes era `response.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim()` inline.
+      // Ahora cualquier engine (rule/plugin/skill) que necesite limpiar fences de markdown va por el mismo helper.
+      var cleaned = X1CapabilityShared.sanitizeAiResponse(response);
       try {
         var parsed = JSON.parse(cleaned);
         return parsed;

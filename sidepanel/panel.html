@@ -1,20 +1,238 @@
-<!DOCTYPE html>
-<html lang="es">
+﻿<!DOCTYPE html>
+<html class="h-full" lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>System X1</title>
-  <style>
-    html, body { margin: 0; padding: 0; height: 100%; width: 100%; overflow: hidden; }
-    #root { height: 100%; }
-    body { background: #ffffff; font-family: 'Geist Sans', 'Segoe UI', system-ui, -apple-system, sans-serif; }
-    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
-    @keyframes slideIn { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; transform: translateX(0); } }
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vektor</title>
+<style>
+@font-face{font-family:'Geist';font-style:normal;font-weight:400;font-display:swap;src:url('./dist/Geist-Regular-ORDHADG2.woff2')format('woff2')}
+@font-face{font-family:'Geist';font-style:normal;font-weight:500;font-display:swap;src:url('./dist/Geist-Medium-32HHSGDV.woff2')format('woff2')}
+@font-face{font-family:'Geist';font-style:normal;font-weight:600;font-display:swap;src:url('./dist/Geist-SemiBold-2JOF5SPE.woff2')format('woff2')}
+@font-face{font-family:'Geist';font-style:normal;font-weight:700;font-display:swap;src:url('./dist/Geist-Bold-YSMNNLK2.woff2')format('woff2')}
+@font-face{font-family:'Geist Mono';font-style:normal;font-weight:400;font-display:swap;src:url('./dist/GeistMono-Regular-V73T6ATO.woff2')format('woff2')}
+@font-face{font-family:'Geist Mono';font-style:normal;font-weight:500;font-display:swap;src:url('./dist/GeistMono-Medium-IK5O6Y7Z.woff2')format('woff2')}
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:#EAEAEA;border-radius:4px}
+::-webkit-scrollbar-thumb:hover{background:#cfc4c5}
+</style>
+<link rel="stylesheet" href="dist/panel-ui-2026.css">
 </head>
-<body>
-  <div id="root"></div>
-  <link rel="stylesheet" href="dist/panel-ui-2026.css">
-  <script src="dist/panel-ui-2026.js"></script>
+<body class="h-full bg-surface-container-lowest text-on-surface font-body-sm overflow-hidden flex justify-end">
+<main class="w-full max-w-[420px] h-full flex flex-col border-l border-accents-2 bg-surface-container-lowest shadow-2xl flex-shrink-0 z-40 text-[13px]">
+<div class="flex flex-col bg-surface-container-lowest border-b border-accents-2">
+<div class="px-3 py-2 flex justify-between items-center">
+<div class="flex items-center gap-3">
+<h2 class="font-headline-md text-[16px] font-semibold text-primary tracking-tight">Vektor</h2>
+<div class="flex gap-4">
+<button class="font-body-sm text-[12px] text-primary border-b-[2px] border-primary font-semibold">Chat</button>
+<button class="font-body-sm text-[12px] text-accents-5 hover:text-primary transition-colors">Repository</button>
+<button class="font-body-sm text-[12px] text-accents-5 hover:text-primary transition-colors">Settings</button>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<div class="flex items-center gap-1.5 px-1.5 py-0.5 rounded-full bg-surface-container-low border border-accents-2">
+<div class="w-1 h-1 rounded-full bg-green-500"></div>
+<span class="font-body-sm text-[10px] text-accents-6">v1.0</span>
+</div>
+<div class="w-5 h-5 rounded-full border border-accents-2 bg-surface-container-low flex items-center justify-center text-[10px] text-accents-4" id="user-avatar">?</div>
+</div>
+</div>
+</div>
+<div class="flex items-center px-3 py-1.5 border-b border-accents-2 bg-surface-bright gap-1.5 overflow-x-auto whitespace-nowrap">
+<div class="flex items-center gap-1 px-2 py-0.5 bg-surface-container-lowest border border-accents-2 rounded font-code-sm text-primary shadow-sm hover:border-accents-4 transition-colors cursor-pointer">
+<span class="text-[12px]">&#x1F40D;</span>
+<span class="text-[11px]">engine.py</span>
+</div>
+<div class="flex items-center gap-1 px-2 py-0.5 text-accents-5 hover:text-primary hover:bg-accents-1 rounded transition-colors font-code-sm cursor-pointer">
+<span class="text-[11px]">train.py</span>
+</div>
+<div class="flex items-center gap-1 px-2 py-0.5 text-accents-5 hover:text-primary hover:bg-accents-1 rounded transition-colors font-code-sm cursor-pointer">
+<span class="text-[11px]">program.md</span>
+</div>
+<div class="flex items-center gap-1.5 pl-2 text-accents-5 font-code-sm text-[10px] border-l border-accents-2 ml-auto">
+<span class="w-1 h-1 rounded-full bg-emerald-500"></span>
+    Index up to date
+</div>
+</div>
+<div class="flex-1 overflow-y-auto p-3 space-y-4 flex flex-col bg-surface-container-lowest" id="chat-area">
+</div>
+<div class="p-2 bg-surface-container-lowest border-t border-accents-2 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+<div class="flex gap-1.5 mb-1.5 overflow-x-auto pb-0.5">
+<button class="flex items-center gap-0.5 px-1.5 py-0.5 rounded border border-accents-2 bg-surface-bright text-accents-6 hover:text-primary hover:border-accents-3 transition-colors text-[10px] whitespace-nowrap">
+<span class="text-info font-code-sm">@</span> Files
+        </button>
+<button class="flex items-center gap-0.5 px-1.5 py-0.5 rounded border border-accents-2 bg-surface-bright text-accents-6 hover:text-primary hover:border-accents-3 transition-colors text-[10px] whitespace-nowrap">
+<span class="text-info font-code-sm">@</span> Codebase
+        </button>
+<button class="flex items-center gap-0.5 px-1.5 py-0.5 rounded border border-accents-2 bg-surface-bright text-accents-6 hover:text-primary hover:border-accents-3 transition-colors text-[10px] whitespace-nowrap">
+<span class="text-info font-code-sm">@</span> Web
+        </button>
+<button class="flex items-center gap-0.5 px-1.5 py-0.5 rounded border border-accents-2 bg-surface-bright text-accents-6 hover:text-primary hover:border-accents-3 transition-colors text-[10px] whitespace-nowrap">
+<span class="text-info font-code-sm">@</span> Docs
+        </button>
+</div>
+<div class="flex flex-col relative border border-accents-3 rounded-lg focus-within:border-primary focus-within:ring-1 focus-within:ring-primary transition-all bg-surface-container-lowest shadow-sm">
+<textarea id="chat-input" class="w-full bg-transparent border-none pt-2 pb-1 px-2.5 resize-none text-[12px] focus:ring-0 min-h-[40px] placeholder:text-accents-4 text-primary leading-tight" placeholder="Ask anything (Cmd+L)"></textarea>
+<div class="flex items-center justify-between p-1.5 pt-0">
+<div class="flex items-center">
+<button class="p-1 text-accents-5 hover:text-primary hover:bg-accents-1 rounded transition-colors flex items-center justify-center">
+<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+</button>
+</div>
+<div class="flex items-center gap-1.5">
+<div class="flex items-center bg-surface-container-low p-0.5 rounded border border-accents-2">
+<button class="px-1.5 py-0.5 rounded shadow-sm bg-surface-container-lowest text-primary text-[10px] font-medium flex items-center gap-0.5">
+<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg> Agent
+                    </button>
+<button class="px-1.5 py-0.5 rounded text-accents-6 hover:text-primary text-[10px] font-medium flex items-center gap-0.5">
+<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg> Chat
+                    </button>
+</div>
+<div class="flex items-center gap-0.5 px-1.5 py-0.5 rounded border border-transparent hover:border-accents-2 text-accents-6 text-[10px] cursor-pointer hover:bg-surface-bright hover:text-primary transition-colors">
+                    SWE-1.6 <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6,9 12,15 18,9"/></svg>
+</div>
+<button id="send-btn" class="w-6 h-6 bg-accents-2 rounded flex items-center justify-center text-accents-6 hover:bg-primary hover:text-on-primary transition-all shadow-sm border border-accents-3 hover:border-primary">
+<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5,12 12,5 19,12"/></svg>
+</button>
+</div>
+</div>
+</div>
+<div class="flex justify-between items-center mt-1 px-1">
+<span class="font-code-sm text-[9px] text-accents-4">/ commands &middot; @ context &middot; ! shell</span>
+</div>
+</div>
+</main>
+<script>
+(function() {
+  'use strict';
+
+  var chatArea = document.getElementById('chat-area');
+  var chatInput = document.getElementById('chat-input');
+  var sendBtn = document.getElementById('send-btn');
+
+  function escHtml(s) {
+    if (!s) return '';
+    var d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+  }
+
+  function fmt(s) {
+    if (!s) return '';
+    return escHtml(s).replace(/\n\n/g, '</p><p>').replace(/\n/g, '<br>');
+  }
+
+  function scrollBottom() {
+    requestAnimationFrame(function() { chatArea.scrollTop = chatArea.scrollHeight; });
+  }
+
+  function addUserMessage(text) {
+    var div = document.createElement('div');
+    div.className = 'flex gap-2 justify-end mt-1';
+    div.innerHTML = '<div class="flex-1 bg-surface-container-low border border-accents-2 rounded-lg p-3 shadow-sm">' +
+      '<p class="font-body-sm text-[13px] leading-snug text-primary">' + escHtml(text) + '</p></div>';
+    chatArea.appendChild(div);
+    scrollBottom();
+  }
+
+  function addAgentMessage(text) {
+    var div = document.createElement('div');
+    div.className = 'flex gap-2';
+    div.innerHTML = '<div class="flex-1 space-y-2"><p class="font-body-sm text-[13px] leading-snug text-primary">' + fmt(text) + '</p></div>';
+    chatArea.appendChild(div);
+    scrollBottom();
+    return div;
+  }
+
+  function showThinking() {
+    removeThinking();
+    var div = document.createElement('div');
+    div.className = 'flex gap-2';
+    div.id = 'thinking';
+    div.innerHTML = '<div class="flex-1"><div class="flex items-center gap-2 py-1"><div class="flex gap-1">' +
+      '<span class="w-1 h-1 rounded-full bg-accents-4" style="animation:pulse 1.4s ease-in-out infinite"></span>' +
+      '<span class="w-1 h-1 rounded-full bg-accents-4" style="animation:pulse 1.4s ease-in-out 0.2s infinite"></span>' +
+      '<span class="w-1 h-1 rounded-full bg-accents-4" style="animation:pulse 1.4s ease-in-out 0.4s infinite"></span>' +
+      '</div><span class="text-[11px] text-accents-4 font-body-sm">Thinking...</span></div></div>';
+    chatArea.appendChild(div);
+    scrollBottom();
+  }
+
+  function removeThinking() {
+    var el = document.getElementById('thinking');
+    if (el) el.remove();
+  }
+
+  function send(text) {
+    var q = (text || chatInput.value).trim();
+    if (!q) return;
+    chatInput.value = '';
+    chatInput.style.height = 'auto';
+    sendBtn.disabled = true;
+
+    addUserMessage(q);
+    showThinking();
+
+    chrome.runtime.sendMessage({ type: 'VOICE_COMMAND_EXEC', command: q, wantsText: true }, function(resp) {
+      removeThinking();
+      sendBtn.disabled = false;
+      if (chrome.runtime.lastError) {
+        addAgentMessage('Error: ' + chrome.runtime.lastError.message);
+        return;
+      }
+      var reply = '';
+      if (resp && resp.text) {
+        reply = resp.text;
+      } else if (resp && resp.response) {
+        reply = resp.response;
+      } else {
+        reply = 'Done.';
+      }
+      addAgentMessage(reply);
+      chrome.runtime.sendMessage({ type: 'X1_ADD_MESSAGE', role: 'user', text: q });
+      chrome.runtime.sendMessage({ type: 'X1_ADD_MESSAGE', role: 'agent', text: reply });
+    });
+  }
+
+  function restore() {
+    chrome.runtime.sendMessage({ type: 'X1_GET_HISTORY' }, function(resp) {
+      if (chrome.runtime.lastError || !resp || !resp.history || resp.history.length === 0) {
+        loadGreeting();
+        return;
+      }
+      var hist = resp.history;
+      for (var i = 0; i < hist.length; i++) {
+        var m = hist[i];
+        if (m.role === 'user') {
+          addUserMessage(m.text);
+        } else {
+          addAgentMessage(m.text);
+        }
+      }
+      chatInput.focus();
+    });
+  }
+
+  function loadGreeting() {
+    chrome.runtime.sendMessage({ type: 'X1_GREET' }, function(resp) {
+      if (chrome.runtime.lastError || !resp) return;
+      if (resp.text) addAgentMessage(resp.text);
+      chatInput.focus();
+    });
+  }
+
+  sendBtn.addEventListener('click', function() { send(); });
+  chatInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+  });
+  chatInput.addEventListener('input', function() {
+    chatInput.style.height = 'auto';
+    chatInput.style.height = Math.min(chatInput.scrollHeight, 120) + 'px';
+  });
+
+  restore();
+})();
+</script>
 </body>
 </html>

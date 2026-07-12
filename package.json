@@ -1,6 +1,7 @@
 {
   "scripts": {
-    "test": "node tests/run.js",
+    "test": "node --test tests/orchestrator/capability-shared.test.js",
+    "test:all": "node tests/run.js && node --test tests/orchestrator/capability-shared.test.js",
     "test:protocol": "node tests/run.js protocol"
   },
   "devDependencies": {

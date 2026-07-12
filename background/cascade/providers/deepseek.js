@@ -1,8 +1,8 @@
 var X1ProviderDeepSeek = (function() {
 
   var BASE_URL = 'https://api.deepseek.com';
-  var DEFAULT_MODEL = 'deepseek-chat';
-  var FALLBACK_MODELS = ['deepseek-reasoner'];
+  var DEFAULT_MODEL = 'deepseek-v4-pro';
+  var FALLBACK_MODELS = ['deepseek-v4-flash'];
   var API_KEY = '';
 
   function setKey(key) { API_KEY = key; }

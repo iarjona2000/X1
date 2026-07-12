@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="es" style="height:100%">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>System X1</title>
+  <style>
+    html, body, #root { height: 100%; margin: 0; padding: 0; overflow: hidden; }
+    body { background: #000000; }
+    #x1-err { display:none; position:fixed; inset:0; z-index:99999; padding:16px;
+      font:12px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace; color:#dc2626;
+      background:#fff; white-space:pre-wrap; word-break:break-word; overflow:auto; }
+  </style>
+  <link rel="stylesheet" href="dist/panel-ui-2026.css"
+    onerror="document.getElementById('x1-err').style.display='block'; document.getElementById('x1-err').textContent += '\n[CSS] No se pudo cargar dist/panel-ui-2026.css (404 o bloqueado)\n';">
+</head>
+<body>
+  <div id="root"></div>
+  <pre id="x1-err"></pre>
+  <script>
+    (function () {
+      var box = document.getElementById('x1-err');
+      function show(msg) {
+        box.style.display = 'block';
+        box.textContent = (box.textContent ? box.textContent + '\n\n' : 'X1 no pudo arrancar:\n\n') + msg;
+      }
+      window.__x1Show = show;
+      // capture:true -- los fallos de carga de recursos (404, bloqueo CSP) no
+      // burbujean como los errores normales; solo se ven en fase de captura.
+      window.addEventListener('error', function (e) {
+        var m = e.error && e.error.stack ? e.error.stack : (e.message + '  @ ' + (e.filename || e.target && e.target.src || '') + ':' + (e.lineno || ''));
+        show('[error] ' + m);
+      }, true);
+      window.addEventListener('unhandledrejection', function (e) {
+        show('[promise] ' + ((e.reason && (e.reason.stack || e.reason.message)) || e.reason));
+      });
+      show('Version diagnostico activa. chrome disponible: ' + (typeof chrome !== 'undefined') +
+        ' | chrome.storage: ' + (typeof chrome !== 'undefined' && !!chrome.storage) +
+        ' | chrome.runtime.id: ' + (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.id));
+      box.style.display = 'none'; // oculta el diagnostico inicial salvo que haya error real
+      setTimeout(function () {
+        var root = document.getElementById('root');
+        if (root && root.childElementCount === 0 && box.style.display !== 'block') {
+          show('El bundle .js se cargo (ver mas abajo) pero React no monto nada en 3s.');
+        }
+      }, 3000);
+    })();
+  </script>
+  <script src="dist/panel-ui-2026.js"
+    onerror="window.__x1Show('[SCRIPT] No se pudo cargar dist/panel-ui-2026.js -- 404, ruta incorrecta, o bloqueado por CSP.')"
+    onload="window.__x1ScriptLoaded = true;"></script>
+</body>
+</html>

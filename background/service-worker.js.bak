@@ -43,7 +43,6 @@ try {
     'google/drive.js',
     'agents/agent-manager.js',
     'agents/workspace.js',
-    'orchestrator/capability-shared.js',  // Capa compartida (2026-07-13): safeCalc, resolveParams, unifiedAiCall, normalizeStep, sanitizeAiResponse, stepProgressSafe. Carga antes de plugins y skills engines.
     'plugins/engine.js',
     // plugins/agency-plugins.js removed 2026-07-05 — Ivan's decision: the vault
     // no longer catalogs agency-agents prompt-only personas (Nivel 4, no
@@ -68,10 +67,6 @@ try {
     // (ai/continue-bridge.js removed 2026-07-03 — redundant provider bridge,
     // Ivan's decision: only NVIDIA NIM + Gemini.)
     'protocol.js',
-    // diff-committer.js: CodeDiffCard Accept/Reject handlers (2026-07-11)
-    // — loads AFTER protocol.js so self.X1Protocol.REQ.* constants are
-    // already available when this module registers its onMessage listener.
-    'diff-committer.js',
     'integrations/registry.js',
     'dex/dex-integration.js',
     // 26 bridges de tu socio (2026-07-04, commits cddd5ec/c8da7e8/466775b/c4a7cf3).
@@ -6903,43 +6898,11 @@ chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
     });
     return true;
   }
-
-  // ── CHAT (X1Protocol.REQ.CHAT) — wired by sidepanel/vektor-bridge.js (Mavis 2026-07-11)
-  // El side panel Vektor envía { type:'CHAT', query, mode, model }. Lo enrutamos al
-  // motor de handleVoice (mismo path que VOICE_COMMAND_EXEC, su legacy alias).
-  if(msg.type==='CHAT' && typeof msg.query==='string' && msg.query.trim().length>0){
-    var _chatQuery = msg.query;
-    var _chatMode  = msg.mode  || 'agent';
-    var _chatModel = msg.model || null;
-    console.log('[X1-SW] CHAT handler firing:', _chatQuery.substring(0,50), 'mode:', _chatMode, 'model:', _chatModel);
-    try {
-      handleVoice(_chatQuery, true, sendResponse);
-    } catch (_e) {
-      console.error('[X1-SW] CHAT handler error:', _e && _e.message);
-      try { sendResponse({ text: 'Error interno: ' + (_e && _e.message || 'desconocido'), showText: true, source: 'x1-chat' }); } catch(_) {}
-    }
-    return true;
-  }
 });
 
-// Icon click → abre X1 a pantalla completa en una pestana, no el side panel
-// (el side panel sigue disponible via chrome.sidePanel.open() para los flujos
-// de voz/clap que ya lo usan mas abajo, solo se desactiva como comportamiento
-// POR DEFECTO del click en el icono).
-chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false }).catch(function(e) {
+// Icon click → open side panel
+chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(function(e) {
   console.error('[X1] setPanelBehavior error:', e);
-});
-
-chrome.action.onClicked.addListener(function() {
-  var url = chrome.runtime.getURL('sidepanel/x1-app.html');
-  chrome.tabs.query({ url: url }, function(tabs) {
-    if (tabs && tabs.length > 0) {
-      chrome.tabs.update(tabs[0].id, { active: true });
-      chrome.windows.update(tabs[0].windowId, { focused: true });
-    } else {
-      chrome.tabs.create({ url: url });
-    }
-  });
 });
 
 chrome.tabs.onActivated.addListener(function(info) {
@@ -7316,9 +7279,47 @@ function getDefaultProvider() {
   return aiKeys.aiProvider || "auto";
 }
 
-// 2026-07-13 cleanup: bloque x1PluginSystem (init/exec/register) + plugin_system health check eliminados.
-// Razon + ledger: ver docs/PLUGIN_SYSTEM_REMOVED.md.
-// Vivos: background/plugins/engine.js (X1PluginEngine) y executePluginHooks (plural) — localizacion exacta en docs.
+var x1PluginSystem = {
+  loaded: false,
+  registry: null,
+  hooks: null,
+  activePlugins: []
+};
+
+function initializePluginSystem() {
+  try {
+    if (x1PluginSystem.loaded) return;
+    x1PluginSystem.hooks = new X1PluginHooks();
+    x1PluginSystem.registry = new X1PluginRegistry();
+    x1PluginSystem.registry.hooks = x1PluginSystem.hooks;
+    x1PluginSystem.loaded = true;
+    console.log("[X1] Plugin system initialized");
+  } catch(e) {
+    console.error("[X1] Plugin system init failed:", e);
+  }
+}
+
+function executePluginHook(hookName, data) {
+  if (!x1PluginSystem.hooks) return Promise.resolve(data);
+  return x1PluginSystem.hooks.execute(hookName, data);
+}
+
+function registerBuiltinPluginHooks() {
+  if (!x1PluginSystem.hooks) return;
+  x1PluginSystem.hooks.register("beforeCommand", "core", function(data) {
+    addMem("system", "Ejecutando: " + data.cmd);
+    return data;
+  });
+  x1PluginSystem.hooks.register("afterCommand", "core", function(data) {
+    addMem("system", "Completado: " + (data.action || "unknown"));
+    return data;
+  });
+  x1PluginSystem.hooks.register("onError", "core", function(data) {
+    console.error("[X1 Plugin]", data.pluginId, data.error);
+    return data;
+  });
+}
+
 var knowledgeGraph = {
   entities: [],
   relations: [],
@@ -13227,6 +13228,9 @@ function getHealthStatus() {
 
 registerHealthCheck("memory_usage", function() {
   return {memoryEntries: memory.length, worldModelKeys: Object.keys(worldModel).length};
+});
+registerHealthCheck("plugin_system", function() {
+  return {loaded: x1PluginSystem.loaded, plugins: x1PluginSystem.registry ? Object.keys(x1PluginSystem.registry).length : 0};
 });
 registerHealthCheck("storage", function() {
   return {quota: chrome.storage ? "available" : "unknown"};
@@ -21836,19 +21840,7 @@ function x1ProcessAutopilotCycle(queue) {
         });
       });
     });
-    // Pillar 3 PHASE 2 (2026-07-07): notifica al watchdog per-tarea completada
-  // cuando corre DENTRO del SW (cola en segundo plano, sidepanel cerrado).
-  // github-agent.js ya notifica en el path inline (publishAutoBuild), pero
-  // aqui NO hay publishAutoBuild -> este hook es la UNICA senal que el
-  // watchdog recibe para tareas de cola. tarea.status === 'error' marca
-  // FAILED para que el contador tasksFailed suba tambien.
-  try {
-    if (typeof X1Watchdog !== 'undefined' && typeof X1Watchdog.onWatchdogMessage === 'function') {
-      var notifType = tarea.status === 'error' ? 'X1_AUTOPILOT_TASK_FAILED' : 'X1_AUTOPILOT_TASK_COMPLETED';
-      X1Watchdog.onWatchdogMessage({ type: notifType, at: Date.now(), source: 'sw-queue', taskStatus: tarea.status, taskIdx: queue.currentIndex, repo: queue.owner + '/' + queue.name }, null, function () {});
-    }
-  } catch (e) { console.warn('[X1-Main] watchdog notify hook failed: ' + (e && e.message)); }
-}).then(function (tarea) {
+  }).then(function (tarea) {
     queue.history = (queue.history || []).concat([tarea]).slice(-40);
     queue.activeTask = null;
     queue.consecutiveFailures = tarea.status === 'error' ? (queue.consecutiveFailures || 0) + 1 : 0;

@@ -100,7 +100,11 @@
     PLAN_TASK:     'PLAN_TASK',
 
     // system
-    HEALTH:        'HEALTH'
+    HEALTH:        'HEALTH',
+
+    // code-diff proposal accept/reject (Vektor sidepanel CodeDiffCard)
+    DIFF_ACCEPT:   'DIFF_ACCEPT',
+    DIFF_REJECT:   'DIFF_REJECT'
   };
 
   // ─── EVENTS (SW → UI, broadcast) ────────────────────────────────────
@@ -248,6 +252,16 @@
   validators[REQ.SELECT_MODEL] = function(p) {
     return (isObject(p) && isString(p.query))
       ? null : 'SELECT_MODEL: query requerido';
+  };
+
+  validators[REQ.DIFF_ACCEPT] = function(p) {
+    return (isObject(p) && isObject(p.diff) && isString(p.diff.fileName) && Array.isArray(p.diff.lines) && p.diff.lines.length > 0)
+      ? null : 'DIFF_ACCEPT: diff{fileName:string, lines:[{kind:"+"|"-",text:string}].length>0} requerido';
+  };
+
+  validators[REQ.DIFF_REJECT] = function(p) {
+    return (isObject(p) && isObject(p.diff) && isString(p.diff.fileName))
+      ? null : 'DIFF_REJECT: diff{fileName} requerido';
   };
 
   validators[REQ.PLAN_TASK] = function(p) {

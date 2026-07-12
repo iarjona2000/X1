@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>X1</title>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400&display=swap" rel="stylesheet"/>
+<style>
+:root {
+  --ink: #171717;
+  --on-primary: #ffffff;
+  --body: #4d4d4d;
+  --mute: #888888;
+  --hairline: #ebebeb;
+  --canvas: #ffffff;
+  --canvas-soft: #fafafa;
+  --canvas-soft-2: #f5f5f5;
+  --link: #0070f3;
+  --error: #ee0000;
+  --error-soft: #f7d4d6;
+  --success: #0070f3;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-full: 9999px;
+  --shadow-inset: inset 0 0 0 1px rgba(0,0,0,0.08);
+  --shadow-small: 0px 2px 2px rgba(0,0,0,0.04);
+  --shadow-medium: 0px 2px 2px rgba(0,0,0,0.04), 0px 8px 8px -8px rgba(0,0,0,0.04);
+  --shadow-border: 0 0 0 1px rgba(0,0,0,0.08);
+  --shadow-border-small: 0 0 0 1px rgba(0,0,0,0.08), 0px 2px 2px rgba(0,0,0,0.04);
+  --shadow-input-ring: 0 0 0 1px rgba(0,0,0,0.34), 0 0 0 4px rgba(0,0,0,0.16);
+  --shadow-menu: 0 0 0 1px rgba(0,0,0,0.08), 0px 1px 1px rgba(0,0,0,0.02), 0px 4px 8px -4px rgba(0,0,0,0.04), 0px 16px 24px -8px rgba(0,0,0,0.06);
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; overflow: hidden; }
+body {
+  font-family: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: var(--canvas-soft);
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 20px;
+  letter-spacing: -0.28px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--hairline); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #c9c9c9; }
+
+@keyframes fadeUp { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+.msg-in { animation: fadeUp 0.15s ease-out; }
+@keyframes blink { 0%,80%,100% { opacity: 0.3; } 40% { opacity: 1; } }
+.dot1 { animation: blink 1.4s infinite 0s; }
+.dot2 { animation: blink 1.4s infinite 0.2s; }
+.dot3 { animation: blink 1.4s infinite 0.4s; }
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  max-width: 420px;
+  margin: 0 auto;
+  background: var(--canvas-soft);
+}
+
+/* ── Nav bar ── */
+.nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 56px;
+  padding: 12px 16px;
+  background: var(--canvas);
+  border-bottom: 1px solid var(--hairline);
+  flex-shrink: 0;
+}
+.nav-left { display: flex; align-items: center; gap: 8px; }
+.nav-dot {
+  width: 8px; height: 8px; border-radius: var(--radius-full);
+  background: var(--success);
+  flex-shrink: 0;
+}
+.nav-title {
+  font-size: 14px; font-weight: 600;
+  color: var(--ink);
+  letter-spacing: -0.28px;
+}
+.nav-ver {
+  font-size: 12px; font-weight: 400;
+  color: var(--mute);
+  line-height: 16px;
+}
+
+/* ── Messages ── */
+.messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  background: var(--canvas-soft);
+}
+
+/* ── User message (button-primary polarity) ── */
+.user-msg {
+  align-self: flex-end;
+  max-width: 85%;
+  background: var(--ink);
+  color: var(--on-primary);
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 20px;
+  letter-spacing: -0.28px;
+  word-break: break-word;
+}
+
+/* ── Agent message (body-sm on canvas-soft) ── */
+.agent-msg {
+  align-self: flex-start;
+  max-width: 90%;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 20px;
+  letter-spacing: -0.28px;
+  word-break: break-word;
+}
+.agent-msg p { margin: 0 0 8px 0; }
+.agent-msg p:last-child { margin-bottom: 0; }
+.agent-msg pre {
+  background: var(--ink);
+  color: var(--on-primary);
+  border-radius: var(--radius-md);
+  padding: 12px 16px;
+  margin: 8px 0;
+  overflow-x: auto;
+  font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 20px;
+  letter-spacing: 0;
+}
+.agent-msg code {
+  font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 20px;
+  background: var(--canvas-soft-2);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+  padding: 1px 5px;
+  color: var(--ink);
+}
+.agent-msg strong { font-weight: 500; }
+.agent-msg a { color: var(--link); text-decoration: underline; }
+
+/* ── Thinking dots (loading-dots) ── */
+.thinking {
+  align-self: flex-start;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 0;
+}
+.thinking span {
+  width: 5px; height: 5px;
+  border-radius: var(--radius-full);
+  background: var(--mute);
+  display: inline-block;
+}
+
+/* ── Input area ── */
+.input-area {
+  flex-shrink: 0;
+  padding: 12px 16px 16px;
+  background: var(--canvas);
+  border-top: 1px solid var(--hairline);
+}
+.input-box {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  background: var(--canvas);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+  padding: 10px 10px 10px 14px;
+  transition: box-shadow 0.15s ease;
+}
+.input-box:focus-within {
+  box-shadow: var(--shadow-input-ring);
+  border-color: transparent;
+}
+#chat-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  resize: none;
+  font-family: 'Geist', sans-serif;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 20px;
+  letter-spacing: -0.28px;
+  color: var(--ink);
+  min-height: 20px;
+  max-height: 120px;
+}
+#chat-input::placeholder { color: var(--mute); }
+
+/* ── Send button (nav-cta-signup style: 6px radius, ink fill) ── */
+#send-btn {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: var(--ink);
+  color: var(--on-primary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.1s ease;
+}
+#send-btn:hover { background: #000; }
+#send-btn:disabled {
+  background: var(--hairline);
+  color: var(--mute);
+  cursor: not-allowed;
+}
+
+/* ── Caption hint (caption-mono style) ── */
+.input-hint {
+  font-family: 'Geist Mono', ui-monospace, monospace;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 16px;
+  color: var(--mute);
+  margin-top: 8px;
+  padding: 0 2px;
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="nav">
+    <div class="nav-left">
+      <div class="nav-dot"></div>
+      <span class="nav-title">X1</span>
+    </div>
+    <span class="nav-ver">v3.2</span>
+  </header>
+  <main class="messages" id="chat-area"></main>
+  <footer class="input-area">
+    <div class="input-box">
+      <textarea id="chat-input" placeholder="Ask anything..." rows="1"></textarea>
+      <button id="send-btn" title="Send">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5,12 12,5 19,12"/></svg>
+      </button>
+    </div>
+    <div class="input-hint">/ commands &middot; @ context</div>
+  </footer>
+</div>
+<script>
+(function() {
+  'use strict';
+  var chatArea = document.getElementById('chat-area');
+  var chatInput = document.getElementById('chat-input');
+  var sendBtn = document.getElementById('send-btn');
+
+  function esc(s) { if (!s) return ''; var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+  function fmt(s) {
+    if (!s) return '';
+    var t = esc(s);
+    t = t.replace(/```([\s\S]*?)```/g, '<pre>$1</pre>');
+    t = t.replace(/`([^`]+)`/g, '<code>$1</code>');
+    t = t.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    t = t.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
+    var parts = t.split(/\n\n+/);
+    return parts.map(function(p) { return '<p>' + p.replace(/\n/g, '<br>') + '</p>'; }).join('');
+  }
+  function scrollBottom() { requestAnimationFrame(function() { chatArea.scrollTop = chatArea.scrollHeight; }); }
+
+  function addUserMessage(text) {
+    var div = document.createElement('div');
+    div.className = 'user-msg msg-in';
+    div.textContent = text;
+    chatArea.appendChild(div); scrollBottom();
+  }
+  function addAgentMessage(text) {
+    var div = document.createElement('div');
+    div.className = 'agent-msg msg-in';
+    div.innerHTML = fmt(text);
+    chatArea.appendChild(div); scrollBottom(); return div;
+  }
+  function showThinking() {
+    removeThinking();
+    var div = document.createElement('div');
+    div.id = 'thinking'; div.className = 'thinking msg-in';
+    div.innerHTML = '<span class="dot1"></span><span class="dot2"></span><span class="dot3"></span>';
+    chatArea.appendChild(div); scrollBottom();
+  }
+  function removeThinking() { var el = document.getElementById('thinking'); if (el) el.remove(); }
+
+  function send(text) {
+    var q = (text || chatInput.value).trim();
+    if (!q) return;
+    chatInput.value = ''; chatInput.style.height = 'auto'; sendBtn.disabled = true;
+    addUserMessage(q); showThinking();
+    chrome.runtime.sendMessage({ type: 'VOICE_COMMAND_EXEC', command: q, wantsText: true }, function(resp) {
+      removeThinking(); sendBtn.disabled = false;
+      if (chrome.runtime.lastError) { addAgentMessage('Error: ' + chrome.runtime.lastError.message); return; }
+      var reply = (resp && resp.text) ? resp.text : (resp && resp.response) ? resp.response : 'Done.';
+      addAgentMessage(reply);
+      chrome.runtime.sendMessage({ type: 'X1_ADD_MESSAGE', role: 'user', text: q });
+      chrome.runtime.sendMessage({ type: 'X1_ADD_MESSAGE', role: 'agent', text: reply });
+    });
+  }
+  function restore() {
+    addAgentMessage('Soy X1. Dime en que puedo ayudarte.');
+    chatInput.focus();
+    chrome.runtime.sendMessage({ type: 'X1_GET_HISTORY' }, function(resp) {
+      if (chrome.runtime.lastError || !resp || !resp.history || resp.history.length === 0) return;
+      chatArea.innerHTML = '';
+      resp.history.forEach(function(m) { m.role === 'user' ? addUserMessage(m.text) : addAgentMessage(m.text); });
+      chatInput.focus();
+    });
+  }
+
+  sendBtn.addEventListener('click', function() { send(); });
+  chatInput.addEventListener('keydown', function(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } });
+  chatInput.addEventListener('input', function() { chatInput.style.height = 'auto'; chatInput.style.height = Math.min(chatInput.scrollHeight, 120) + 'px'; });
+  restore();
+})();
+</script>
+</body></html>

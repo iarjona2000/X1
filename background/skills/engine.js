@@ -1,10 +1,20 @@
-var X1SkillEngine = (function() {
+var X1SkillEngine = (function () {
+  'use strict';
+
+  // ── Guard: la capa compartida debe cargar ANTES. ─────────────────────
+  if (typeof X1CapabilityShared === 'undefined') {
+    throw new Error(
+      '[X1SkillEngine] X1CapabilityShared no definido. ' +
+      'Carga orchestrator/capability-shared.js ANTES de skills/engine.js en importScripts.'
+    );
+  }
+
   var STORAGE_KEY = 'x1_skills';
   var skills = {};
 
   function loadSkills() {
-    return new Promise(function(resolve) {
-      chrome.storage.local.get(STORAGE_KEY, function(data) {
+    return new Promise(function (resolve) {
+      chrome.storage.local.get(STORAGE_KEY, function (data) {
         skills = data[STORAGE_KEY] || {};
         resolve(skills);
       });
@@ -12,10 +22,10 @@ var X1SkillEngine = (function() {
   }
 
   function saveSkills() {
-    return new Promise(function(resolve) {
+    return new Promise(function (resolve) {
       var obj = {};
       obj[STORAGE_KEY] = skills;
-      chrome.storage.local.set(obj, function() { resolve(); });
+      chrome.storage.local.set(obj, function () { resolve(); });
     });
   }
 
@@ -35,7 +45,7 @@ var X1SkillEngine = (function() {
       created: Date.now()
     };
     skills[skill.name] = skill;
-    return saveSkills().then(function() { return skill; });
+    return saveSkills().then(function () { return skill; });
   }
 
   function runSkill(name, params, tabId) {
@@ -51,7 +61,7 @@ var X1SkillEngine = (function() {
       stepIndex: 0
     };
 
-    return executeSteps(skill.steps, context).then(function(results) {
+    return executeSteps(skill.steps, context).then(function (results) {
       var duration = Date.now() - startTime;
       skill.runCount++;
       skill.lastRun = Date.now();
@@ -65,136 +75,115 @@ var X1SkillEngine = (function() {
 
   function executeSteps(steps, context) {
     if (context.stepIndex >= steps.length) return Promise.resolve(context.results);
-    var step = steps[context.stepIndex];
+    var rawStep = steps[context.stepIndex];
+    // Normalizar: skill usa `action`, plugin usa `type`. La capa compartida
+    // los aliasa — engine lee siempre `step.type`.
+    var step = X1CapabilityShared.normalizeStep(rawStep);
     context.stepIndex++;
 
-    if (typeof stepProgress === 'function' && context.tabId) {
-      stepProgress(context.tabId, step.app || 'X1', step.description || step.action, 'active');
-    }
+    // stepProgressSafe reemplaza al global stepProgress (envuelto en
+    // try/catch con fallback a console.log si no esta disponible).
+    X1CapabilityShared.stepProgressSafe(context.tabId, step.app || 'X1', step.description || step.action, 'active');
 
-    return executeStep(step, context).then(function(result) {
-      context.results.push({ step: step.action, result: result });
+    return executeStep(step, context).then(function (result) {
+      context.results.push({ step: step.action || step.type, result: result });
       if (step.saveAs && result) {
         context.params[step.saveAs] = result;
       }
       return executeSteps(steps, context);
-    }).catch(function(err) {
-      context.results.push({ step: step.action, error: err.message });
+    }).catch(function (err) {
+      context.results.push({ step: step.action || step.type, error: err.message });
       if (!step.optional) return Promise.reject(err);
       return executeSteps(steps, context);
     });
   }
 
   function executeStep(step, context) {
-    var action = step.action;
-    var resolvedParams = resolveParams(step, context.params);
+    var resolvedParams = X1CapabilityShared.resolveParams(step, context.params);
 
-    if (action === 'navigate' && resolvedParams.url) {
-      return new Promise(function(resolve) {
-        chrome.tabs.update(context.tabId, { url: resolvedParams.url }, function() {
-          setTimeout(function() { resolve(resolvedParams.url); }, resolvedParams.wait || 3000);
+    if (step.type === 'navigate' && resolvedParams.url) {
+      return new Promise(function (resolve) {
+        chrome.tabs.update(context.tabId, { url: resolvedParams.url }, function () {
+          setTimeout(function () { resolve(resolvedParams.url); }, resolvedParams.wait || 3000);
         });
       });
     }
 
-    if (action === 'search') {
+    if (step.type === 'search') {
       var q = resolvedParams.query || '';
       var url = 'https://www.google.com/search?q=' + encodeURIComponent(q);
-      return new Promise(function(resolve) {
-        chrome.tabs.update(context.tabId, { url: url }, function() {
-          setTimeout(function() { resolve(q); }, 3000);
+      return new Promise(function (resolve) {
+        chrome.tabs.update(context.tabId, { url: url }, function () {
+          setTimeout(function () { resolve(q); }, 3000);
         });
       });
     }
 
-    if (action === 'extract') {
+    if (step.type === 'extract') {
       if (typeof X1DataExtractor !== 'undefined') {
         return X1DataExtractor.extractFromPage(context.tabId, resolvedParams.schema);
       }
       return Promise.resolve(null);
     }
 
-    if (action === 'ai') {
-      if (typeof aiComplete === 'function') {
-        // Fixed 2026-07-04: aiComplete's real signature is (userMsg, opts) —
-        // opts is an options object (only .forceJudge is ever read), not a
-        // 3rd positional {maxTokens,temperature} arg, and there's no separate
-        // system-prompt slot. This used to send `system` as the actual
-        // message and silently drop the real `prompt` text entirely. Fixed
-        // to match the convention used everywhere else in the codebase:
-        // persona baked into the single message string.
-        var system = resolvedParams.system || 'You are a helpful assistant.';
-        var prompt = resolvedParams.prompt || '';
-        return aiComplete(system + '\n\n' + prompt);
-      }
-      return Promise.reject(new Error('AI_NOT_AVAILABLE'));
+    if (step.type === 'ai') {
+      // Antes: aiComplete(system + '\n\n' + prompt) — divergia con la
+      // firma de plugin (persona+prompt). Ahora unifiedAiCall acepta
+      // tanto `persona` como `system` indistintamente — un solo camino.
+      var system = resolvedParams.system || 'You are a helpful assistant.';
+      var prompt = resolvedParams.prompt || '';
+      return X1CapabilityShared.unifiedAiCall(prompt, { system: system });
     }
 
-    if (action === 'speak') {
+    if (step.type === 'speak') {
       return Promise.resolve(resolvedParams.text || '');
     }
 
-    if (action === 'wait') {
-      return new Promise(function(resolve) {
+    if (step.type === 'wait') {
+      return new Promise(function (resolve) {
         setTimeout(resolve, resolvedParams.ms || 1000);
       });
     }
 
-    if (action === 'click') {
-      return new Promise(function(resolve, reject) {
+    if (step.type === 'click') {
+      return new Promise(function (resolve, reject) {
         chrome.scripting.executeScript({
           target: { tabId: context.tabId },
-          func: function(selector) {
+          func: function (selector) {
             var el = document.querySelector(selector);
             if (el) { el.click(); return true; }
             return false;
           },
           args: [resolvedParams.selector || '']
-        }, function(r) {
+        }, function (r) {
           if (chrome.runtime.lastError) { reject(new Error(chrome.runtime.lastError.message)); return; }
           resolve(r && r[0] && r[0].result);
         });
       });
     }
 
-    if (action === 'type') {
-      return new Promise(function(resolve, reject) {
+    if (step.type === 'type') {
+      return new Promise(function (resolve, reject) {
         chrome.scripting.executeScript({
           target: { tabId: context.tabId },
-          func: function(selector, text) {
+          func: function (selector, text) {
             var el = document.querySelector(selector);
             if (el) { el.value = text; el.dispatchEvent(new Event('input', { bubbles: true })); return true; }
             return false;
           },
           args: [resolvedParams.selector || '', resolvedParams.text || '']
-        }, function(r) {
+        }, function (r) {
           if (chrome.runtime.lastError) { reject(new Error(chrome.runtime.lastError.message)); return; }
           resolve(r && r[0] && r[0].result);
         });
       });
     }
 
-    if (action === 'exec' && typeof execAction === 'function') {
+    if (step.type === 'exec' && typeof execAction === 'function') {
       return execAction(resolvedParams, context.tabId);
     }
 
     return Promise.resolve(null);
-  }
-
-  function resolveParams(step, contextParams) {
-    var resolved = {};
-    if (!step) return resolved;
-    Object.keys(step).forEach(function(key) {
-      if (key === 'action' || key === 'saveAs' || key === 'optional' || key === 'description' || key === 'app') return;
-      var val = step[key];
-      if (typeof val === 'string' && val.indexOf('{{') !== -1) {
-        val = val.replace(/\{\{(\w+)\}\}/g, function(m, name) {
-          return contextParams[name] !== undefined ? contextParams[name] : m;
-        });
-      }
-      resolved[key] = val;
-    });
-    return resolved;
   }
 
   function findSkillByTrigger(text) {
@@ -218,7 +207,7 @@ var X1SkillEngine = (function() {
 
   function getStats() {
     var stats = { total: 0, totalRuns: 0, categories: {} };
-    Object.keys(skills).forEach(function(name) {
+    Object.keys(skills).forEach(function (name) {
       stats.total++;
       stats.totalRuns += skills[name].runCount || 0;
       var cat = skills[name].category || 'general';

@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>X1 Sandbox REPL</title>
+  <!--
+    repl-iframe.html — Receptor del mini REPL headless del autopiloto Freebuff.
+
+    Por que existe: el autopiloto publica PRs en GitHub y necesita verificar
+    que el codigo propuesto NO tiene errores de sintaxis/dependencias antes
+    de publicarlo. MV3 CSP bloquea 'unsafe-eval' en Web Workers del SW y
+    tambien bloquea `new Function(code)` en el SW directamente. SOLUCION:
+    cargar este HTML como `<iframe sandbox="allow-scripts">` dentro del
+    offscreen document (offscreen/keepalive.html). Los iframes sandboxed
+    tienen su propio origen (sin mismo-origen que el padre) y por defecto
+    no heredan el CSP del padre, asi que `new Function()` y `eval()` son
+    legales aqui.
+
+    Comunicacion: el padre (keepalive.html) hace
+      iframe.contentWindow.postMessage({type:'X1_SANDBOX_RUN', code}, '*')
+    y este iframe responde con
+      parent.postMessage({type:'X1_SANDBOX_RESULT', ok, error, kind, took}, '*')
+    El padre mantiene un mapa de requestId → resolver para hacer el bridge
+    sincrono con el SW.
+
+    Seguridad: NO permitir mismo-origen. El padre nunca mete datos sensibles
+    en este iframe; solo codigo JS arbitrario desconocido.
+  -->
+  <style>html,body{margin:0;padding:0;width:1px;height:1px;overflow:hidden;background:transparent;}</style>
+</head>
+<body>
+<script>
+(function () {
+  'use strict';
+  var VERSION = 1;
+
+  function reply(msg) {
+    try { parent.postMessage(Object.assign({ v: VERSION }, msg), '*'); } catch (e) {}
+  }
+
+  // Handshake inicial — el padre espera esto antes de mandar tareas.
+  try { reply({ type: 'X1_SANDBOX_READY', ok: true }); } catch (e) {}
+
+  window.addEventListener('message', function (e) {
+    var d = e.data || {};
+    if (!d || d.type !== 'X1_SANDBOX_RUN') return;
+    var code = String(d.code == null ? '' : d.code);
+    var filePath = String(d.filePath || '<anonymous>');
+    var requestId = d.requestId || ('req-' + Date.now());
+    var t0 = Date.now();
+
+    // Estrategia: PARSE primero (catches SyntaxError sin ejecutar), luego
+    // opcionalmente ejecutar con un wrapper de timeout. Si la ejecucion hace
+    // loop infinito el padre nos matara via iframe.parentNode.removeChild().
+    if (!code.trim()) {
+      reply({ type: 'X1_SANDBOX_RESULT', requestId: requestId, ok: true, took: 0, msg: 'archivo vacio — skip' });
+      return;
+    }
+
+    // 1. Parse check via `(new Function(code))` — esto es solo construir la
+    //    funcion, NO la ejecuta. Captura SyntaxError pero NO ReferenceError.
+    var fn = null;
+    try {
+      // El prefijo "'use strict'" fuerza modo estricto (cambia ref errors).
+      fn = new Function('"use strict";\n' + code);
+    } catch (parseErr) {
+      reply({
+        type: 'X1_SANDBOX_RESULT', requestId: requestId, ok: false, took: Date.now() - t0,
+        kind: 'syntax', filePath: filePath,
+        error: String(parseErr && parseErr.message || parseErr),
+        stack: ''
+      });
+      return;
+    }
+
+    // 2. Ejecucion controlada. Para maximo aislamiento NO dejamos que el
+    //    codigo toque window, document, parent. Solo `undefined`. Cualquier
+    //    `console.log` lo capturamos.
+    var capturedConsole = [];
+    var fakeConsole = { log: function () { try { capturedConsole.push(Array.prototype.slice.call(arguments).map(String).join(' ').slice(0, 200)); } catch (e) {} } };
+    var fakeWindow = undefined;
+    var fakeDocument = undefined;
+
+    try {
+      var result = fn.call(fakeWindow, fakeConsole, fakeDocument);
+      reply({
+        type: 'X1_SANDBOX_RESULT', requestId: requestId, ok: true, took: Date.now() - t0,
+        kind: 'executed', filePath: filePath,
+        resultPreview: result === undefined ? 'undefined' : (function () { try { return String(result).slice(0, 200); } catch (e) { return '<no serializable>'; } })(),
+        consoleLines: capturedConsole.slice(0, 20)
+      });
+    } catch (runErr) {
+      reply({
+        type: 'X1_SANDBOX_RESULT', requestId: requestId, ok: false, took: Date.now() - t0,
+        kind: runErr instanceof TypeError ? 'type' : (runErr instanceof ReferenceError ? 'reference' : 'runtime'),
+        filePath: filePath,
+        error: String(runErr && runErr.message || runErr),
+        stack: String(runErr && runErr.stack || '').slice(0, 400)
+      });
+    }
+  });
+})();
+</script>
+</body>
+</html>

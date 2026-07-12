@@ -1,122 +1,27 @@
-var X1PluginEngine = (function() {
+var X1PluginEngine = (function () {
+  'use strict';
+
+  // ── Guard: la capa compartida debe cargar ANTES. ─────────────────────
+  // Si no, fallar con error explicito ayuda a detectar errores de
+  // orden en importScripts de service-worker.js (futuro hardening).
+  if (typeof X1CapabilityShared === 'undefined') {
+    throw new Error(
+      '[X1PluginEngine] X1CapabilityShared no definido. ' +
+      'Carga orchestrator/capability-shared.js ANTES de plugins/engine.js en importScripts.'
+    );
+  }
+
   var plugins = [];
   var STORAGE_KEY = 'x1_plugins';
 
-  function safeCalc(expr) {
-    var tokens = String(expr).replace(/[^0-9+\-*/.(),a-z ]/gi, '').trim();
-    var nums = [];
-    var ops = [];
-
-    function applyOp() {
-      var b = nums.pop();
-      var a = nums.pop();
-      var op = ops.pop();
-      if (op === '+') nums.push(a + b);
-      else if (op === '-') nums.push(a - b);
-      else if (op === '*') nums.push(a * b);
-      else if (op === '/') nums.push(b !== 0 ? a / b : 0);
-    }
-
-    function precedence(op) {
-      if (op === '+' || op === '-') return 1;
-      if (op === '*' || op === '/') return 2;
-      return 0;
-    }
-
-    function parseNumbers(str) {
-      var result = [];
-      var parts = str.split(',');
-      for (var i = 0; i < parts.length; i++) {
-        var n = parseFloat(parts[i].trim());
-        if (!isNaN(n)) result.push(n);
-      }
-      return result;
-    }
-
-    var avgMatch = tokens.match(/^avg\((.+)\)$/i);
-    if (avgMatch) {
-      var avgNums = parseNumbers(avgMatch[1]);
-      if (avgNums.length === 0) return 0;
-      var avgSum = 0;
-      for (var ai = 0; ai < avgNums.length; ai++) avgSum += avgNums[ai];
-      return avgSum / avgNums.length;
-    }
-
-    var sumMatch = tokens.match(/^sum\((.+)\)$/i);
-    if (sumMatch) {
-      var sumNums = parseNumbers(sumMatch[1]);
-      var sumTotal = 0;
-      for (var si = 0; si < sumNums.length; si++) sumTotal += sumNums[si];
-      return sumTotal;
-    }
-
-    var minMatch = tokens.match(/^min\((.+)\)$/i);
-    if (minMatch) {
-      var minNums = parseNumbers(minMatch[1]);
-      if (minNums.length === 0) return 0;
-      var minVal = minNums[0];
-      for (var mi = 1; mi < minNums.length; mi++) {
-        if (minNums[mi] < minVal) minVal = minNums[mi];
-      }
-      return minVal;
-    }
-
-    var maxMatch = tokens.match(/^max\((.+)\)$/i);
-    if (maxMatch) {
-      var maxNums = parseNumbers(maxMatch[1]);
-      if (maxNums.length === 0) return 0;
-      var maxVal = maxNums[0];
-      for (var xi = 1; xi < maxNums.length; xi++) {
-        if (maxNums[xi] > maxVal) maxVal = maxNums[xi];
-      }
-      return maxVal;
-    }
-
-    var i = 0;
-    while (i < tokens.length) {
-      var ch = tokens[i];
-      if (ch === ' ') { i++; continue; }
-      if (ch === '(') { ops.push(ch); i++; continue; }
-      if (ch === ')') {
-        while (ops.length && ops[ops.length - 1] !== '(') applyOp();
-        ops.pop();
-        i++;
-        continue;
-      }
-      if (ch === '+' || ch === '-' || ch === '*' || ch === '/') {
-        if (ch === '-' && (i === 0 || tokens[i - 1] === '(' || tokens[i - 1] === '+' || tokens[i - 1] === '-' || tokens[i - 1] === '*' || tokens[i - 1] === '/')) {
-          var neg = '-';
-          i++;
-          while (i < tokens.length && (tokens[i] >= '0' && tokens[i] <= '9' || tokens[i] === '.')) {
-            neg += tokens[i];
-            i++;
-          }
-          nums.push(parseFloat(neg));
-          continue;
-        }
-        while (ops.length && ops[ops.length - 1] !== '(' && precedence(ops[ops.length - 1]) >= precedence(ch)) applyOp();
-        ops.push(ch);
-        i++;
-        continue;
-      }
-      if ((ch >= '0' && ch <= '9') || ch === '.') {
-        var numStr = '';
-        while (i < tokens.length && ((tokens[i] >= '0' && tokens[i] <= '9') || tokens[i] === '.')) {
-          numStr += tokens[i];
-          i++;
-        }
-        nums.push(parseFloat(numStr));
-        continue;
-      }
-      i++;
-    }
-    while (ops.length) applyOp();
-    return nums.length ? nums[0] : 0;
-  }
+  // safeCalc ahora viene de la capa compartida. El parser Shunting Yard
+  // vio duplicado accidentalmente entre plugins/engine.js y skills/engine.js
+  // — al consolidarse aqui elimina ~100 lineas de drift potencial.
+  var safeCalc = X1CapabilityShared.safeCalc;
 
   function loadPlugins() {
-    return new Promise(function(resolve) {
-      chrome.storage.local.get(STORAGE_KEY, function(data) {
+    return new Promise(function (resolve) {
+      chrome.storage.local.get(STORAGE_KEY, function (data) {
         plugins = data[STORAGE_KEY] || [];
         resolve(plugins);
       });
@@ -124,10 +29,10 @@ var X1PluginEngine = (function() {
   }
 
   function savePlugins() {
-    return new Promise(function(resolve) {
+    return new Promise(function (resolve) {
       var obj = {};
       obj[STORAGE_KEY] = plugins;
-      chrome.storage.local.set(obj, function() {
+      chrome.storage.local.set(obj, function () {
         resolve();
       });
     });
@@ -137,9 +42,19 @@ var X1PluginEngine = (function() {
     if (!manifest || !manifest.id || !manifest.name || !manifest.version) return false;
     if (!manifest.trigger || !Array.isArray(manifest.trigger) || manifest.trigger.length === 0) return false;
     if (!manifest.steps || !Array.isArray(manifest.steps) || manifest.steps.length === 0) return false;
-    var validTypes = ['search', 'synthesize', 'navigate', 'extract', 'write', 'notify', 'calculate', 'webhook'];
+    // Contract: validate == dispatch. Si añades un type al array, debes
+    // añadir el case en runStep() abajo o el manifest validará pero no-op.
+    // Plugin engine solo dispatcha: search/synthesize/navigate/extract/write/
+    // notify/calculate/wait/click/type (los 8 originales + 3 migrados del
+    // skill engine via normalizeStep). 'speak/ai/exec/webhook' son del
+    // skill engine y NO se aceptan como plugin manifest para evitar
+    // validates-but- silently-no-op (reviewer warn 2026-07-13).
+    var validTypes = ['search','synthesize','navigate','extract','write','notify','calculate','webhook','wait','click','type'];
     for (var i = 0; i < manifest.steps.length; i++) {
-      if (validTypes.indexOf(manifest.steps[i].type) === -1) return false;
+      // Normalizar: un manifest plugin siempre usa `type`, pero aceptamos
+      // tmb `action` (skill style) para futura migracion cross-engine.
+      var step = X1CapabilityShared.normalizeStep(manifest.steps[i]);
+      if (validTypes.indexOf(step.type) === -1) return false;
     }
     return true;
   }
@@ -184,15 +99,9 @@ var X1PluginEngine = (function() {
     return null;
   }
 
-  function stripHtml(html) {
-    return String(html)
-      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
-      .replace(/<[^>]+>/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim()
-      .substring(0, 8000);
-  }
+  // stripHtml() eliminado en la consolidacion 2026-07-13: el step 'extract'
+  // ahora usa chrome.scripting.executeScript(doc.body.innerText) directo —
+  // stripHtml era un fallback para HTML crudo que ya no entra en el pipeline.
 
   function executePlugin(pluginId, userMsg, context) {
     var plugin = null;
@@ -207,7 +116,9 @@ var X1PluginEngine = (function() {
       if (stepIndex >= plugin.steps.length) {
         return Promise.resolve(results);
       }
-      var step = plugin.steps[stepIndex];
+      // Normalizar step (acepta `type` o `action`) — habilita plugins
+      // y skills con la misma definicion legible.
+      var step = X1CapabilityShared.normalizeStep(plugin.steps[stepIndex]);
 
       if (step.type === 'search') {
         var searchQuery = step.query || userMsg;
@@ -220,14 +131,14 @@ var X1PluginEngine = (function() {
               max_results: step.maxResults || 5,
               api_key: aiKeys.tavilyKey
             })
-          }).then(function(resp) {
+          }).then(function (resp) {
             return resp.json();
-          }).then(function(data) {
+          }).then(function (data) {
             var searchResults = data.results || [];
             results.stepResults.push({ type: 'search', data: searchResults });
             results.searchResults = searchResults;
             return runStep(stepIndex + 1);
-          }).catch(function() {
+          }).catch(function () {
             results.stepResults.push({ type: 'search', data: [], error: 'Search failed' });
             return runStep(stepIndex + 1);
           });
@@ -251,28 +162,21 @@ var X1PluginEngine = (function() {
           }
         }
         var fullPrompt = synthesizePrompt + '\n\nData:\n' + dataToSynthesize + '\n\nUser request: ' + userMsg;
-        // Fixed 2026-07-04: this used to hardcode groqComplete||geminiComplete —
-        // groqComplete no longer exists (removed in the provider consolidation),
-        // so every plugin synthesis silently fell through to a single bare
-        // geminiComplete() call with no persona, no cache, no NVIDIA cascade, no
-        // Panel+Judge. Routing through aiComplete() (the real entry point used at
-        // 20+ other call sites in service-worker.js) gives every plugin the full
-        // brain instead of a dead-end single model call.
-        var aiFunc = (typeof aiComplete === 'function') ? function(prompt, persona) { return aiComplete(persona ? persona + '\n\n' + prompt : prompt); } : null;
-        if (aiFunc) {
-          // plugin.persona lets a manifest carry its own identity (e.g. a specialist
-          // persona plugin) instead of the generic research-analyst framing below.
-          return aiFunc(fullPrompt, plugin.persona || 'You are a research analyst. Provide clear, actionable analysis.').then(function(response) {
-            results.stepResults.push({ type: 'synthesize', data: response });
-            results.synthesis = response;
-            return runStep(stepIndex + 1);
-          }).catch(function() {
-            results.stepResults.push({ type: 'synthesize', data: '', error: 'Synthesis failed' });
-            return runStep(stepIndex + 1);
-          });
-        }
-        results.stepResults.push({ type: 'synthesize', data: '', error: 'No AI function available' });
-        return runStep(stepIndex + 1);
+        // Fixed 2026-07-04: antes hardcodeaba groqComplete||geminiComplete —
+        // groqComplete ya no existe. Antes de 2026-07-13 usaba un wrapper
+        // local (persona+prompt). Ahora todas las AI calls de cualquier
+        // engine pasan por X1CapabilityShared.unifiedAiCall — UNA sola
+        // firma, UNA sola intención (persona prefix + prompt).
+        return X1CapabilityShared.unifiedAiCall(fullPrompt, {
+          persona: plugin.persona || 'You are a research analyst. Provide clear, actionable analysis.'
+        }).then(function (response) {
+          results.stepResults.push({ type: 'synthesize', data: response });
+          results.synthesis = response;
+          return runStep(stepIndex + 1);
+        }).catch(function () {
+          results.stepResults.push({ type: 'synthesize', data: '', error: 'Synthesis failed' });
+          return runStep(stepIndex + 1);
+        });
       }
 
       if (step.type === 'navigate') {
@@ -289,28 +193,32 @@ var X1PluginEngine = (function() {
         var extractPrompt = step.prompt || 'Extract the key information from this page content.';
         var pageContent = '';
         if (context && context.tabId) {
-          return new Promise(function(resolve) {
+          return new Promise(function (resolve) {
             chrome.scripting.executeScript({
               target: { tabId: context.tabId },
-              func: function() {
+              func: function () {
                 return document.body ? document.body.innerText.substring(0, 8000) : '';
               }
-            }, function(injectionResults) {
+            }, function (injectionResults) {
               if (injectionResults && injectionResults[0]) {
                 pageContent = injectionResults[0].result || '';
               }
-              var aiFunc2 = (typeof aiComplete === 'function') ? function(prompt, persona) { return aiComplete(persona ? persona + '\n\n' + prompt : prompt); } : null;
-              if (aiFunc2 && pageContent) {
-                aiFunc2(extractPrompt + '\n\nPage content:\n' + pageContent, plugin.persona || 'You are a data extraction assistant. Extract structured data as requested.').then(function(extracted) {
-                  results.stepResults.push({ type: 'extract', data: extracted });
-                  results.extracted = extracted;
-                  resolve(runStep(stepIndex + 1));
-                }).catch(function() {
-                  results.stepResults.push({ type: 'extract', data: '', error: 'Extraction AI failed' });
-                  resolve(runStep(stepIndex + 1));
-                });
-              } else {
-                results.stepResults.push({ type: 'extract', data: pageContent, error: pageContent ? null : 'No page content' });
+              // unifiedAiCall con fallback persona — antes este bloque
+              // duplicaba la firma aiComplete y era facil divergir.
+              X1CapabilityShared.unifiedAiCall(
+                extractPrompt + '\n\nPage content:\n' + pageContent,
+                { persona: plugin.persona || 'You are a data extraction assistant. Extract structured data as requested.' }
+              ).then(function (extracted) {
+                results.stepResults.push({ type: 'extract', data: extracted });
+                results.extracted = extracted;
+                resolve(runStep(stepIndex + 1));
+              }).catch(function () {
+                results.stepResults.push({ type: 'extract', data: '', error: 'Extraction AI failed' });
+                resolve(runStep(stepIndex + 1));
+              });
+              // Si pageContent vacio, no llamamos AI — fallback abajo.
+              if (!pageContent) {
+                results.stepResults.push({ type: 'extract', data: '', error: 'No page content' });
                 resolve(runStep(stepIndex + 1));
               }
             });
@@ -321,13 +229,11 @@ var X1PluginEngine = (function() {
       }
 
       if (step.type === 'write') {
-        var writeContent = step.content || results.synthesis || '';
-        if (step.contentTemplate) {
-          writeContent = step.contentTemplate;
-          writeContent = writeContent.replace(/\{synthesis\}/g, results.synthesis || '');
-          writeContent = writeContent.replace(/\{userMsg\}/g, userMsg);
-          writeContent = writeContent.replace(/\{extracted\}/g, results.extracted || '');
-        }
+        // Templating usa X1CapabilityShared.resolveParams — antes era
+        // string.replace manual propenso a typos. Ahora {synthesis},
+        // {userMsg}, {extracted} + {{ctx.foo}} funcionan igual.
+        var resolvedWrite = X1CapabilityShared.resolveParams(step, Object.assign({}, results, { userMsg: userMsg }));
+        var writeContent = resolvedWrite.content || resolvedWrite.contentTemplate || results.synthesis || '';
         results.stepResults.push({ type: 'write', data: { action: 'newDoc', content: writeContent } });
         results.writeAction = { action: 'newDoc', content: writeContent };
         return runStep(stepIndex + 1);
@@ -345,27 +251,27 @@ var X1PluginEngine = (function() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(webhookBody),
           signal: AbortSignal.timeout(15000)
-        }).then(function(resp) {
+        }).then(function (resp) {
           results.stepResults.push({ type: 'webhook', data: { ok: resp.ok, status: resp.status } });
           return runStep(stepIndex + 1);
-        }).catch(function(e) {
+        }).catch(function (e) {
           results.stepResults.push({ type: 'webhook', data: null, error: e.message });
           return runStep(stepIndex + 1);
         });
       }
 
       if (step.type === 'notify') {
-        var notifyText = step.text || results.synthesis || 'Task complete.';
-        notifyText = notifyText.replace(/\{synthesis\}/g, results.synthesis || '');
-        notifyText = notifyText.replace(/\{userMsg\}/g, userMsg);
+        var resolvedNotify = X1CapabilityShared.resolveParams(step, Object.assign({}, results, { userMsg: userMsg }));
+        var notifyText = resolvedNotify.text || results.synthesis || 'Task complete.';
         results.stepResults.push({ type: 'notify', data: { action: 'speak', text: notifyText } });
         results.notifyAction = { action: 'speak', text: notifyText };
         return runStep(stepIndex + 1);
       }
 
       if (step.type === 'calculate') {
+        // Templating de {var} con busqueda contra extract results.
         var expression = step.expression || '';
-        expression = expression.replace(/\{([^}]+)\}/g, function(match, key) {
+        expression = expression.replace(/\{([^}]+)\}/g, function (match, key) {
           for (var ci = 0; ci < results.stepResults.length; ci++) {
             if (results.stepResults[ci].type === 'extract' && results.stepResults[ci].data) {
               var numMatch = String(results.stepResults[ci].data).match(new RegExp(key + '[:\\s]*([\\d.,]+)'));
@@ -374,10 +280,51 @@ var X1PluginEngine = (function() {
           }
           return '0';
         });
-        var calcResult = safeCalc(expression);
+        var calcResult = X1CapabilityShared.safeCalc(expression);
         results.stepResults.push({ type: 'calculate', data: calcResult });
         results.calculation = calcResult;
         return runStep(stepIndex + 1);
+      }
+
+      // New types accepted from skill engine via normalizeStep:
+      if (step.type === 'wait') {
+        return new Promise(function (resolve) {
+          setTimeout(function () { resolve(runStep(stepIndex + 1)); }, step.ms || 1000);
+        });
+      }
+      if (step.type === 'click' && context && context.tabId) {
+        return new Promise(function (resolve, reject) {
+          chrome.scripting.executeScript({
+            target: { tabId: context.tabId },
+            func: function (selector) {
+              var el = document.querySelector(selector);
+              if (el) { el.click(); return true; }
+              return false;
+            },
+            args: [step.selector || '']
+          }, function (r) {
+            if (chrome.runtime.lastError) { reject(new Error(chrome.runtime.lastError.message)); return; }
+            results.stepResults.push({ type: 'click', data: r && r[0] && r[0].result });
+            resolve(runStep(stepIndex + 1));
+          });
+        });
+      }
+      if (step.type === 'type' && context && context.tabId) {
+        return new Promise(function (resolve, reject) {
+          chrome.scripting.executeScript({
+            target: { tabId: context.tabId },
+            func: function (selector, text) {
+              var el = document.querySelector(selector);
+              if (el) { el.value = text; el.dispatchEvent(new Event('input', { bubbles: true })); return true; }
+              return false;
+            },
+            args: [step.selector || '', step.text || '']
+          }, function (r) {
+            if (chrome.runtime.lastError) { reject(new Error(chrome.runtime.lastError.message)); return; }
+            results.stepResults.push({ type: 'type', data: r && r[0] && r[0].result });
+            resolve(runStep(stepIndex + 1));
+          });
+        });
       }
 
       results.stepResults.push({ type: step.type, data: null, error: 'Unknown step type' });
